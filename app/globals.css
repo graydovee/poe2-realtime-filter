@@ -142,3 +142,42 @@ dt { color: var(--muted); } dd { margin: 0; color: #bed0dc; overflow-wrap: anywh
 footer { display: flex; justify-content: space-between; border-top: 1px solid rgba(128,157,184,.14); padding-top: 20px; color: #5f7182; font: 10px "DM Mono", monospace; }
 @media (max-width: 1000px) { .shell { padding: 0 22px 24px; } .workspace, .preview-layout { grid-template-columns: 1fr; } .strictness-grid { grid-template-columns: repeat(4, 1fr); } .side-column { display: grid; grid-template-columns: 1fr 1fr; align-items: start; } .generate-button, .error-message { grid-column: 1 / -1; } }
 @media (max-width: 680px) { .topbar-meta, .source-pill { display: none; } .hero { display: block; padding: 40px 0 28px; } .safety-card { margin-top: 24px; } .strictness-grid { grid-template-columns: repeat(2, 1fr); } .inline-fields, .price-layout, .range-grid, .side-column { grid-template-columns: 1fr; } .preview-toolbar, footer { align-items: start; flex-direction: column; } .preview-actions { width: 100%; } .preview-actions button { flex: 1; } }
+
+.catalog-toolbar { display: grid; grid-template-columns: 1fr 180px; gap: 8px; margin-bottom: 12px; }
+.catalog-toolbar input { margin-top: 0; }
+.catalog-list { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: rgba(7,12,17,.35); }
+.catalog-row { min-height: 42px; display: flex; align-items: center; gap: 9px; padding: 7px 11px; border-bottom: 1px solid rgba(38,51,66,.55); cursor: pointer; }
+.catalog-row:last-child { border-bottom: 0; }
+.catalog-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.catalog-row b { color: var(--text); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-row small { color: var(--muted); font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catalog-row em { color: var(--muted); font-size: 9px; font-style: normal; white-space: nowrap; }
+.catalog-count { color: var(--muted); font: 10px "DM Mono", monospace; margin-top: 9px; }
+.preset-list { display: flex; flex-direction: column; gap: 9px; }
+.preset-editor { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(7,12,17,.35); }
+.preset-editor.enabled { border-color: rgba(116,240,220,.45); background: rgba(59,134,146,.08); }
+.preset-top { display: flex; align-items: center; gap: 8px; }
+.preset-enable { display: flex; align-items: center; gap: 8px; min-width: 150px; color: var(--text); cursor: pointer; }
+.preset-enable span { font-weight: 700; font-size: 11px; }
+.preset-name { flex: 1; margin-top: 0; padding: 7px 9px; }
+.remove-button, .secondary-button { border: 1px solid var(--border); background: var(--surface-3); border-radius: 8px; color: #b9c7d2; padding: 8px 10px; font-size: 10px; }
+.remove-button { color: #ffabab; }
+.secondary-button { margin-top: 12px; width: 100%; }
+.preset-grid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px; margin-top: 9px; }
+.preset-grid label { display: grid; grid-template-columns: 1fr 90px; gap: 5px; align-items: center; }
+.preset-grid label:first-child { display: block; }
+.preset-grid select, .preset-grid input { margin-top: 5px; padding: 7px 8px; font-size: 10px; }
+.preset-grid label:first-child select { width: 100%; }
+.preset-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.sound-file { display: flex; align-items: center; gap: 8px; color: #b9c7d2; }
+.sound-file input { width: 160px; font-size: 9px; }
+.sound-file small { color: var(--muted); font-size: 9px; }
+.preset-note { color: var(--cyan); font: 10px "DM Mono", monospace; white-space: nowrap; }
+.compact-price { margin-top: 18px; }
+.safety-result.failed { border-color: rgba(255,158,158,.3); background: rgba(110,45,45,.13); }
+@media (max-width: 680px) {
+  .catalog-toolbar, .preset-grid { grid-template-columns: 1fr; }
+  .preset-grid label { display: grid; grid-template-columns: 1fr 100px; }
+  .preset-bottom { align-items: start; flex-direction: column; }
+  .preset-name { min-width: 0; }
+}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DEFAULT_VISUAL_PRESETS } from "../../../lib/data";
 import { generateFilter } from "../../../lib/filter-engine";
 import { loadMarketSnapshot } from "../../../lib/market";
 import type { FilterProfile } from "../../../lib/types";
@@ -15,6 +16,7 @@ const defaultProfile: FilterProfile = {
   hideBelowAmount: 0.5,
   hideBelowCurrency: "divine",
   whitelist: [],
+  visualPresets: DEFAULT_VISUAL_PRESETS,
   sound: { pack: "neversink", alertLevel: "economy" },
   visuals: {
     showBeams: true,
@@ -29,7 +31,7 @@ const defaultProfile: FilterProfile = {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Partial<FilterProfile>;
-    const profile = { ...defaultProfile, ...body } as FilterProfile;
+    const profile = { ...defaultProfile, ...body, visualPresets: body.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
     const snapshot = await loadMarketSnapshot();
     const bundle = generateFilter(profile, snapshot);
     return NextResponse.json({ ...bundle, market: snapshot });

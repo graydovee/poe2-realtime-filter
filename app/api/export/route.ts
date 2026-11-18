@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { DEFAULT_VISUAL_PRESETS } from "../../../lib/data";
 import { generateFilter } from "../../../lib/filter-engine";
 import { loadMarketSnapshot } from "../../../lib/market";
 import type { FilterProfile } from "../../../lib/types";
@@ -35,28 +36,41 @@ function zip(entries: Array<{ name: string; data: Uint8Array }>): Uint8Array {
   return concat(...local, ...central, concat(u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length), u32(centralBytes), u32(localBytes), u16(0)));
 }
 
+function safeName(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
-    const profile = JSON.parse(String(form.get("profile"))) as FilterProfile;
-    const customSound = form.get("sound");
+    const rawProfile = JSON.parse(String(form.get("profile"))) as Partial<FilterProfile>;
+    const profile = { ...rawProfile, visualPresets: rawProfile.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
     const snapshot = await loadMarketSnapshot();
     const bundle = generateFilter(profile, snapshot);
     const entries: Array<{ name: string; data: Uint8Array }> = [
       { name: bundle.fileName, data: new TextEncoder().encode(bundle.filterFile) },
-      { name: "poe2-filter-manifest.json", data: new TextEncoder().encode(JSON.stringify({ generatedAt: new Date().toISOString(), baseline: bundle.baselineFile, market: snapshot, safety: bundle.safetyReport }, null, 2)) },
+      { name: "poe2-filter-manifest.json", data: new TextEncoder().encode(JSON.stringify({ generatedAt: new Date().toISOString(), baseline: bundle.baselineFile, market: snapshot, appliedPresets: bundle.appliedPresets, safety: bundle.safetyReport }, null, 2)) },
     ];
-    if (customSound instanceof File && customSound.size > 0) {
-      const name = customSound.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      entries.push({ name, data: new Uint8Array(await customSound.arrayBuffer()) });
-    } else {
-      for (const soundName of ["1maybevaluable.mp3", "2currency.mp3", "6veryvaluable.mp3"]) {
-        const soundPath = path.join(process.cwd(), "vendor", "neversink", "(STYLE) CUSTOMSOUNDS", soundName);
-        try { entries.push({ name: soundName, data: new Uint8Array(await fs.readFile(soundPath)) }); } catch { /* optional vendor asset */ }
+    const added = new Set(entries.map((entry) => entry.name));
+    for (const [key, value] of form.entries()) {
+      if (!key.startsWith("sound:") || !(value instanceof File) || value.size === 0) continue;
+      const name = safeName(value.name);
+      if (added.has(name)) continue;
+      entries.push({ name, data: new Uint8Array(await value.arrayBuffer()) });
+      added.add(name);
+    }
+    for (const soundName of bundle.soundFiles) {
+      if (added.has(soundName) || soundName.includes("/") || soundName.includes("\\\\")) continue;
+      const soundPath = path.join(process.cwd(), "vendor", "neversink", "(STYLE) CUSTOMSOUNDS", soundName);
+      try {
+        entries.push({ name: soundName, data: new Uint8Array(await fs.readFile(soundPath)) });
+        added.add(soundName);
+      } catch {
+        // A custom sound is uploaded separately; missing optional vendor sounds remain listed in the manifest.
       }
     }
     const archive = zip(entries);
-    return new NextResponse(archive as unknown as BodyInit, { headers: { "content-type": "application/zip", "content-disposition": `attachment; filename="poe2-filter.zip"`, "content-length": String(archive.length) } });
+    return new NextResponse(archive as unknown as BodyInit, { headers: { "content-type": "application/zip", "content-disposition": 'attachment; filename="poe2-filter.zip"', "content-length": String(archive.length) } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "无法导出 ZIP" }, { status: 400 });
   }

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
-import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness } from "./types";
+import { DEFAULT_VISUAL_PRESETS, FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
+import { toDivines } from "./market";
+import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness, VisualPreset } from "./types";
 
 const BASELINE_NAMES: Record<Strictness, string> = {
   0: "0-SOFT",
@@ -23,143 +24,172 @@ const STYLE_DIRS: Record<string, string> = {
   zen: "(STYLE) ZEN",
 };
 
-const valueInDivines = (amount: number, currency: string): number => {
-  if (currency === "divine") return amount;
-  if (currency === "exalted") return amount * 0.02;
-  return amount * 0.001;
-};
-
 export function baselineFileFor(profile: FilterProfile): string {
   const suffix = BASELINE_NAMES[profile.strictness];
-  if (profile.style === "default") return `NeverSink's filter 2 - ${suffix}.filter`;
+  if (profile.style === "default") return "NeverSink's filter 2 - " + suffix + ".filter";
   const dir = STYLE_DIRS[profile.style] ?? STYLE_DIRS.customsounds;
   const styleName = profile.style === "customsounds" ? "customsounds" : profile.style;
-  return `${dir}/NeverSink's filter 2 - ${suffix} (${styleName}) .filter`;
+  return dir + "/NeverSink's filter 2 - " + suffix + " (" + styleName + ") .filter";
 }
 
 function readBaseline(profile: FilterProfile): { contents: string; file: string } {
   const file = baselineFileFor(profile);
   const fullPath = path.join(process.cwd(), "vendor", "neversink", file);
   if (fs.existsSync(fullPath)) return { contents: fs.readFileSync(fullPath, "utf8"), file };
-  const fallback = path.join(process.cwd(), "vendor", "neversink", `NeverSink's filter 2 - ${BASELINE_NAMES[profile.strictness]}.filter`);
+  const fallback = path.join(process.cwd(), "vendor", "neversink", "NeverSink's filter 2 - " + BASELINE_NAMES[profile.strictness] + ".filter");
   return { contents: fs.readFileSync(fallback, "utf8"), file: path.basename(fallback) };
 }
 
 function quote(value: string): string {
-  return `"${value.replace(/"/g, '\\"')}"`;
+  return '"' + value.replace(/"/g, '\\"') + '"';
 }
 
-function itemRule(item: ItemDefinition, profile: FilterProfile, level: "high" | "valuable" | "unknown"): string {
-  const base = item.baseType ?? item.name;
-  const color = level === "high" ? profile.visuals.highValueColor : level === "unknown" ? profile.visuals.unknownColor : profile.visuals.valuableColor;
-  const fontSize = level === "high" ? Math.max(profile.visuals.fontSize, 42) : profile.visuals.fontSize;
-  const sound = level === "high" ? "6veryvaluable.mp3" : level === "valuable" ? "2currency.mp3" : "1maybevaluable.mp3";
-  const icon = level === "high" ? "Red Star" : level === "valuable" ? "Yellow Circle" : "Pink Diamond";
+export function matcherLines(item: ItemDefinition): string[] {
+  const lines: string[] = [];
+  if (item.matcher.class) lines.push("\tClass == " + quote(item.matcher.class));
+  if (item.matcher.baseType) lines.push("\tBaseType == " + quote(item.matcher.baseType));
+  if (item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
+  return lines;
+}
+
+function presetRule(item: ItemDefinition, preset: VisualPreset): string {
   const actions = [
-    `\tSetFontSize ${fontSize}`,
-    `\tSetTextColor ${color}`,
-    `\tSetBorderColor ${color}`,
-    `\tSetBackgroundColor 20 20 28 245`,
-    profile.visuals.showMinimapIcons ? `\tMinimapIcon 0 ${icon}` : "",
-    profile.visuals.showBeams && level !== "unknown" ? `\tPlayEffect ${level === "high" ? "Red" : "Yellow"}` : "",
-    `\tPlayAlertSoundCustom ${quote(profile.sound.pack === "custom" && profile.sound.customFileName ? profile.sound.customFileName : sound)} ${level === "high" ? 300 : 150}`,
+    preset.fontSize ? "\tSetFontSize " + preset.fontSize : "",
+    preset.textColor ? "\tSetTextColor " + preset.textColor : "",
+    preset.borderColor ? "\tSetBorderColor " + preset.borderColor : "",
+    preset.backgroundColor ? "\tSetBackgroundColor " + preset.backgroundColor : "",
+    preset.minimapIcon ? "\tMinimapIcon " + preset.minimapIcon : "",
+    preset.effect ? "\tPlayEffect " + preset.effect : "",
+    preset.sound.fileName ? "\tPlayAlertSoundCustom " + quote(preset.sound.fileName) + " 300" : "",
   ].filter(Boolean).join("\n");
-  return `Show # poe2-filter override: ${item.name}\n\tBaseType == ${quote(base)}\n${actions}`;
+  return "Show # poe2-filter preset: " + preset.name + " / " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + actions;
+}
+
+function whitelistRule(item: ItemDefinition): string {
+  return "Show # poe2-filter whitelist: " + item.name + "\n" + matcherLines(item).join("\n") + "\n\tSetFontSize 42\n\tSetTextColor 255 255 255 255\n\tSetBorderColor 255 255 255 255\n\tMinimapIcon 0 White Star\n\tPlayEffect White\n\tPlayAlertSound 6 300";
 }
 
 function hideRule(item: ItemDefinition, profile: FilterProfile): string {
-  const base = item.baseType ?? item.name;
-  return `Hide # poe2-filter optional low-value rule: ${item.name}\n\tBaseType == ${quote(base)}\n\tItemLevel < ${Math.max(1, profile.itemLevelMin)}\n\tSetFontSize 18`;
+  return "Hide # poe2-filter optional low-value rule: " + item.name + "\n" + matcherLines(item).join("\n") + "\n\tItemLevel < " + Math.max(1, profile.itemLevelMin) + "\n\tSetFontSize 18";
 }
 
 function isWhitelisted(itemId: string, profile: FilterProfile): boolean {
   return profile.whitelist.some((entry) => entry.itemIds.includes(itemId));
 }
 
-function resolveSnapshot(snapshot?: MarketSnapshot): MarketSnapshot {
-  if (!snapshot || Date.parse(snapshot.expiresAt) < Date.now()) return FALLBACK_SNAPSHOT;
-  return snapshot;
+function resolvedPresets(profile: FilterProfile): VisualPreset[] {
+  return profile.visualPresets?.length ? profile.visualPresets : DEFAULT_VISUAL_PRESETS;
 }
 
-export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
-  const { contents: baseline, file: baselineFile } = readBaseline(profile);
-  const snapshot = resolveSnapshot(inputSnapshot);
-  const highValueFloor = profile.hideBelowEnabled ? valueInDivines(profile.hideBelowAmount, profile.hideBelowCurrency) : Number.POSITIVE_INFINITY;
-  const overrides: string[] = [];
-  const hidden: string[] = [];
-  const warnings: string[] = [];
-
-  for (const item of ITEM_CATALOG) {
-    const price = snapshot.prices[item.id];
-    const divines = price ? valueInDivines(price.amount, price.currency) : undefined;
-    const whitelisted = isWhitelisted(item.id, profile);
-    const unknown = !item.known;
-    if (unknown) {
-      overrides.push(itemRule(item, profile, "unknown"));
-      continue;
-    }
-    if (divines !== undefined && divines >= 5) {
-      overrides.push(itemRule(item, profile, "high"));
-      continue;
-    }
-    if (divines !== undefined && divines >= 0.1) {
-      overrides.push(itemRule(item, profile, "valuable"));
-      continue;
-    }
-    if (profile.hideBelowEnabled && divines !== undefined && divines < highValueFloor && !whitelisted) {
-      overrides.push(hideRule(item, profile));
-      hidden.push(item.name);
-    } else if (whitelisted) {
-      overrides.push(itemRule(item, profile, "valuable"));
-    }
-  }
-
-  if (snapshot.source.includes("fallback")) warnings.push("当前价格快照来自 NeverSink 回退数据，未新增基于市场的隐藏规则。");
-  if (profile.hideBelowEnabled) warnings.push(`已启用低于 ${profile.hideBelowAmount} ${profile.hideBelowCurrency} 的隐藏；白名单优先。`);
-  if (ITEM_CATALOG.some((item) => !item.known)) warnings.push("目录中存在未知物品，已使用警示样式显示，不会静默隐藏。");
-
-  const safetyReport = validateSafety(profile, baselineFile, baseline, hidden, warnings);
-  const header = [
-    "# poe2-filter generated overlay",
-    `# Base: ${baselineFile}`,
-    `# Strictness: ${profile.strictness} - ${STRICTNESS_LABELS[profile.strictness]}`,
-    `# Market: ${snapshot.source} @ ${snapshot.capturedAt}`,
-    "# Safety: unknown items are shown; whitelist wins over optional hide rules.",
-    "",
-  ].join("\n");
-  const filterFile = `${header}${overrides.join("\n\n")}\n\n${baseline}`;
-  const soundFiles = profile.sound.pack === "custom" && profile.sound.customFileName ? [profile.sound.customFileName] : ["1maybevaluable.mp3", "2currency.mp3", "6veryvaluable.mp3"];
-  return {
-    filterFile,
-    baselineFile,
-    fileName: `poe2-filter-${BASELINE_NAMES[profile.strictness].toLowerCase()}.filter`,
-    soundFiles,
-    safetyReport,
-  };
+function rangeMatches(divines: number, preset: VisualPreset, rates: MarketSnapshot["rates"]): boolean {
+  const min = preset.range.min ? toDivines(preset.range.min, rates) : 0;
+  const max = preset.range.max ? toDivines(preset.range.max, rates) : Number.POSITIVE_INFINITY;
+  if (min === undefined || max === undefined) return false;
+  return divines >= min && divines < max;
 }
 
-export function validateSafety(profile: FilterProfile, baselineFile: string, baseline: string, hidden: string[], warnings: string[]): SafetyReport {
+function snapshotUsable(snapshot: MarketSnapshot): boolean {
+  return snapshot.source !== FALLBACK_SNAPSHOT.source && Date.parse(snapshot.expiresAt) >= Date.now();
+}
+
+function validateSafety(
+  profile: FilterProfile,
+  baselineFile: string,
+  baseline: string,
+  hidden: Array<{ item: ItemDefinition; divines?: number }>,
+  warnings: string[],
+): SafetyReport {
   const baseTypes = new Set<string>();
   const classes = new Set<string>();
-  for (const line of baseline.matchAll(/^\s*(?:BaseType|Class) == (.+)$/gm)) {
-    for (const value of line[1].matchAll(/"([^"\n]+)"/g)) {
-      if (line[0].includes("BaseType")) baseTypes.add(value[1]);
-      else classes.add(value[1]);
+  for (const line of baseline.matchAll(/^\s*(BaseType|Class) == (.+)$/gm)) {
+    for (const value of line[2].matchAll(/"([^"\n]+)"/g)) {
+      (line[1] === "BaseType" ? baseTypes : classes).add(value[1]);
     }
   }
-  const known = baseTypes.size + classes.size;
-  const unknown = ITEM_CATALOG.filter((item) => !item.known).length;
-  const hiddenHighValueItems = hidden.filter((name) => ["Divine Orb", "Mirror of Kalandra", "Temporalis", "Headhunter"].includes(name));
-  const whitelistViolations = profile.whitelist.flatMap((entry) => entry.itemIds.filter((itemId) => hidden.includes(ITEM_CATALOG.find((item) => item.id === itemId)?.name ?? "")));
+  const hiddenHighValueItems = hidden.filter((entry) => (entry.divines ?? 0) >= 1).map((entry) => entry.item.name);
+  const whitelistViolations = profile.whitelist.flatMap((entry) => entry.itemIds.filter((itemId) => hidden.some((hiddenItem) => hiddenItem.item.id === itemId)));
   return {
-    sourceVersion: "NeverSink PoE2 0.10.4a vendored baseline",
+    sourceVersion: "NeverSink PoE2 vendored union + PoE2 client catalog",
     baselineFile,
-    catalogSize: known,
-    coveredItems: known,
-    unknownItems: unknown,
+    catalogSize: ITEM_CATALOG.length,
+    coveredItems: baseTypes.size + classes.size,
+    unknownItems: ITEM_CATALOG.filter((item) => !item.known).length,
+    unpricedItems: 0,
+    ambiguousItems: ITEM_CATALOG.filter((item) => item.ambiguous).length,
     hiddenHighValueItems,
     whitelistViolations,
     warnings,
     passed: hiddenHighValueItems.length === 0 && whitelistViolations.length === 0,
+  };
+}
+
+export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
+  const { contents: baseline, file: baselineFile } = readBaseline(profile);
+  const snapshot = inputSnapshot && snapshotUsable(inputSnapshot) ? inputSnapshot : FALLBACK_SNAPSHOT;
+  const presets = resolvedPresets(profile).filter((preset) => preset.enabled);
+  const overrides: string[] = [];
+  const hidden: Array<{ item: ItemDefinition; divines?: number }> = [];
+  const warnings: string[] = [];
+  const soundFiles = new Set<string>();
+  const applied = new Map<string, { preset: VisualPreset; count: number }>();
+  let unpriced = 0;
+  let ambiguous = 0;
+
+  for (const item of ITEM_CATALOG) {
+    const price = item.priceable ? snapshot.prices[item.id] : undefined;
+    const divines = price && snapshot.rates ? toDivines({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
+    const whitelisted = isWhitelisted(item.id, profile);
+    if (item.ambiguous) ambiguous += 1;
+    if (item.priceable && divines === undefined) unpriced += 1;
+
+    if (whitelisted && !item.ambiguous) {
+      overrides.push(whitelistRule(item));
+      continue;
+    }
+
+    if (divines !== undefined) {
+      const preset = presets.find((candidate) => rangeMatches(divines, candidate, snapshot.rates));
+      if (preset) {
+        overrides.push(presetRule(item, preset));
+        soundFiles.add(preset.sound.fileName);
+        const current = applied.get(preset.id);
+        applied.set(preset.id, { preset, count: (current?.count ?? 0) + 1 });
+        continue;
+      }
+    }
+
+    if (profile.hideBelowEnabled && divines !== undefined && !whitelisted) {
+      const floor = toDivines({ amount: profile.hideBelowAmount, currency: profile.hideBelowCurrency }, snapshot.rates);
+      if (floor !== undefined && divines < floor && !item.ambiguous) {
+        hidden.push({ item, divines });
+        overrides.push(hideRule(item, profile));
+      }
+    }
+  }
+
+  if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
+    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，所有未定价物品继续使用 NeverSink 原始规则。");
+  }
+  if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，未新增价格光效或隐藏规则。");
+  if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用 NeverSink 原始规则，避免误覆盖其他物品。");
+  if (profile.hideBelowEnabled) warnings.push("已启用低于 " + profile.hideBelowAmount + " " + profile.hideBelowCurrency + " 的隐藏；白名单优先且高价值误藏会使安全检查失败。");
+
+  const safetyReport = validateSafety(profile, baselineFile, baseline, hidden, warnings);
+  const header = [
+    "# poe2-filter generated overlay",
+    "# Base: " + baselineFile,
+    "# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness],
+    "# Market: " + snapshot.source + " @ " + snapshot.capturedAt,
+    "# Safety: unpriced and ambiguous items remain under the NeverSink baseline.",
+    "",
+  ].join("\n");
+  const filterFile = header + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
+  return {
+    filterFile,
+    baselineFile,
+    fileName: "poe2-filter-" + BASELINE_NAMES[profile.strictness].toLowerCase() + ".filter",
+    soundFiles: [...soundFiles],
+    appliedPresets: [...applied.values()].map(({ preset, count }) => ({ presetId: preset.id, presetName: preset.name, itemCount: count })),
+    safetyReport: { ...safetyReport, unpricedItems: unpriced, ambiguousItems: ambiguous },
   };
 }

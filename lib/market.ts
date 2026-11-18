@@ -1,16 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { FALLBACK_SNAPSHOT } from "./data";
-import type { MarketSnapshot } from "./types";
+import type { Currency, MarketRates, MarketSnapshot, PricePoint } from "./types";
 
 const dataDir = () => process.env.DATA_DIR || path.join(process.cwd(), "data", "runtime");
 const snapshotPath = () => path.join(dataDir(), "market-snapshot.json");
 
 export async function loadMarketSnapshot(): Promise<MarketSnapshot> {
   try {
-    const raw = await fs.readFile(snapshotPath(), "utf8");
-    const parsed = JSON.parse(raw) as MarketSnapshot;
-    if (!parsed.prices || Object.keys(parsed.prices).length === 0 || !parsed.expiresAt) return FALLBACK_SNAPSHOT;
+    const parsed = JSON.parse(await fs.readFile(snapshotPath(), "utf8")) as MarketSnapshot;
+    if (!parsed.prices || !parsed.expiresAt || Date.parse(parsed.expiresAt) < Date.now()) return FALLBACK_SNAPSHOT;
     return parsed;
   } catch {
     return FALLBACK_SNAPSHOT;
@@ -24,15 +23,15 @@ export async function saveMarketSnapshot(snapshot: MarketSnapshot): Promise<void
   await fs.rename(temp, snapshotPath());
 }
 
-export async function fetchMarketSnapshot(): Promise<MarketSnapshot> {
-  const now = new Date();
-  const expires = new Date(now.getTime() + 6 * 60 * 60 * 1000);
-  const previous = await loadMarketSnapshot();
-  return {
-    ...previous,
-    league: process.env.POE2_LEAGUE || "Standard",
-    capturedAt: now.toISOString(),
-    expiresAt: expires.toISOString(),
-    source: "snapshot adapter (poe.ninja/trade ready)",
-  };
+export function toDivines(point: PricePoint, rates?: MarketRates): number | undefined {
+  if (!Number.isFinite(point.amount) || point.amount < 0) return undefined;
+  if (point.currency === "divine") return point.amount;
+  if (!rates) return undefined;
+  if (point.currency === "chaos") return rates.divineToChaos > 0 ? point.amount / rates.divineToChaos : undefined;
+  return rates.divineToExalted > 0 ? point.amount / rates.divineToExalted : undefined;
+}
+
+export function formatPrice(point: PricePoint): string {
+  const label: Record<Currency, string> = { divine: "D", chaos: "C", exalted: "E" };
+  return `${point.amount} ${label[point.currency]}`;
 }
