@@ -1,0 +1,9 @@
+{
+  "league": "Standard",
+  "capturedAt": "2026-01-01T00:00:00.000Z",
+  "expiresAt": "2099-01-01T00:00:00.000Z",
+  "source": "NeverSink baseline fallback",
+  "prices": {
+    "divine-orb": { "itemId": "divine-orb", "amount": 1, "currency": "divine", "confidence": 1, "capturedAt": "2026-01-01T00:00:00.000Z", "source": "fallback" }
+  }
+}

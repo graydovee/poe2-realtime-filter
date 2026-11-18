@@ -1,0 +1,12 @@
+apiVersion: v2
+name: poe2-filter
+description: Safety-first Path of Exile 2 loot filter generator
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+keywords:
+  - path-of-exile-2
+  - loot-filter
+  - neversink
+maintainers:
+  - name: graydovee

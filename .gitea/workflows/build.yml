@@ -1,0 +1,85 @@
+name: build-and-release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  REGISTRY: harbor.graydove.cn
+  IMAGE: harbor.graydove.cn/apps/poe2-filter
+  REPO: git.graydove.cn/graydove/poe2-filter.git
+  BRANCH: main
+
+jobs:
+  build:
+    name: build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: linux-amd64, arch: amd64 }
+          - { runner: linux-arm64, arch: arm64 }
+    env:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+      CI_GIT_USER: ${{ secrets.CI_GIT_USER }}
+      CI_GIT_TOKEN: ${{ secrets.CI_GIT_TOKEN }}
+    steps:
+      - name: checkout
+        run: |
+          set -eu
+          git clone --branch '${{ github.ref_name }}' --depth 1 \
+            "https://${CI_GIT_USER}:${CI_GIT_TOKEN}@${REPO}" .
+      - name: build and push
+        run: |
+          set -eu
+          TAG='${{ github.ref_name }}'
+          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
+          docker build -t "${IMAGE}:${TAG}-${{ matrix.arch }}" .
+          docker push "${IMAGE}:${TAG}-${{ matrix.arch }}"
+
+  merge:
+    name: merge manifest
+    needs: [build]
+    runs-on: linux-amd64
+    env:
+      HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+      HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+    steps:
+      - name: merge per-arch images
+        run: |
+          set -eu
+          TAG='${{ github.ref_name }}'
+          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
+          docker buildx imagetools create \
+            -t "${IMAGE}:${TAG}" \
+            -t "${IMAGE}:latest" \
+            "${IMAGE}:${TAG}-amd64" "${IMAGE}:${TAG}-arm64"
+          docker buildx imagetools inspect "${IMAGE}:${TAG}"
+
+  bump-chart:
+    name: bump chart tag
+    needs: [merge]
+    runs-on: linux-amd64
+    env:
+      CI_GIT_USER: ${{ secrets.CI_GIT_USER }}
+      CI_GIT_TOKEN: ${{ secrets.CI_GIT_TOKEN }}
+    steps:
+      - name: update image tag in project chart
+        run: |
+          set -eu
+          TAG='${{ github.ref_name }}'
+          git clone --branch "${BRANCH}" "https://${CI_GIT_USER}:${CI_GIT_TOKEN}@${REPO}" /tmp/app
+          cd /tmp/app
+          sed -i "s|^  tag: .*|  tag: ${TAG}|" charts/poe2-filter/values.yaml
+          grep -q "^  tag: ${TAG}$" charts/poe2-filter/values.yaml \
+            || { echo "chart image tag was not updated" >&2; exit 1; }
+          if git diff --quiet; then
+            echo "chart tag already points to ${TAG}"
+            exit 0
+          fi
+          git config user.name "graydove-ci"
+          git config user.email "ci@graydove.cn"
+          git commit -am "poe2-filter: 镜像升级到 ${TAG}（CI 自动提交）"
+          git push origin "${BRANCH}"
