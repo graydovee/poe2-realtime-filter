@@ -35,7 +35,16 @@ jobs:
         run: |
           set -eu
           TAG='${{ github.ref_name }}'
-          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
+          login_ok=false
+          for attempt in 1 2 3 4 5 6; do
+            if echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin; then
+              login_ok=true
+              break
+            fi
+            echo "Harbor login failed (attempt ${attempt}/6), retrying in 10s..."
+            sleep 10
+          done
+          test "$login_ok" = true
           docker build -t "${IMAGE}:${TAG}-${{ matrix.arch }}" .
           docker push "${IMAGE}:${TAG}-${{ matrix.arch }}"
 
@@ -51,7 +60,16 @@ jobs:
         run: |
           set -eu
           TAG='${{ github.ref_name }}'
-          echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin
+          login_ok=false
+          for attempt in 1 2 3 4 5 6; do
+            if echo "$HARBOR_PASSWORD" | docker login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin; then
+              login_ok=true
+              break
+            fi
+            echo "Harbor login failed (attempt ${attempt}/6), retrying in 10s..."
+            sleep 10
+          done
+          test "$login_ok" = true
           docker buildx imagetools create \
             -t "${IMAGE}:${TAG}" \
             -t "${IMAGE}:latest" \
