@@ -2,8 +2,15 @@
   "league": "Standard",
   "capturedAt": "2026-01-01T00:00:00.000Z",
   "expiresAt": "2099-01-01T00:00:00.000Z",
-  "source": "NeverSink baseline fallback",
+  "source": "poe.ninja PoE2 exchange",
+  "rates": {
+    "divineToChaos": 100,
+    "divineToExalted": 10,
+    "capturedAt": "2026-01-01T00:00:00.000Z",
+    "source": "poe.ninja currency stats"
+  },
   "prices": {
-    "divine-orb": { "itemId": "divine-orb", "amount": 1, "currency": "divine", "confidence": 1, "capturedAt": "2026-01-01T00:00:00.000Z", "source": "fallback" }
+    "divine-orb": { "itemId": "divine-orb", "amount": 100, "currency": "chaos", "confidence": 0.9, "capturedAt": "2026-01-01T00:00:00.000Z", "source": "poe.ninja" },
+    "exalted-orb": { "itemId": "exalted-orb", "amount": 10, "currency": "chaos", "confidence": 0.9, "capturedAt": "2026-01-01T00:00:00.000Z", "source": "poe.ninja" }
   }
 }
