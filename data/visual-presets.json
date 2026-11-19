@@ -1,10 +1,125 @@
 {
-  "source": "NeverSink 2-SEMI-STRICT representative visuals",
+  "source": "NeverSink currency rules + representative visuals",
   "presets": [
+    {
+      "id": "currency-exalted-orb",
+      "name": "崇高石光效",
+      "sourceItemId": "exalted-orb",
+      "autoRange": true,
+      "enabled": true,
+      "effect": "White",
+      "minimapIcon": "1 Yellow Circle",
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "245 139 87 255",
+      "fontSize": 42,
+      "range": {
+        "min": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "exalted-orb"
+        },
+        "max": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "chaos-orb"
+        }
+      },
+      "sound": {
+        "type": "builtin",
+        "id": 2,
+        "volume": 300
+      }
+    },
+    {
+      "id": "currency-chaos-orb",
+      "name": "混沌石光效",
+      "sourceItemId": "chaos-orb",
+      "autoRange": true,
+      "enabled": true,
+      "effect": "Yellow",
+      "minimapIcon": "1 Yellow Circle",
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "245 105 90 255",
+      "fontSize": 42,
+      "range": {
+        "min": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "chaos-orb"
+        },
+        "max": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "orb-of-annulment"
+        }
+      },
+      "sound": {
+        "type": "builtin",
+        "id": 2,
+        "volume": 300
+      }
+    },
+    {
+      "id": "currency-orb-of-annulment",
+      "name": "剥离石光效",
+      "sourceItemId": "orb-of-annulment",
+      "autoRange": true,
+      "enabled": true,
+      "effect": "Red",
+      "minimapIcon": "0 Red Circle",
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "245 105 90 255",
+      "fontSize": 45,
+      "range": {
+        "min": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "orb-of-annulment"
+        },
+        "max": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "divine-orb"
+        }
+      },
+      "sound": {
+        "type": "builtin",
+        "id": 1,
+        "volume": 300
+      }
+    },
+    {
+      "id": "currency-divine-orb",
+      "name": "神圣石光效",
+      "sourceItemId": "divine-orb",
+      "autoRange": true,
+      "enabled": true,
+      "effect": "Red",
+      "minimapIcon": "0 Red Star",
+      "textColor": "255 0 0 255",
+      "borderColor": "255 0 0 255",
+      "backgroundColor": "255 255 255 255",
+      "fontSize": 45,
+      "range": {
+        "min": {
+          "amount": 1,
+          "currency": "divine",
+          "referenceItemId": "divine-orb"
+        }
+      },
+      "sound": {
+        "type": "builtin",
+        "id": 6,
+        "volume": 300
+      }
+    },
     {
       "id": "ns-blue",
       "name": "NeverSink Blue",
-      "enabled": true,
+      "enabled": false,
       "effect": "Blue",
       "minimapIcon": "0 Blue Diamond",
       "textColor": "0 240 190 255",
@@ -201,7 +316,7 @@
     {
       "id": "ns-red",
       "name": "NeverSink Red",
-      "enabled": true,
+      "enabled": false,
       "effect": "Red",
       "minimapIcon": "0 Red Diamond",
       "textColor": "125 255 89 255",
@@ -254,7 +369,7 @@
     {
       "id": "ns-yellow",
       "name": "NeverSink Yellow",
-      "enabled": true,
+      "enabled": false,
       "effect": "Yellow",
       "minimapIcon": "1 Yellow Diamond",
       "textColor": null,

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_VISUAL_PRESETS, FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
-import { toDivines } from "./market";
+import { toDivines, currencyDefaultRanges } from "./pricing";
 import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness, VisualPreset } from "./types";
 
 const BASELINE_NAMES: Record<Strictness, string> = {
@@ -60,7 +60,7 @@ function presetRule(item: ItemDefinition, preset: VisualPreset): string {
     preset.backgroundColor ? "\tSetBackgroundColor " + preset.backgroundColor : "",
     preset.minimapIcon ? "\tMinimapIcon " + preset.minimapIcon : "",
     preset.effect ? "\tPlayEffect " + preset.effect : "",
-    preset.sound.fileName ? "\tPlayAlertSoundCustom " + quote(preset.sound.fileName) + " 300" : "",
+    preset.sound.type === "builtin" ? "\tPlayAlertSound " + preset.sound.id + " " + preset.sound.volume : "\tCustomAlertSound " + quote(preset.sound.fileName) + " 300",
   ].filter(Boolean).join("\n");
   return "Show # poe2-filter preset: " + preset.name + " / " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + actions;
 }
@@ -78,12 +78,12 @@ function isWhitelisted(itemId: string, profile: FilterProfile): boolean {
 }
 
 function resolvedPresets(profile: FilterProfile): VisualPreset[] {
-  return profile.visualPresets?.length ? profile.visualPresets : DEFAULT_VISUAL_PRESETS;
+  return profile.visualPresets ?? DEFAULT_VISUAL_PRESETS;
 }
 
-function rangeMatches(divines: number, preset: VisualPreset, rates: MarketSnapshot["rates"]): boolean {
-  const min = preset.range.min ? toDivines(preset.range.min, rates) : 0;
-  const max = preset.range.max ? toDivines(preset.range.max, rates) : Number.POSITIVE_INFINITY;
+function rangeMatches(divines: number, preset: VisualPreset, snapshot: MarketSnapshot): boolean {
+  const min = preset.range.min ? toDivines(preset.range.min, snapshot.rates, snapshot.prices) : 0;
+  const max = preset.range.max ? toDivines(preset.range.max, snapshot.rates, snapshot.prices) : Number.POSITIVE_INFINITY;
   if (min === undefined || max === undefined) return false;
   return divines >= min && divines < max;
 }
@@ -126,7 +126,7 @@ function validateSafety(
 export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
   const { contents: baseline, file: baselineFile } = readBaseline(profile);
   const snapshot = inputSnapshot && snapshotUsable(inputSnapshot) ? inputSnapshot : FALLBACK_SNAPSHOT;
-  const presets = resolvedPresets(profile).filter((preset) => preset.enabled);
+  const presets = currencyDefaultRanges(resolvedPresets(profile), snapshot).filter((preset) => preset.enabled);
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; divines?: number }> = [];
   const warnings: string[] = [];
@@ -148,10 +148,10 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
     }
 
     if (divines !== undefined) {
-      const preset = presets.find((candidate) => rangeMatches(divines, candidate, snapshot.rates));
+      const preset = presets.find((candidate) => rangeMatches(divines, candidate, snapshot));
       if (preset) {
         overrides.push(presetRule(item, preset));
-        soundFiles.add(preset.sound.fileName);
+        if (preset.sound.type !== "builtin") soundFiles.add(preset.sound.fileName);
         const current = applied.get(preset.id);
         applied.set(preset.id, { preset, count: (current?.count ?? 0) + 1 });
         continue;

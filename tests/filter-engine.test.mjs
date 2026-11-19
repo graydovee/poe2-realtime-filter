@@ -13,12 +13,11 @@ test("NeverSink baseline and generated data are vendored", () => {
   assert.ok(catalog.items.some((item) => item.matcher?.baseType === "Divine Orb"));
 });
 
-test("visual presets expose default price tiers", () => {
+test("four currency defaults are enabled", () => {
   const presets = JSON.parse(readFileSync("data/visual-presets.json", "utf8")).presets;
-  assert.equal(presets.length, 17);
-  assert.deepEqual(presets.filter((preset) => preset.enabled).map((preset) => preset.effect).sort(), ["Blue", "Red", "Yellow"]);
-  assert.equal(presets.find((preset) => preset.effect === "Blue").range.max.currency, "chaos");
-  assert.equal(presets.find((preset) => preset.effect === "Red").range.min.currency, "divine");
+  assert.equal(presets.length, 21);
+  assert.equal(presets.filter((preset) => preset.enabled).length, 4);
+  assert.ok(presets.filter((preset) => preset.enabled).every((preset) => preset.autoRange && preset.range.min.referenceItemId));
 });
 
 test("market worker is valid JavaScript", () => {

@@ -39,7 +39,7 @@ const visualIds = new Set();
 for (const preset of visuals.presets || []) {
   if (!preset.id || visualIds.has(preset.id)) problems.push("visual presets: duplicate id " + preset.id);
   visualIds.add(preset.id);
-  if (!preset.effect || !preset.sound?.fileName) problems.push("visual presets: incomplete " + preset.id);
+  if (!preset.effect || (!preset.sound || (preset.sound.type === "builtin" ? !Number.isInteger(preset.sound.id) : !preset.sound.fileName))) problems.push("visual presets: incomplete " + preset.id);
 }
 
 if (problems.length) {

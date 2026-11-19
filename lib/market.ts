@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { FALLBACK_SNAPSHOT } from "./data";
-import type { Currency, MarketRates, MarketSnapshot, PricePoint } from "./types";
+import type { MarketSnapshot } from "./types";
+export { toDivines, formatPrice } from "./pricing";
 
 const dataDir = () => process.env.DATA_DIR || path.join(process.cwd(), "data", "runtime");
 const snapshotPath = () => path.join(dataDir(), "market-snapshot.json");
@@ -21,17 +22,4 @@ export async function saveMarketSnapshot(snapshot: MarketSnapshot): Promise<void
   const temp = `${snapshotPath()}.tmp`;
   await fs.writeFile(temp, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
   await fs.rename(temp, snapshotPath());
-}
-
-export function toDivines(point: PricePoint, rates?: MarketRates): number | undefined {
-  if (!Number.isFinite(point.amount) || point.amount < 0) return undefined;
-  if (point.currency === "divine") return point.amount;
-  if (!rates) return undefined;
-  if (point.currency === "chaos") return rates.divineToChaos > 0 ? point.amount / rates.divineToChaos : undefined;
-  return rates.divineToExalted > 0 ? point.amount / rates.divineToExalted : undefined;
-}
-
-export function formatPrice(point: PricePoint): string {
-  const label: Record<Currency, string> = { divine: "D", chaos: "C", exalted: "E" };
-  return `${point.amount} ${label[point.currency]}`;
 }

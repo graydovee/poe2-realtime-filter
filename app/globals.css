@@ -162,3 +162,12 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid rg
 @media (min-width: 1001px) { .side-column { position: sticky; top: 20px; } }
 
 .catalog-toolbar input, .preset-name { min-width: 0; }
+
+.price-bound { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 12px; min-width: 0; }
+.price-bound strong { font-size: 12px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; }
+.price-bound .secondary-button { margin-top: 0; padding: 7px 8px; }
+.preset-grid .price-bound label { display: block; }
+.preset-grid .price-bound input, .preset-grid .price-bound select { width: 100%; margin-top: 0; }
+.preset-bottom { flex-wrap: wrap; }
+.preset-note { white-space: normal; line-height: 1.7; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

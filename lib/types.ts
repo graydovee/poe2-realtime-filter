@@ -63,6 +63,7 @@ export type MarketSnapshot = {
 export type PricePoint = {
   amount: number;
   currency: Currency;
+  referenceItemId?: string;
 };
 
 export type PriceRange = {
@@ -71,10 +72,13 @@ export type PriceRange = {
 };
 
 export type PresetSound =
+  | { type: "builtin"; id: number; volume: number; fileName?: never }
   | { type: "neversink"; fileName: string }
   | { type: "custom"; fileName: string };
 
 export type VisualPreset = {
+  sourceItemId?: string;
+  autoRange?: boolean;
   id: string;
   name: string;
   enabled: boolean;
