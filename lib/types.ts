@@ -52,6 +52,9 @@ export type MarketRates = {
   source: string;
 };
 
+export type LeagueOption = { id: string; label: string; hardcore: boolean; permanent: boolean };
+export type LeagueCatalog = { leagues: LeagueOption[]; defaultLeague: string; capturedAt: string; expiresAt: string };
+
 export type MarketSnapshot = {
   league: string;
   capturedAt: string;
@@ -117,6 +120,7 @@ export type VisualOverrides = {
 };
 
 export type FilterProfile = {
+  league: string;
   strictness: Strictness;
   style: FilterStyle;
   locale: Locale;

@@ -22,7 +22,7 @@ const snapshot = {
   rates: { divineToChaos: 100, divineToExalted: 1000, capturedAt: now, source: "poe.ninja" },
   prices: Object.fromEntries([["exalted-orb", .001], ["chaos-orb", .01], ["orb-of-annulment", .1], ["divine-orb", 1]].map(([itemId, amount]) => [itemId, { itemId, amount, currency: "divine", confidence: .9, capturedAt: now, source: "poe.ninja" }])),
 };
-const profile = { strictness: 2, style: "default", locale: "cn", itemLevelMin: 65, areaLevelMin: 65, hideBelowEnabled: false, hideBelowAmount: 0, hideBelowCurrency: "exalted", whitelist: [], visualPresets: DEFAULT_VISUAL_PRESETS, sound: { pack: "neversink", alertLevel: "economy" }, visuals: {} };
+const profile = { league: "Standard", strictness: 2, style: "default", locale: "cn", itemLevelMin: 65, areaLevelMin: 65, hideBelowEnabled: false, hideBelowAmount: 0, hideBelowCurrency: "exalted", whitelist: [], visualPresets: DEFAULT_VISUAL_PRESETS, sound: { pack: "neversink", alertLevel: "economy" }, visuals: {} };
 
 test("each enabled preset copies its currency's complete NeverSink appearance", () => {
   const baseline = readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8");
@@ -183,4 +183,13 @@ test("low-value hiding defaults off at 0.1 E and whitelist overrides an enabled 
   const white = generateFilter({ ...config, hideBelowEnabled: true, whitelist: [{ id: "scroll", label: "Scroll of Wisdom", itemIds: ["scroll-of-wisdom"] }] }, { ...snapshot, prices });
   assert.ok(white.filterFile.includes("Show # poe2-filter whitelist: Scroll of Wisdom"));
   assert.ok(!white.filterFile.includes("poe2-filter optional low-value rule: Scroll of Wisdom"));
+});
+
+test("generator rejects prices from a different league and identifies exports", () => {
+  const wrong = generateFilter({ ...profile, league: "Season A" }, snapshot);
+  assert.equal(wrong.appliedPresets.length, 0);
+  assert.ok(wrong.filterFile.includes("# League: Season A"));
+  assert.ok(wrong.fileName.includes("season-a"));
+  const right = generateFilter({ ...profile, league: "Season A" }, { ...snapshot, league: "Season A" });
+  assert.equal(right.appliedPresets.length, 4);
 });

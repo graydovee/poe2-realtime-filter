@@ -2,6 +2,7 @@ import { DEFAULT_VISUAL_PRESETS } from "./data";
 import type { FilterProfile } from "./types";
 
 export const DEFAULT_PROFILE: FilterProfile = {
+  league: "Standard",
   strictness: 2,
   style: "default",
   locale: "cn",

@@ -127,7 +127,8 @@ function validateSafety(
 
 export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
   const { contents: baseline, file: baselineFile } = readBaseline(profile);
-  const snapshot = inputSnapshot && snapshotUsable(inputSnapshot) ? inputSnapshot : FALLBACK_SNAPSHOT;
+  const league = profile.league ?? "Standard";
+  const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot) ? inputSnapshot : { ...FALLBACK_SNAPSHOT, league };
   const presets = currencyDefaultRanges(applyTemplateAppearances(resolvedPresets(profile), profile), snapshot).filter((preset) => preset.enabled);
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
@@ -180,6 +181,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   const header = [
     "# poe2-filter generated overlay",
     "# Base: " + baselineFile,
+    "# League: " + league,
     "# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness],
     "# Market: " + snapshot.source + " @ " + snapshot.capturedAt,
     "# Safety: unpriced and ambiguous items remain under the NeverSink baseline.",
@@ -190,7 +192,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   return {
     filterFile,
     baselineFile,
-    fileName: "poe2-filter-" + BASELINE_NAMES[profile.strictness].toLowerCase() + ".filter",
+    fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + BASELINE_NAMES[profile.strictness].toLowerCase() + ".filter",
     soundFiles: [...soundFiles],
     appliedPresets: [...applied.values()].map(({ preset, count }) => ({ presetId: preset.id, presetName: preset.name, itemCount: count })),
     safetyReport: { ...safetyReport, unpricedItems: unpriced, ambiguousItems: ambiguous },

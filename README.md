@@ -4,6 +4,9 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 
 ## 能力
 
+- 选择赛季或永久区；物价、D/C/E 汇率和默认光效价格区间按赛季独立加载。
+- 赛季选项来自 PoE2 官方交易站与 poe.ninja 行情索引，切换赛季会清空旧行情与旧预览。
+
 - 七个 NeverSink PoE2 基础档位和多种官方视觉风格。
 - 从 NeverSink 基础规则解析的完整物品目录（当前包含 1417 个 BaseType/Class 条目）。
 - 白名单按物品种类逐级选择（例如装备 → 武器 → 弓），支持三语搜索、已选汇总和移除。
@@ -55,3 +58,9 @@ NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2
 物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。
 
 通货样式从全部 56 个 NeverSink 模板提取，预览和生成器共用 `data/neversink-currency-appearances.json`。运行 `node scripts/extract-neversink-appearances.mjs --check` 验证源文件及样式数据一致；更新模板后可去掉 `--check` 重建。
+
+## 赛季行情
+
+`GET /api/leagues` 返回可选赛季；`GET /api/market?league=<赛季ID>` 返回该赛季快照。生成和 ZIP 导出配置均包含 `league`，结果文件名、文件头和清单标记赛季。
+
+行情按赛季保存到 DATA_DIR/markets/ 独立文件，同一赛季缺失或过期时拉取新数据；失败时仅使用该赛季仍有效的缓存，否则沿用 NeverSink 基线。旧版单文件缓存只会被同名赛季使用。同步 worker 每个周期更新全部可选经济区。`POE2_LEAGUE` 只控制默认选择，用户仍可在网页切换。自定义 `MARKET_SNAPSHOT_URL` 接收 league 查询参数，返回 JSON 的 league 必须与请求完全一致。

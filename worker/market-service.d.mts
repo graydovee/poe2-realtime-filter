@@ -1,0 +1,10 @@
+import type { ItemDefinition, LeagueCatalog, MarketSnapshot } from "../lib/types";
+export type MarketOptions = { dataDir?: string; defaultLeague?: string; force?: boolean; intervalMs?: number; sourceUrl?: string; types?: string[]; catalog?: ItemDefinition[]; fetcher?: (url: string) => Promise<unknown> };
+export function normalizeLeague(league: unknown): string;
+export function leagueSnapshotPath(league: string, options?: MarketOptions): string;
+export function emptySnapshot(league: string): MarketSnapshot;
+export function leaguesFromSources(ninja: unknown, official: unknown): LeagueCatalog["leagues"];
+export function getLeagueCatalog(options?: MarketOptions): Promise<LeagueCatalog>;
+export function validSnapshot(snapshot: unknown, league: string): boolean;
+export function readLeagueSnapshot(league: string, options?: MarketOptions): Promise<MarketSnapshot>;
+export function getMarketSnapshot(league: string, options?: MarketOptions): Promise<MarketSnapshot>;

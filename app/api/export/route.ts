@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { DEFAULT_VISUAL_PRESETS } from "../../../lib/data";
 import { DEFAULT_PROFILE } from "../../../lib/default-profile";
 import { generateFilter } from "../../../lib/filter-engine";
-import { loadMarketSnapshot } from "../../../lib/market";
+import { loadMarketSnapshot, normalizeLeague } from "../../../lib/market";
 import type { FilterProfile } from "../../../lib/types";
 
 export const runtime = "nodejs";
@@ -45,8 +45,8 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const rawProfile = JSON.parse(String(form.get("profile"))) as Partial<FilterProfile>;
-    const profile = { ...DEFAULT_PROFILE, ...rawProfile, visualPresets: rawProfile.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
-    const snapshot = await loadMarketSnapshot();
+    const profile = { ...DEFAULT_PROFILE, ...rawProfile, league: normalizeLeague(rawProfile.league ?? process.env.POE2_LEAGUE ?? DEFAULT_PROFILE.league), visualPresets: rawProfile.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
+    const snapshot = await loadMarketSnapshot(profile.league);
     const bundle = generateFilter(profile, snapshot);
     const entries: Array<{ name: string; data: Uint8Array }> = [
       { name: bundle.fileName, data: new TextEncoder().encode(bundle.filterFile) },
