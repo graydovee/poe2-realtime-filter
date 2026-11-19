@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_VISUAL_PRESETS, FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
+import { applyTemplateAppearances } from "./neversink-appearance";
 import { toExalted, currencyDefaultRanges } from "./pricing";
 import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness, VisualPreset } from "./types";
 
@@ -127,7 +128,7 @@ function validateSafety(
 export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
   const { contents: baseline, file: baselineFile } = readBaseline(profile);
   const snapshot = inputSnapshot && snapshotUsable(inputSnapshot) ? inputSnapshot : FALLBACK_SNAPSHOT;
-  const presets = currencyDefaultRanges(resolvedPresets(profile), snapshot).filter((preset) => preset.enabled);
+  const presets = currencyDefaultRanges(applyTemplateAppearances(resolvedPresets(profile), profile), snapshot).filter((preset) => preset.enabled);
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
   const warnings: string[] = [];
@@ -185,6 +186,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
     "",
   ].join("\n");
   const filterFile = header + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
+  for (const match of filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)) soundFiles.add(match[1]);
   return {
     filterFile,
     baselineFile,

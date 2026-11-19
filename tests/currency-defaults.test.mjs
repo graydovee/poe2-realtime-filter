@@ -38,6 +38,40 @@ test("each enabled preset copies its currency's complete NeverSink appearance", 
   }
 });
 
+test("all 56 template appearances match their actual source rules", () => {
+  execFileSync(process.execPath, ["scripts/extract-neversink-appearances.mjs", "--check"], { stdio: "pipe" });
+});
+
+test("currency appearances follow the selected style in generated filters", () => {
+  function blockFor(result, name) {
+    return result.filterFile.split("#===============================================================================================================")[0].split("\n\n").find((block) => block.includes(" / " + name + "\n"));
+  }
+  const classic = blockFor(generateFilter(profile, snapshot), "Exalted Orb");
+  assert.ok(classic.includes("SetBackgroundColor 245 139 87 255"));
+  assert.ok(classic.includes("PlayEffect White"));
+  const mythic = blockFor(generateFilter({ ...profile, style: "mythic" }, snapshot), "Exalted Orb");
+  assert.ok(mythic.includes("SetTextColor 0 112 221 255"));
+  assert.ok(mythic.includes("PlayEffect Blue"));
+  assert.ok(mythic.includes("MinimapIcon 1 Blue Circle"));
+  assert.ok(!mythic.includes("SetBackgroundColor"));
+  const aura = blockFor(generateFilter({ ...profile, style: "aura" }, snapshot), "Exalted Orb");
+  assert.ok(aura.includes("SetTextColor 154 222 210 255"));
+  assert.ok(aura.includes("SetBackgroundColor 20 20 0 255"));
+  const custom = generateFilter({ ...profile, style: "customsounds" }, snapshot);
+  assert.ok(blockFor(custom, "Exalted Orb").includes('CustomAlertSound "2currency.mp3" 300'));
+  const referenced = new Set([...custom.filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)].map((match) => match[1]));
+  assert.deepEqual(new Set(custom.soundFiles), referenced);
+  const selected = structuredClone(DEFAULT_VISUAL_PRESETS);
+  selected[0].appearanceItemId = "divine-orb";
+  const remapped = blockFor(generateFilter({ ...profile, visualPresets: selected }, snapshot), "Exalted Orb");
+  assert.ok(remapped.includes("MinimapIcon 0 Red Star"));
+  assert.ok(remapped.includes("PlayAlertSound 6 300"));
+  selected[0] = { ...selected[0], followTemplate: false, effect: "Cyan", fontSize: 40 };
+  const manual = blockFor(generateFilter({ ...profile, visualPresets: selected, style: "aura" }, snapshot), "Exalted Orb");
+  assert.ok(manual.includes("PlayEffect Cyan"));
+  assert.ok(manual.includes("SetFontSize 40"));
+});
+
 test("anchors follow the snapshot, intervals include the lower boundary and exclude the upper", () => {
   const candidates = [["scroll-of-wisdom", .0009], ["orb-of-alchemy", .005], ["vaal-orb", .05], ["regal-orb", .5], ["mirror-of-kalandra", 2]];
   const prices = { ...snapshot.prices };

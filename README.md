@@ -9,7 +9,7 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 - 白名单按物品种类逐级选择（例如装备 → 武器 → 弓），支持三语搜索、已选汇总和移除。
 - 白名单和低价值隐藏在同一板块；隐藏默认关闭，预填阈值为 0.1 E。
 - 每个 NeverSink 光效可以单独设置价格范围、启用状态、优先级和音效。
-- 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效，先按 poe.ninja 汇率统一换算成 E，再从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
+- 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效（从所选 NeverSink 档位与风格读取），先按 poe.ninja 汇率统一换算成 E，再从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
 - 默认端点跟随通货市价，也可切换为固定 D/C/E 价格；行情缺失时不猜测价格端点。
 - 价格范围输入单位为 D（神圣石）、C（混沌石）或 E（崇高石）。
 - 价格排序与区间比较统一使用 E，基于同一份 poe.ninja 快照：
@@ -53,3 +53,5 @@ Gitea Actions 只在 `v*` tag 上构建 amd64/arm64 镜像，推送到 Harbor �
 NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2 游戏数据属于 Grinding Gear Games。
 
 物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。
+
+通货样式从全部 56 个 NeverSink 模板提取，预览和生成器共用 `data/neversink-currency-appearances.json`。运行 `node scripts/extract-neversink-appearances.mjs --check` 验证源文件及样式数据一致；更新模板后可去掉 `--check` 重建。

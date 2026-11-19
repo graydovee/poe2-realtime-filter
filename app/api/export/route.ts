@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     for (const [key, value] of form.entries()) {
       if (!key.startsWith("sound:") || !(value instanceof File) || value.size === 0) continue;
       const name = safeName(value.name);
-      if (added.has(name)) continue;
+      if (added.has(name) || !bundle.soundFiles.includes(name)) continue;
       entries.push({ name, data: new Uint8Array(await value.arrayBuffer()) });
       added.add(name);
     }

@@ -1,0 +1,3618 @@
+{
+  "version": "0.10.4a",
+  "releaseUrl": "https://github.com/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/tag/0.10.4a",
+  "files": {
+    "default:0": {
+      "file": "NeverSink's filter 2 - 0-SOFT.filter",
+      "sha256": "efec5f864e8f82707502fdf03ec6c1eb1d4844da4de5e6c1a13590f174aceb36",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3407
+        }
+      }
+    },
+    "default:1": {
+      "file": "NeverSink's filter 2 - 1-REGULAR.filter",
+      "sha256": "4600483a99c018a0b03a928cf3f21e067fd8da19a486189055db68e08863367a",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3407
+        }
+      }
+    },
+    "default:2": {
+      "file": "NeverSink's filter 2 - 2-SEMI-STRICT.filter",
+      "sha256": "6892e2bf3e45fc550e1610aa7a914b7dbca213c943e8d78312ff76cc85c8a766",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3407
+        }
+      }
+    },
+    "default:3": {
+      "file": "NeverSink's filter 2 - 3-STRICT.filter",
+      "sha256": "9d061e4fcc77c2b59d78d3d6d35cdaec19ba54aa7b684a3217b6c4d969d1ce63",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3407
+        }
+      }
+    },
+    "default:4": {
+      "file": "NeverSink's filter 2 - 4-VERY-STRICT.filter",
+      "sha256": "6f8112c26fab65a1599382257fdc1157af9244bead725b5889c20de96ea55e4e",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3385
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3374
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3363
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3352
+        }
+      }
+    },
+    "default:5": {
+      "file": "NeverSink's filter 2 - 5-UBER-STRICT.filter",
+      "sha256": "f39f715113d01d4f5a127a6e55df8ffed1b00bca024d0dc4eab7b24c91d88aec",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3364
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3353
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3342
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3331
+        }
+      }
+    },
+    "default:6": {
+      "file": "NeverSink's filter 2 - 6-UBER-PLUS-STRICT.filter",
+      "sha256": "0e5a7fb27e5f1fa04e8fe2b2d42b3517eb2b8224d370ddd373d44875bf08b8b5",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3340
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3329
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3318
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3307
+        }
+      }
+    },
+    "aura:0": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 0-SOFT (aura) .filter",
+      "sha256": "1410150058b3dc34de10c092f8488d6a8f1252dde4fc0fe0bafd62c8c6015816",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3410
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3399
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3388
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3377
+        }
+      }
+    },
+    "aura:1": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 1-REGULAR (aura) .filter",
+      "sha256": "f548e041f56c4fa4739601619fe3f2b7e2d05693a50ad24c33bbe94f38a1a67f",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3410
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3399
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3388
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3377
+        }
+      }
+    },
+    "aura:2": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 2-SEMI-STRICT (aura) .filter",
+      "sha256": "3a4ff386a2c6cdab44c2fd79bb24829946bd9aa2ea65d213e5f02b19a3091889",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3410
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3399
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3388
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3377
+        }
+      }
+    },
+    "aura:3": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 3-STRICT (aura) .filter",
+      "sha256": "97d0990d1c3d926c5f4d3d51eda303e148804ed93d11669d24cde6ba9e63f3d0",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3410
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3399
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3388
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3377
+        }
+      }
+    },
+    "aura:4": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 4-VERY-STRICT (aura) .filter",
+      "sha256": "9b892cd3c7a55e79e752ebfe1f3f41b75584cb8351634cee74e40becabd900f7",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3355
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3344
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3333
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3322
+        }
+      }
+    },
+    "aura:5": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 5-UBER-STRICT (aura) .filter",
+      "sha256": "0ac8461c3926df0c0ba45fcad9616444ea66394c237ac4e5681ae142cbe50ad0",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3334
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3323
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3312
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3301
+        }
+      }
+    },
+    "aura:6": {
+      "file": "(STYLE) AURA/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (aura) .filter",
+      "sha256": "ed12a3a33617d033330f7e3919a147851b8274ff2ed834e2d6d15f968405938a",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "154 222 210 255",
+          "borderColor": "154 222 210 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3310
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "203 176 255 255",
+          "borderColor": "203 176 255 255",
+          "backgroundColor": "32 19 50 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3299
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "240 48 70 255",
+          "borderColor": "240 48 70 255",
+          "backgroundColor": "36 10 15 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3288
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3277
+        }
+      }
+    },
+    "cobalt:0": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 0-SOFT (cobalt) .filter",
+      "sha256": "993e2e3b0ea2925cfc279c4b071fb434894f5da82d117482eaa5bef0d35fb66e",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3424
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3413
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3391
+        }
+      }
+    },
+    "cobalt:1": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 1-REGULAR (cobalt) .filter",
+      "sha256": "9240d5d662060f8e3b24e618341ab5d300fbb1704e7b68f6167dae7caa7412be",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3424
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3413
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3391
+        }
+      }
+    },
+    "cobalt:2": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 2-SEMI-STRICT (cobalt) .filter",
+      "sha256": "2f09ede0311025aee96764ad23f5940d9fdea4966220d552c986590ef6391c47",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3424
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3413
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3391
+        }
+      }
+    },
+    "cobalt:3": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 3-STRICT (cobalt) .filter",
+      "sha256": "8ca965e183ed207a481b3128d0b8c87016cf02ea87a8a24fddebfe58a8bb62c1",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3424
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3413
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3391
+        }
+      }
+    },
+    "cobalt:4": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 4-VERY-STRICT (cobalt) .filter",
+      "sha256": "2896ed80effc90a2ddd7a2e136730d67af5eaaf6d54d423393f128b460bc975a",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3369
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3358
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3347
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3336
+        }
+      }
+    },
+    "cobalt:5": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 5-UBER-STRICT (cobalt) .filter",
+      "sha256": "aa302e6ded76cf3e878e8b6b3bdd7775906ade756191c2e02fb6c73fe1dfaabb",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3348
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3337
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3326
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3315
+        }
+      }
+    },
+    "cobalt:6": {
+      "file": "(STYLE) COBALT/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (cobalt) .filter",
+      "sha256": "388802aaa577105bf525aeb92856f370873cddc3ad5ba6d86dddde001f454996",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3324
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "130 30 190",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3313
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "185 0 120",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3302
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3291
+        }
+      }
+    },
+    "darkmode:0": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 0-SOFT (darkmode) .filter",
+      "sha256": "2ba7ef17db9c36c444d61c6b0cf8f59e455dc8b94f81c5fe78cd31a7c46792e1",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3412
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3391
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3380
+        }
+      }
+    },
+    "darkmode:1": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 1-REGULAR (darkmode) .filter",
+      "sha256": "6a6b465c2fb8ccf357ce6f1e938cd90c4e81906bbc62da5e85ed9fb8a5d5f622",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3412
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3391
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3380
+        }
+      }
+    },
+    "darkmode:2": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 2-SEMI-STRICT (darkmode) .filter",
+      "sha256": "0cfe3a4f6d306bc3588b2dd501e58bc93ef5b7d9d3e3007c0752428334aaa297",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3412
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3391
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3380
+        }
+      }
+    },
+    "darkmode:3": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 3-STRICT (darkmode) .filter",
+      "sha256": "17d988472f5534cb0d1d00ca84d05bad7beb7bff0e393f9413e01d091bd64b57",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3412
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3402
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3391
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3380
+        }
+      }
+    },
+    "darkmode:4": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 4-VERY-STRICT (darkmode) .filter",
+      "sha256": "e1088fdf2720b0b0a8d23246a137e2c6c1e29992b9c2fe6be987a00e2f4ab0e7",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3357
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3347
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3336
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3325
+        }
+      }
+    },
+    "darkmode:5": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 5-UBER-STRICT (darkmode) .filter",
+      "sha256": "6c4deaabd2d15b40e41c61325d6263f4321b0495af6c40f0a00d3a87251f25fa",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3336
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3326
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3315
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3304
+        }
+      }
+    },
+    "darkmode:6": {
+      "file": "(STYLE) DARKMODE/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (darkmode) .filter",
+      "sha256": "029b49daf5372d0913ebaea841e6e5340be40796d2eca81d4c7486279254f9c6",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 139 87 255",
+          "borderColor": "245 139 87 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3312
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3302
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3291
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3280
+        }
+      }
+    },
+    "mythic:0": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 0-SOFT (mythic) .filter",
+      "sha256": "5bdd0628304b6d7c5bfc5e31d3aba1d5fdd974f4c2d2a75fa02d01fc93f4533c",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3380
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3370
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3360
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3349
+        }
+      }
+    },
+    "mythic:1": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 1-REGULAR (mythic) .filter",
+      "sha256": "a8396ebba46e650e950cd10a63a377de113b0080a400affb35aa08a7c8f1e254",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3380
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3370
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3360
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3349
+        }
+      }
+    },
+    "mythic:2": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 2-SEMI-STRICT (mythic) .filter",
+      "sha256": "4d4f27741ccd5027facca3b7a6b8220627bae369dd13a73623dc697147d197c7",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3380
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3370
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3360
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3349
+        }
+      }
+    },
+    "mythic:3": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 3-STRICT (mythic) .filter",
+      "sha256": "10bcfe21d483584b24d3e4c237c7e999b44777184f5bae092177b8c00ecfbe1d",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3380
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3370
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3360
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3349
+        }
+      }
+    },
+    "mythic:4": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 4-VERY-STRICT (mythic) .filter",
+      "sha256": "dbee1d3a60b04151d187827ea122ec99194e2d3d64a8f1b0f37249292f17c8b9",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3322
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3312
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3302
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3291
+        }
+      }
+    },
+    "mythic:5": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 5-UBER-STRICT (mythic) .filter",
+      "sha256": "3d049b946a87a3d697ed3ec0250ed083bd04f855359786e4752fb63377983174",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3301
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3291
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3281
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3270
+        }
+      }
+    },
+    "mythic:6": {
+      "file": "(STYLE) MYTHIC/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (mythic) .filter",
+      "sha256": "74e43e48b321c18e20e4deb6c08d5772a4f44de65805f24771ed6d08b8df7692",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "Blue",
+          "minimapIcon": "1 Blue Circle",
+          "textColor": "0 112 221 255",
+          "borderColor": "0 112 221 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3277
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Purple",
+          "minimapIcon": "1 Purple Circle",
+          "textColor": "163 53 238 255",
+          "borderColor": "163 53 238 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3267
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Orange",
+          "minimapIcon": "0 Orange Circle",
+          "textColor": "255 128 0 255",
+          "borderColor": "255 128 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3257
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3246
+        }
+      }
+    },
+    "vaal:0": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 0-SOFT (vaal) .filter",
+      "sha256": "2284125b9f953113974f9d667574754ece5c9037390e7aba75864e597573fe2f",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3492
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3481
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3470
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3459
+        }
+      }
+    },
+    "vaal:1": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 1-REGULAR (vaal) .filter",
+      "sha256": "62bddd094718e9328e72073cc0a7da7bb5b67fc5b35b094bd2e8ef951b4042cd",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3492
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3481
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3470
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3459
+        }
+      }
+    },
+    "vaal:2": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 2-SEMI-STRICT (vaal) .filter",
+      "sha256": "13f0c59d97a5a8df3d25057d1d381941fffbf9e9b986039372d4cb74f13f1e89",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3492
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3481
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3470
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3459
+        }
+      }
+    },
+    "vaal:3": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 3-STRICT (vaal) .filter",
+      "sha256": "fe4f8eb89f75cb5d152195011e518fe7a20914020ad0640936e05b8c36ff61db",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3492
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3481
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3470
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3459
+        }
+      }
+    },
+    "vaal:4": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 4-VERY-STRICT (vaal) .filter",
+      "sha256": "386d9332707592bc466b90411334223cfe616d7021390d8658791769059829c7",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3437
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3426
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3415
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3404
+        }
+      }
+    },
+    "vaal:5": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 5-UBER-STRICT (vaal) .filter",
+      "sha256": "7bfba263b7c249f5548cf5f6816e4474ebe689fbe2436487a42f7a1f8fa00d9f",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3416
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3405
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3394
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3383
+        }
+      }
+    },
+    "vaal:6": {
+      "file": "(STYLE) VAAL/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (vaal) .filter",
+      "sha256": "a7338795dd9b49ac4cf3d3d49b389354ff41690536a5eb83d1ed0a8087ee2d31",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "180 76 58 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3392
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3381
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "190 30 30 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3370
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3359
+        }
+      }
+    },
+    "zen:0": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 0-SOFT (zen) .filter",
+      "sha256": "51f2b465bde44e5b0c68c67c17931f94b2da62646d33d75afc51113bceaa7f72",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3348
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3338
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3327
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3316
+        }
+      }
+    },
+    "zen:1": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 1-REGULAR (zen) .filter",
+      "sha256": "bf8dff81960a968848ea2ba94fcec5898de8c514da9c80deabb1c670033c2b30",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3348
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3338
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3327
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3316
+        }
+      }
+    },
+    "zen:2": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 2-SEMI-STRICT (zen) .filter",
+      "sha256": "26e559976a842248f8da33f9def65bc9431244416a7081bb67d37043219151c1",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3348
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3338
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3327
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3316
+        }
+      }
+    },
+    "zen:3": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 3-STRICT (zen) .filter",
+      "sha256": "1d131387f98ea0fcb6cd1dbf811f85c7e8b5c95362c007108b3125d91a6ae31e",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3348
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3338
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3327
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3316
+        }
+      }
+    },
+    "zen:4": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 4-VERY-STRICT (zen) .filter",
+      "sha256": "0db17ea63462a3f5676a39471f06898b834fab1cbbb74b35bacb91bb8758338f",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3293
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3283
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3272
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3261
+        }
+      }
+    },
+    "zen:5": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 5-UBER-STRICT (zen) .filter",
+      "sha256": "e4e7db6cb5ec00e333928f3a81f6831a2491c55d624b0d58730247afa2ef2e58",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3272
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3262
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3251
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3240
+        }
+      }
+    },
+    "zen:6": {
+      "file": "(STYLE) ZEN/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (zen) .filter",
+      "sha256": "ca7dcfe3246bc5c04a22e6c391003527d76c5234a016ccd4b041355e017c5c6c",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3248
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "220 170 100 255",
+          "borderColor": "220 170 100 255",
+          "fontSize": 35,
+          "sound": {
+            "type": "builtin",
+            "id": 2,
+            "volume": 300
+          },
+          "line": 3238
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "245 105 90 255",
+          "borderColor": "245 105 90 255",
+          "backgroundColor": "20 20 0 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 1,
+            "volume": 300
+          },
+          "line": 3227
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "builtin",
+            "id": 6,
+            "volume": 300
+          },
+          "line": 3216
+        }
+      }
+    },
+    "customsounds:0": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 0-SOFT (customsounds) .filter",
+      "sha256": "081ee3e3c9e44d4b7af9fb8d97e7b230b1b2316de2a5cc1366430b54796720e5",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3407
+        }
+      }
+    },
+    "customsounds:1": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 1-REGULAR (customsounds) .filter",
+      "sha256": "3c10cfdf9f9c5b2f704f3173856bb49b96c6f9a3f8daa6cdd1b6caee2fe9e2c4",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3407
+        }
+      }
+    },
+    "customsounds:2": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 2-SEMI-STRICT (customsounds) .filter",
+      "sha256": "29d267d8f5fbe923460cd341a56b1e7c3a9a68bdeef9e0d0933ba0053b72fe55",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3407
+        }
+      }
+    },
+    "customsounds:3": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 3-STRICT (customsounds) .filter",
+      "sha256": "b4139fdec77dc4e3e2e0d664ba699771c4cf669044df76a030cd82f401082f92",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3440
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3429
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3418
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3407
+        }
+      }
+    },
+    "customsounds:4": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 4-VERY-STRICT (customsounds) .filter",
+      "sha256": "49729bc462bea79c43d874217a98c2da8a4d283a07081cf16e1912cbbdc7f451",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3385
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3374
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3363
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3352
+        }
+      }
+    },
+    "customsounds:5": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 5-UBER-STRICT (customsounds) .filter",
+      "sha256": "5d2cf852e540fd33a1483f0254c1ad98846b8452761225356a3f79ebf6adca8e",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3364
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3353
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3342
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3331
+        }
+      }
+    },
+    "customsounds:6": {
+      "file": "(STYLE) CUSTOMSOUNDS/NeverSink's filter 2 - 6-UBER-PLUS-STRICT (customsounds) .filter",
+      "sha256": "f46e040c40b6f19920e5b8e6230f6c15a3f6aaa979b5ff588758109f75f5df78",
+      "appearances": {
+        "exalted-orb": {
+          "name": "Exalted Orb",
+          "effect": "White",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3340
+        },
+        "chaos-orb": {
+          "name": "Chaos Orb",
+          "effect": "Yellow",
+          "minimapIcon": "1 Yellow Circle",
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 42,
+          "sound": {
+            "type": "neversink",
+            "fileName": "2currency.mp3"
+          },
+          "line": 3329
+        },
+        "orb-of-annulment": {
+          "name": "Orb of Annulment",
+          "effect": "Red",
+          "minimapIcon": "0 Red Circle",
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "1maybevaluable.mp3"
+          },
+          "line": 3318
+        },
+        "divine-orb": {
+          "name": "Divine Orb",
+          "effect": "Red",
+          "minimapIcon": "0 Red Star",
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255",
+          "fontSize": 45,
+          "sound": {
+            "type": "neversink",
+            "fileName": "6veryvaluable.mp3"
+          },
+          "line": 3307
+        }
+      }
+    }
+  }
+}

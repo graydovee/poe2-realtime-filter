@@ -29,7 +29,9 @@
         "type": "builtin",
         "id": 2,
         "volume": 300
-      }
+      },
+      "appearanceItemId": "exalted-orb",
+      "followTemplate": true
     },
     {
       "id": "currency-chaos-orb",
@@ -59,7 +61,9 @@
         "type": "builtin",
         "id": 2,
         "volume": 300
-      }
+      },
+      "appearanceItemId": "chaos-orb",
+      "followTemplate": true
     },
     {
       "id": "currency-orb-of-annulment",
@@ -89,7 +93,9 @@
         "type": "builtin",
         "id": 1,
         "volume": 300
-      }
+      },
+      "appearanceItemId": "orb-of-annulment",
+      "followTemplate": true
     },
     {
       "id": "currency-divine-orb",
@@ -114,7 +120,9 @@
         "type": "builtin",
         "id": 6,
         "volume": 300
-      }
+      },
+      "appearanceItemId": "divine-orb",
+      "followTemplate": true
     },
     {
       "id": "ns-blue",

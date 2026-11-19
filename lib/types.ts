@@ -78,6 +78,8 @@ export type PresetSound =
   | { type: "custom"; fileName: string };
 
 export type VisualPreset = {
+  appearanceItemId?: string;
+  followTemplate?: boolean;
   sourceItemId?: string;
   autoRange?: boolean;
   id: string;
