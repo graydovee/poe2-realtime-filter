@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { FALLBACK_SNAPSHOT } from "./data";
 import type { MarketSnapshot } from "./types";
-export { toDivines, formatPrice } from "./pricing";
+export { toExalted, toDivines, formatPrice } from "./pricing";
 
 const dataDir = () => process.env.DATA_DIR || path.join(process.cwd(), "data", "runtime");
 const snapshotPath = () => path.join(dataDir(), "market-snapshot.json");

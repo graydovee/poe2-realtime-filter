@@ -16,12 +16,12 @@
       "range": {
         "min": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "exalted-orb"
         },
         "max": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "chaos-orb"
         }
       },
@@ -46,12 +46,12 @@
       "range": {
         "min": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "chaos-orb"
         },
         "max": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "orb-of-annulment"
         }
       },
@@ -76,12 +76,12 @@
       "range": {
         "min": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "orb-of-annulment"
         },
         "max": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "divine-orb"
         }
       },
@@ -106,7 +106,7 @@
       "range": {
         "min": {
           "amount": 1,
-          "currency": "divine",
+          "currency": "exalted",
           "referenceItemId": "divine-orb"
         }
       },

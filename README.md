@@ -6,15 +6,16 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 
 - 七个 NeverSink PoE2 基础档位和多种官方视觉风格。
 - 从 NeverSink 基础规则解析的完整物品目录（当前包含 1417 个 BaseType/Class 条目）。
-- 白名单支持搜索、分类和任意目录项添加。
+- 白名单按物品种类逐级选择（例如装备 → 武器 → 弓），支持三语搜索、已选汇总和移除。
+- 白名单和低价值隐藏在同一板块；隐藏默认关闭，预填阈值为 0.1 E。
 - 每个 NeverSink 光效可以单独设置价格范围、启用状态、优先级和音效。
-- 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效，按 poe.ninja 市价从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
+- 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效，先按 poe.ninja 汇率统一换算成 E，再从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
 - 默认端点跟随通货市价，也可切换为固定 D/C/E 价格；行情缺失时不猜测价格端点。
 - 价格范围输入单位为 D（神圣石）、C（混沌石）或 E（崇高石）。
-- 价格比较使用同一份 poe.ninja 快照中的物品价格和汇率：
-  - `D = 1 divine`
-  - `C = amount / divineToChaos`
-  - `E = amount / divineToExalted`
+- 价格排序与区间比较统一使用 E，基于同一份 poe.ninja 快照：
+  - `D × divineToExalted = E`
+  - `C × divineToExalted / divineToChaos = E`
+  - `E = 崇高石数量`
 - 未知物品、没有可靠价格、汇率或安全匹配器的物品继续使用 NeverSink 原始规则。
 - 自定义音效按光效预设上传并随 ZIP 一起导出。
 - 生成前输出覆盖率、未定价、歧义匹配和潜在误隐藏安全报告。
@@ -50,3 +51,5 @@ RUN_ONCE=1 npm run sync:prices
 Gitea Actions 只在 `v*` tag 上构建 amd64/arm64 镜像，推送到 Harbor 并回写项目 Chart 的 `image.tag`。ArgoCD Application 从本仓库的 `charts/poe2-filter` 拉取 Chart 并部署。
 
 NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2 游戏数据属于 Grinding Gear Games。
+
+物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。

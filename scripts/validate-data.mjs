@@ -30,6 +30,7 @@ for (const item of catalog.items || []) {
   if (!item.id || itemIds.has(item.id)) problems.push("catalog: duplicate or empty item id " + item.id);
   itemIds.add(item.id);
   if (!item.name || !item.matcher || (!item.matcher.baseType && !item.matcher.class)) problems.push("catalog: invalid matcher " + item.id);
+  if (!Array.isArray(item.categoryPath) || item.categoryPath.length < 2) problems.push("catalog: missing category path " + item.id);
   if (!item.localeNames?.cn || !item.localeNames?.tw || !item.localeNames?.us) problems.push("catalog: missing locale name " + item.id);
 }
 

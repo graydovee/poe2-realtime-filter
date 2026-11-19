@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_VISUAL_PRESETS, FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
-import { toDivines, currencyDefaultRanges } from "./pricing";
+import { toExalted, currencyDefaultRanges } from "./pricing";
 import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness, VisualPreset } from "./types";
 
 const BASELINE_NAMES: Record<Strictness, string> = {
@@ -81,11 +81,11 @@ function resolvedPresets(profile: FilterProfile): VisualPreset[] {
   return profile.visualPresets ?? DEFAULT_VISUAL_PRESETS;
 }
 
-function rangeMatches(divines: number, preset: VisualPreset, snapshot: MarketSnapshot): boolean {
-  const min = preset.range.min ? toDivines(preset.range.min, snapshot.rates, snapshot.prices) : 0;
-  const max = preset.range.max ? toDivines(preset.range.max, snapshot.rates, snapshot.prices) : Number.POSITIVE_INFINITY;
+function rangeMatches(exaltedValue: number, preset: VisualPreset, snapshot: MarketSnapshot): boolean {
+  const min = preset.range.min ? toExalted(preset.range.min, snapshot.rates, snapshot.prices) : 0;
+  const max = preset.range.max ? toExalted(preset.range.max, snapshot.rates, snapshot.prices) : Number.POSITIVE_INFINITY;
   if (min === undefined || max === undefined) return false;
-  return divines >= min && divines < max;
+  return exaltedValue >= min && exaltedValue < max;
 }
 
 function snapshotUsable(snapshot: MarketSnapshot): boolean {
@@ -96,8 +96,9 @@ function validateSafety(
   profile: FilterProfile,
   baselineFile: string,
   baseline: string,
-  hidden: Array<{ item: ItemDefinition; divines?: number }>,
+  hidden: Array<{ item: ItemDefinition; exaltedValue?: number }>,
   warnings: string[],
+  divineToExalted?: number,
 ): SafetyReport {
   const baseTypes = new Set<string>();
   const classes = new Set<string>();
@@ -106,7 +107,7 @@ function validateSafety(
       (line[1] === "BaseType" ? baseTypes : classes).add(value[1]);
     }
   }
-  const hiddenHighValueItems = hidden.filter((entry) => (entry.divines ?? 0) >= 1).map((entry) => entry.item.name);
+  const hiddenHighValueItems = hidden.filter((entry) => (entry.exaltedValue ?? 0) >= (divineToExalted ?? Number.POSITIVE_INFINITY)).map((entry) => entry.item.name);
   const whitelistViolations = profile.whitelist.flatMap((entry) => entry.itemIds.filter((itemId) => hidden.some((hiddenItem) => hiddenItem.item.id === itemId)));
   return {
     sourceVersion: "NeverSink PoE2 vendored union + PoE2 client catalog",
@@ -128,7 +129,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   const snapshot = inputSnapshot && snapshotUsable(inputSnapshot) ? inputSnapshot : FALLBACK_SNAPSHOT;
   const presets = currencyDefaultRanges(resolvedPresets(profile), snapshot).filter((preset) => preset.enabled);
   const overrides: string[] = [];
-  const hidden: Array<{ item: ItemDefinition; divines?: number }> = [];
+  const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
   const warnings: string[] = [];
   const soundFiles = new Set<string>();
   const applied = new Map<string, { preset: VisualPreset; count: number }>();
@@ -137,18 +138,18 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
 
   for (const item of ITEM_CATALOG) {
     const price = item.priceable ? snapshot.prices[item.id] : undefined;
-    const divines = price && snapshot.rates ? toDivines({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
+    const exaltedValue = price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
     const whitelisted = isWhitelisted(item.id, profile);
     if (item.ambiguous) ambiguous += 1;
-    if (item.priceable && divines === undefined) unpriced += 1;
+    if (item.priceable && exaltedValue === undefined) unpriced += 1;
 
     if (whitelisted && !item.ambiguous) {
       overrides.push(whitelistRule(item));
       continue;
     }
 
-    if (divines !== undefined) {
-      const preset = presets.find((candidate) => rangeMatches(divines, candidate, snapshot));
+    if (exaltedValue !== undefined) {
+      const preset = presets.find((candidate) => rangeMatches(exaltedValue, candidate, snapshot));
       if (preset) {
         overrides.push(presetRule(item, preset));
         if (preset.sound.type !== "builtin") soundFiles.add(preset.sound.fileName);
@@ -158,10 +159,10 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
       }
     }
 
-    if (profile.hideBelowEnabled && divines !== undefined && !whitelisted) {
-      const floor = toDivines({ amount: profile.hideBelowAmount, currency: profile.hideBelowCurrency }, snapshot.rates);
-      if (floor !== undefined && divines < floor && !item.ambiguous) {
-        hidden.push({ item, divines });
+    if (profile.hideBelowEnabled && exaltedValue !== undefined && !whitelisted) {
+      const floor = toExalted({ amount: profile.hideBelowAmount, currency: profile.hideBelowCurrency }, snapshot.rates);
+      if (floor !== undefined && exaltedValue < floor && !item.ambiguous) {
+        hidden.push({ item, exaltedValue });
         overrides.push(hideRule(item, profile));
       }
     }
@@ -174,7 +175,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用 NeverSink 原始规则，避免误覆盖其他物品。");
   if (profile.hideBelowEnabled) warnings.push("已启用低于 " + profile.hideBelowAmount + " " + profile.hideBelowCurrency + " 的隐藏；白名单优先且高价值误藏会使安全检查失败。");
 
-  const safetyReport = validateSafety(profile, baselineFile, baseline, hidden, warnings);
+  const safetyReport = validateSafety(profile, baselineFile, baseline, hidden, warnings, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
     "# Base: " + baselineFile,

@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { DEFAULT_VISUAL_PRESETS } from "../../../lib/data";
+import { DEFAULT_PROFILE } from "../../../lib/default-profile";
 import { generateFilter } from "../../../lib/filter-engine";
 import { loadMarketSnapshot } from "../../../lib/market";
 import type { FilterProfile } from "../../../lib/types";
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const rawProfile = JSON.parse(String(form.get("profile"))) as Partial<FilterProfile>;
-    const profile = { ...rawProfile, visualPresets: rawProfile.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
+    const profile = { ...DEFAULT_PROFILE, ...rawProfile, visualPresets: rawProfile.visualPresets ?? DEFAULT_VISUAL_PRESETS } as FilterProfile;
     const snapshot = await loadMarketSnapshot();
     const bundle = generateFilter(profile, snapshot);
     const entries: Array<{ name: string; data: Uint8Array }> = [

@@ -9,10 +9,12 @@ import { parseExchange } from "../worker/market-adapter.mjs";
 
 const require = createRequire(import.meta.url);
 const output = mkdtempSync(path.join(tmpdir(), "poe2-engine-"));
-execFileSync(process.execPath, ["node_modules/typescript/bin/tsc", "lib/filter-engine.ts", "--outDir", output, "--module", "commonjs", "--target", "es2021", "--esModuleInterop", "--resolveJsonModule", "--skipLibCheck"], { stdio: "pipe" });
+execFileSync(process.execPath, ["node_modules/typescript/bin/tsc", "lib/filter-engine.ts", "lib/catalog.ts", "lib/default-profile.ts", "--outDir", output, "--module", "commonjs", "--target", "es2021", "--esModuleInterop", "--resolveJsonModule", "--skipLibCheck"], { stdio: "pipe" });
 const { generateFilter } = require(path.join(output, "lib/filter-engine.js"));
-const { toDivines, currencyDefaultRanges } = require(path.join(output, "lib/pricing.js"));
+const { toExalted, toDivines, currencyPriceTiers, formatPrice, currencyDefaultRanges } = require(path.join(output, "lib/pricing.js"));
 const { DEFAULT_VISUAL_PRESETS, ITEM_CATALOG } = require(path.join(output, "lib/data.js"));
+const { DEFAULT_PROFILE } = require(path.join(output, "lib/default-profile.js"));
+const { buildCatalogTree, catalogItems, catalogNode, searchCatalog } = require(path.join(output, "lib/catalog.js"));
 test.after(() => rmSync(output, { recursive: true, force: true }));
 const now = new Date().toISOString();
 const snapshot = {
@@ -74,4 +76,77 @@ test("exchange adapter reads divine primaryValue and rates without fuzzy base ma
   assert.equal(parsed.prices["greater-exalted-orb"].amount, .02);
   assert.equal(parsed.rates.divineToChaos, 100);
   assert.throws(() => parseExchange({ ...payload, core: { primary: "unknown" } }, ITEM_CATALOG, now));
+});
+
+test("mixed D/C/E anchor quotes are converted to E before sorting and matching", () => {
+  const mixed = structuredClone(snapshot);
+  mixed.rates.divineToExalted = 200;
+  mixed.rates.divineToChaos = 10;
+  for (const [itemId, amount, currency] of [["exalted-orb", 1, "exalted"], ["chaos-orb", 1, "chaos"], ["orb-of-annulment", .25, "divine"], ["divine-orb", 1, "divine"]]) {
+    mixed.prices[itemId] = { ...snapshot.prices["divine-orb"], itemId, amount, currency };
+  }
+  assert.deepEqual(currencyPriceTiers(mixed).map((t) => [t.itemId, t.exaltedValue]), [["exalted-orb", 1], ["chaos-orb", 20], ["orb-of-annulment", 50], ["divine-orb", 200]]);
+  const cases = [
+    ["scroll-of-wisdom", .99, "exalted", null],
+    ["orb-of-alchemy", 1, "exalted", "崇高石光效"],
+    ["vaal-orb", 1, "chaos", "混沌石光效"],
+    ["regal-orb", 2.5, "chaos", "剥离石光效"],
+    ["mirror-of-kalandra", 1, "divine", "神圣石光效"],
+  ];
+  for (const [itemId, amount, currency] of cases) mixed.prices[itemId] = { ...snapshot.prices["divine-orb"], itemId, amount, currency };
+  const overlay = generateFilter(profile, mixed).filterFile.split("#===============================================================================================================")[0];
+  for (const [itemId, , , expected] of cases) {
+    const name = ITEM_CATALOG.find((item) => item.id === itemId).name;
+    const block = overlay.split("\n\n").find((block) => block.includes(" / " + name + "\n"));
+    if (expected === null) assert.equal(block, undefined);
+    else assert.ok(block?.includes("preset: " + expected + " / " + name), name);
+  }
+  assert.equal(toExalted({ amount: 2.5, currency: "chaos" }, mixed.rates), 50);
+  assert.equal(toExalted({ amount: .25, currency: "divine" }, mixed.rates), 50);
+  assert.match(formatPrice({ amount: 1, currency: "exalted", referenceItemId: "divine-orb" }, mixed), /200 E$/);
+  assert.match(formatPrice({ amount: 1, currency: "exalted", referenceItemId: "chaos-orb" }, mixed), /20 E$/);
+  mixed.prices["orb-of-annulment"].amount = .05;
+  assert.deepEqual(currencyPriceTiers(mixed).map((t) => [t.itemId, t.exaltedValue]), [["exalted-orb", 1], ["orb-of-annulment", 10], ["chaos-orb", 20], ["divine-orb", 200]]);
+});
+
+test("missing or invalid rates do not generate partial automatic price tiers", () => {
+  const incomplete = structuredClone(snapshot);
+  delete incomplete.prices["orb-of-annulment"];
+  assert.deepEqual(currencyPriceTiers(incomplete), []);
+  assert.equal(generateFilter(profile, incomplete).appliedPresets.length, 0);
+  assert.equal(toExalted({ amount: 1, currency: "chaos" }, { ...snapshot.rates, divineToChaos: 0 }), undefined);
+  assert.equal(toExalted({ amount: 1, currency: "divine" }, { ...snapshot.rates, divineToExalted: NaN }), undefined);
+});
+
+test("catalog exposes category menus before individual items and retains every item", () => {
+  const tree = buildCatalogTree(ITEM_CATALOG);
+  assert.equal(tree.items.length, 0);
+  assert.ok(tree.children.length >= 5);
+  const ids = catalogItems(tree).map((item) => item.id);
+  assert.equal(ids.length, ITEM_CATALOG.length);
+  assert.equal(new Set(ids).size, ITEM_CATALOG.length);
+  const bows = catalogNode(tree, ["equipment", "weapons", "bows"]);
+  assert.ok(bows.items.some((item) => item.name === "Gemini Bow"));
+  const boots = catalogNode(tree, ["equipment", "armour", "boots"]);
+  assert.ok(boots.items.some((item) => item.name === "Charmed Shoes"));
+  const search = buildCatalogTree(searchCatalog(ITEM_CATALOG, "Divine Orb"));
+  assert.equal(search.items.length, 0);
+  assert.ok(catalogItems(search).some((item) => item.id === "divine-orb"));
+  assert.equal(catalogNode(tree, ["equipment", "unknown"]), undefined);
+  assert.equal(catalogItems(buildCatalogTree(searchCatalog(ITEM_CATALOG, "no-such-item-zzyy"))).length, 0);
+});
+
+test("low-value hiding defaults off at 0.1 E and whitelist overrides an enabled hide", () => {
+  assert.equal(DEFAULT_PROFILE.hideBelowEnabled, false);
+  assert.equal(DEFAULT_PROFILE.hideBelowAmount, .1);
+  assert.equal(DEFAULT_PROFILE.hideBelowCurrency, "exalted");
+  const prices = { ...snapshot.prices, "scroll-of-wisdom": { ...snapshot.prices["divine-orb"], itemId: "scroll-of-wisdom", amount: .05, currency: "exalted" } };
+  const config = { ...DEFAULT_PROFILE, visualPresets: [] };
+  const generated = generateFilter(config, { ...snapshot, prices });
+  assert.ok(!generated.filterFile.includes("poe2-filter optional low-value rule: Scroll of Wisdom"));
+  const hidden = generateFilter({ ...config, hideBelowEnabled: true }, { ...snapshot, prices });
+  assert.ok(hidden.filterFile.includes("Hide # poe2-filter optional low-value rule: Scroll of Wisdom"));
+  const white = generateFilter({ ...config, hideBelowEnabled: true, whitelist: [{ id: "scroll", label: "Scroll of Wisdom", itemIds: ["scroll-of-wisdom"] }] }, { ...snapshot, prices });
+  assert.ok(white.filterFile.includes("Show # poe2-filter whitelist: Scroll of Wisdom"));
+  assert.ok(!white.filterFile.includes("poe2-filter optional low-value rule: Scroll of Wisdom"));
 });

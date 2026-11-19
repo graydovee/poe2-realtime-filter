@@ -26,6 +26,7 @@ export type ItemDefinition = {
   name: string;
   localeNames: Record<Locale, string>;
   category: ItemCategory;
+  categoryPath: string[];
   baseType?: string;
   marketKey: string;
   source: "never-sink" | "game-data" | "fallback";

@@ -1,29 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { CATEGORY_LABELS, FALLBACK_SNAPSHOT, DEFAULT_VISUAL_PRESETS, ITEM_CATALOG, LOCALE_LABELS, STRICTNESS_LABELS, STYLE_LABELS } from "../lib/data";
+import { useEffect, useState } from "react";
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG, LOCALE_LABELS, STRICTNESS_LABELS, STYLE_LABELS } from "../lib/data";
 import type { Currency, FilterProfile, FilterStyle, Locale, MarketSnapshot, PricePoint, Strictness, VisualPreset } from "../lib/types";
 
-import { currencyDefaultRanges, displayPrice, formatPrice, toDivines } from "../lib/pricing";
+import { ItemPicker } from "./components/item-picker";
+import { DEFAULT_PROFILE } from "../lib/default-profile";
+
+import { currencyDefaultRanges, currencyPriceTiers, formatPrice, toExalted } from "../lib/pricing";
 
 const currencyLabels: Record<Currency, string> = { divine: "D · 神圣石", chaos: "C · 混沌石", exalted: "E · 崇高石" };
 const currencyShort: Record<Currency, string> = { divine: "D", chaos: "C", exalted: "E" };
 const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-const initialProfile: FilterProfile = {
-  strictness: 2,
-  style: "default",
-  locale: "cn",
-  itemLevelMin: 65,
-  areaLevelMin: 65,
-  hideBelowEnabled: false,
-  hideBelowAmount: 0.5,
-  hideBelowCurrency: "divine",
-  whitelist: [],
-  visualPresets: DEFAULT_VISUAL_PRESETS,
-  sound: { pack: "neversink", alertLevel: "economy" },
-  visuals: { showBeams: true, showMinimapIcons: true, fontSize: 32, highValueColor: "255 220 90", valuableColor: "80 210 255", unknownColor: "255 120 220" },
-};
 
 type Generated = {
   filterFile: string;
@@ -44,23 +33,12 @@ export default function HomePage() {
     }).then(setMarket).catch(() => {});
     return () => controller.abort();
   }, []);
-  const [profile, setProfile] = useState<FilterProfile>(initialProfile);
+  const [profile, setProfile] = useState<FilterProfile>(DEFAULT_PROFILE);
   const [customSounds, setCustomSounds] = useState<Record<string, File>>({});
   const [generated, setGenerated] = useState<Generated | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
-  const [itemSearch, setItemSearch] = useState("");
-  const [itemCategory, setItemCategory] = useState("all");
-
-  const filteredItems = useMemo(() => ITEM_CATALOG.filter((item) => {
-    const query = itemSearch.trim().toLowerCase();
-    const matchesText = !query || [item.name, item.localeNames.cn, item.localeNames.tw, item.localeNames.us].some((value) => value.toLowerCase().includes(query));
-    return matchesText && (itemCategory === "all" || item.category === itemCategory);
-  }), [itemSearch, itemCategory]);
-
-  const categories = useMemo(() => [...new Set(ITEM_CATALOG.map((item) => item.category))], []);
-
   function update<K extends keyof FilterProfile>(key: K, value: FilterProfile[K]) {
     setProfile((current) => ({ ...current, [key]: value }));
   }
@@ -129,11 +107,11 @@ export default function HomePage() {
       {activeTab === "builder" ? <section className="workspace"><div className="main-column">
         <section className="panel"><PanelHeading step="01" title="选择基础过滤器" description="严格度越高，显示的物品越少。" /><div className="strictness-grid">{(Object.keys(STRICTNESS_LABELS).map(Number) as Strictness[]).map((level) => <button key={level} className={"strictness " + (profile.strictness === level ? "selected" : "")} onClick={() => update("strictness", level)}><span className="strict-number">{level}</span><span><b>{STRICTNESS_LABELS[level]}</b><small>{level < 2 ? "显示更多物品" : level > 4 ? "专注高价值" : "推荐起点"}</small></span></button>)}</div><div className="inline-fields"><label>视觉风格<select value={profile.style} onChange={(event) => update("style", event.target.value as FilterStyle)}>{Object.entries(STYLE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label>客户端语言<select value={profile.locale} onChange={(event) => update("locale", event.target.value as Locale)}>{Object.entries(LOCALE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></section>
 
-        <section className="panel"><PanelHeading step="02" title="物品目录与白名单" description="搜索物品并勾选加入白名单，也可以按类别筛选。" /><div className="catalog-toolbar"><input aria-label="搜索物品" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="搜索中文、繁中或英文名称" /><select aria-label="物品类别" value={itemCategory} onChange={(event) => setItemCategory(event.target.value)}><option value="all">全部类别</option>{categories.map((category) => <option value={category} key={category}>{CATEGORY_LABELS[category]?.[profile.locale] || category}</option>)}</select></div><div className="catalog-list">{filteredItems.map((item) => { const checked = profile.whitelist.some((entry) => entry.itemIds.includes(item.id)); return <label className="catalog-row" key={item.id}><input type="checkbox" checked={checked} onChange={(event) => toggleWhitelist(item.id, event.target.checked)} /><span><b>{item.localeNames[profile.locale]}</b><small>{item.name} · {CATEGORY_LABELS[item.category]?.[profile.locale] || item.category}</small></span>{item.ambiguous ? <em>沿用原始</em> : <em>{checked ? "白名单" : "可配置"}</em>}</label>; })}</div><div className="catalog-count">显示 {filteredItems.length} / {ITEM_CATALOG.length} 项</div></section>
+        <section className="panel" aria-labelledby="visibility-title"><div className="panel-heading"><div><span className="step">02</span><div><h2 id="visibility-title">白名单与低价值隐藏</h2><p>按物品种类选择白名单，并设置可选的价格隐藏阈值。</p></div></div></div><div className="hide-settings"><div className="hide-settings-heading"><h3>可选低价值隐藏</h3><label className="hide-toggle"><input type="checkbox" checked={profile.hideBelowEnabled} onChange={(event) => update("hideBelowEnabled", event.target.checked)} />启用低价值隐藏</label></div><div className="hide-price-fields"><label>隐藏价格阈值<input type="number" min="0" step="0.01" value={profile.hideBelowAmount} onChange={(event) => update("hideBelowAmount", Number(event.target.value))} disabled={!profile.hideBelowEnabled} /></label><label>计价单位<select value={profile.hideBelowCurrency} onChange={(event) => update("hideBelowCurrency", event.target.value as Currency)} disabled={!profile.hideBelowEnabled}>{Object.entries(currencyLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><p className="field-help">启用后隐藏低于阈值的已定价物品；白名单优先，未定价物品沿用所选 NeverSink 规则。</p></div><ItemPicker locale={profile.locale} selectedIds={profile.whitelist.flatMap((entry) => entry.itemIds)} onToggle={toggleWhitelist} /></section>
 
-        <section className="panel"><PanelHeading step="03" title="价格光效规则" description="默认使用崇高石、混沌石、剥离石、神圣石的原始光效，按市价从低到高划分区间。可改为固定 D / C / E 价格；重叠范围按列表顺序匹配。" /><div className="preset-list">{currencyDefaultRanges(profile.visualPresets, market).map((preset) => <PresetEditor key={preset.id} preset={preset} market={market} customFile={customSounds[preset.id]} onChange={(patch) => updatePreset(preset.id, patch)} onRemove={() => removePreset(preset.id)} onSound={(file) => { if (!file) return; setCustomSounds((current) => ({ ...current, [preset.id]: file })); updatePreset(preset.id, { sound: { type: "custom", fileName: safeSoundName(file.name) } }); }} />)}</div><button className="secondary-button" onClick={addPreset}>＋ 新增光效预设</button></section>
+        <section className="panel"><PanelHeading step="03" title="价格光效规则" description="默认使用崇高石、混沌石、剥离石、神圣石的原始光效，先统一换算成 E，再从低到高排序划分区间。可改为固定 D / C / E 价格；重叠范围按列表顺序匹配。" /><div className="currency-value-list">{currencyPriceTiers(market).map((tier) => <div key={tier.itemId}><span>{tier.name}</span><strong>{formatPrice({ amount: tier.exaltedValue, currency: "exalted" })}</strong></div>)}</div><div className="preset-list">{currencyDefaultRanges(profile.visualPresets, market).map((preset) => <PresetEditor key={preset.id} preset={preset} market={market} customFile={customSounds[preset.id]} onChange={(patch) => updatePreset(preset.id, patch)} onRemove={() => removePreset(preset.id)} onSound={(file) => { if (!file) return; setCustomSounds((current) => ({ ...current, [preset.id]: file })); updatePreset(preset.id, { sound: { type: "custom", fileName: safeSoundName(file.name) } }); }} />)}</div><button className="secondary-button" onClick={addPreset}>＋ 新增光效预设</button></section>
 
-        <section className="panel"><PanelHeading step="04" title="等级与基础视觉" description="设置等级条件、字体大小和显示效果。" /><div className="range-grid"><label>物品等级下限<strong>{profile.itemLevelMin}</strong><input type="range" min="1" max="86" value={profile.itemLevelMin} onChange={(event) => update("itemLevelMin", Number(event.target.value))} /></label><label>区域等级下限<strong>{profile.areaLevelMin}</strong><input type="range" min="1" max="86" value={profile.areaLevelMin} onChange={(event) => update("areaLevelMin", Number(event.target.value))} /></label><label>字体大小<strong>{profile.visuals.fontSize}</strong><input type="range" min="18" max="48" value={profile.visuals.fontSize} onChange={(event) => update("visuals", { ...profile.visuals, fontSize: Number(event.target.value) })} /></label></div><div className="checks"><label><input type="checkbox" checked={profile.visuals.showBeams} onChange={(event) => update("visuals", { ...profile.visuals, showBeams: event.target.checked })} />掉落光束</label><label><input type="checkbox" checked={profile.visuals.showMinimapIcons} onChange={(event) => update("visuals", { ...profile.visuals, showMinimapIcons: event.target.checked })} />小地图图标</label></div><div className="price-layout compact-price"><div className="price-hero"><span className="price-label">可选低价值隐藏</span><div className="price-input"><input type="number" min="0" step="0.05" value={profile.hideBelowAmount} onChange={(event) => update("hideBelowAmount", Number(event.target.value))} disabled={!profile.hideBelowEnabled} /><select value={profile.hideBelowCurrency} onChange={(event) => update("hideBelowCurrency", event.target.value as Currency)} disabled={!profile.hideBelowEnabled}>{Object.entries(currencyLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></div><label className="switch-row"><input type="checkbox" checked={profile.hideBelowEnabled} onChange={(event) => update("hideBelowEnabled", event.target.checked)} /><span className="switch" />启用低价值隐藏</label></div><p className="field-help">仅对有价格的物品应用隐藏阈值。白名单物品始终显示，未定价物品使用所选 NeverSink 规则。</p></div></section>
+        <section className="panel"><PanelHeading step="04" title="等级与基础视觉" description="设置等级条件、字体大小和显示效果。" /><div className="range-grid"><label>物品等级下限<strong>{profile.itemLevelMin}</strong><input type="range" min="1" max="86" value={profile.itemLevelMin} onChange={(event) => update("itemLevelMin", Number(event.target.value))} /></label><label>区域等级下限<strong>{profile.areaLevelMin}</strong><input type="range" min="1" max="86" value={profile.areaLevelMin} onChange={(event) => update("areaLevelMin", Number(event.target.value))} /></label><label>字体大小<strong>{profile.visuals.fontSize}</strong><input type="range" min="18" max="48" value={profile.visuals.fontSize} onChange={(event) => update("visuals", { ...profile.visuals, fontSize: Number(event.target.value) })} /></label></div><div className="checks"><label><input type="checkbox" checked={profile.visuals.showBeams} onChange={(event) => update("visuals", { ...profile.visuals, showBeams: event.target.checked })} />掉落光束</label><label><input type="checkbox" checked={profile.visuals.showMinimapIcons} onChange={(event) => update("visuals", { ...profile.visuals, showMinimapIcons: event.target.checked })} />小地图图标</label></div></section>
       </div><aside className="side-column"><section className="panel config-summary"><h2>当前配置</h2><dl><dt>基础档位</dt><dd>{STRICTNESS_LABELS[profile.strictness]}</dd><dt>视觉风格</dt><dd>{STYLE_LABELS[profile.style]}</dd><dt>客户端语言</dt><dd>{LOCALE_LABELS[profile.locale]}</dd><dt>白名单</dt><dd>{profile.whitelist.flatMap((entry) => entry.itemIds).length} 项</dd><dt>启用光效</dt><dd>{profile.visualPresets.filter((preset) => preset.enabled).length} / {profile.visualPresets.length}</dd><dt>低价值隐藏</dt><dd>{profile.hideBelowEnabled ? "低于 " + profile.hideBelowAmount + " " + currencyShort[profile.hideBelowCurrency] : "未启用"}</dd></dl></section><button className="generate-button" onClick={generate} disabled={busy}><span>{busy ? "生成中…" : "生成过滤器"}</span><b>→</b></button>{error && <p className="error-message">{error}</p>}</aside></section> : <Preview generated={generated} onGenerate={generate} onDownload={downloadFilter} onBundle={downloadBundle} busy={busy} />}
       <footer><span>poe2-filter</span><span>模板：NeverSink · 行情：poe.ninja</span></footer>
     </main>
@@ -154,8 +132,8 @@ function PresetEditor({ preset, market, customFile, onChange, onRemove, onSound 
 
 function PriceBoundEditor({ label, point, market, onChange }: { label: string; point?: PricePoint; market: MarketSnapshot; onChange: (point?: PricePoint) => void }) {
   if (point?.referenceItemId) {
-    const value = toDivines(point, market.rates, market.prices);
-    return <div className="price-bound"><span>{label}</span><strong>{formatPrice(point, market)}</strong><button type="button" className="secondary-button" disabled={value === undefined} onClick={() => onChange(displayPrice(value!, market.rates))}>改为固定价格</button></div>;
+    const value = toExalted(point, market.rates, market.prices);
+    return <div className="price-bound"><span>{label}</span><strong>{formatPrice(point, market)}</strong><button type="button" className="secondary-button" disabled={value === undefined} onClick={() => onChange({ amount: value!, currency: "exalted" })}>改为固定价格</button></div>;
   }
   return <div className="price-bound"><span>{label}</span><label className="price-amount"><span className="sr-only">{label}数值</span><input type="number" min="0" step="0.01" placeholder="不限" value={point?.amount ?? ""} onChange={(event) => onChange(event.target.value === "" ? undefined : { amount: Number(event.target.value), currency: point?.currency ?? "divine" })} /></label><label><span className="sr-only">{label}单位</span><select value={point?.currency ?? "divine"} onChange={(event) => onChange({ amount: point?.amount ?? 0, currency: event.target.value as Currency })}>{Object.entries(currencyLabels).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label></div>;
 }
