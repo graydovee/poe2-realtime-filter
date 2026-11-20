@@ -64,6 +64,7 @@ jobs:
 
   desktop-release:
     name: desktop Windows amd64 release
+    if: ${{ vars.WINDOWS_DESKTOP_RELEASE_ENABLED == 'true' }}
     needs: [merge]
     runs-on: linux-amd64
     env:
