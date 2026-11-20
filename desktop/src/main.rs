@@ -1,9 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #[cfg(not(windows))]
 compile_error!("This client supports Windows amd64 only");
+mod app;
 mod platform;
 mod sync;
-mod ui;
+mod theme;
+mod tray;
+mod widgets;
 fn main(){
  let args:Vec<String>=std::env::args().collect();
  if args.iter().any(|a|a=="--diagnostics"){
@@ -16,5 +19,5 @@ fn main(){
   let (code,data)=match result{Ok(v)=>(0,v),Err(e)=>(1,serde_json::json!({"error":e}))};
   if let Some(i)=args.iter().position(|a|a=="--output"){if let Some(file)=args.get(i+1){let _=std::fs::write(file,data.to_string());}}else{println!("{data}");}std::process::exit(code);
  }
- ui::run(args.iter().any(|a|a=="--tray"));
+ let _=app::run(args.iter().any(|a|a=="--tray"));
 }
