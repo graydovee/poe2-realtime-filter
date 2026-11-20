@@ -79,18 +79,9 @@ jobs:
         run: |
           set -eu
           test -f desktop/Cargo.lock
-          if [ "$(id -u)" -eq 0 ]; then APT=apt-get; else APT="sudo apt-get"; fi
-          $APT update
-          $APT install -y --no-install-recommends curl ca-certificates mingw-w64
-          if command -v rustup >/dev/null; then
-            RUSTUP=rustup
-          else
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.96.1
-            RUSTUP=/root/.cargo/bin/rustup
-          fi
-          export PATH="/tmp/poe2-cargo/bin:/root/.cargo/bin:${PATH}"
-          $RUSTUP target add x86_64-pc-windows-gnu
-          cargo build --release --target x86_64-pc-windows-gnu --manifest-path desktop/Cargo.toml
+          command -v docker >/dev/null
+          docker run --rm -v "$PWD:/src" -w /src/desktop rust:1.96-bookworm \
+            bash -lc 'apt-get update && apt-get install -y --no-install-recommends mingw-w64 && rustup target add x86_64-pc-windows-gnu && cargo build --release --target x86_64-pc-windows-gnu --locked'
           cp desktop/target/x86_64-pc-windows-gnu/release/poe2-filter-client.exe "poe2-filter-windows-amd64-${{ github.ref_name }}.exe"
           sha256sum "poe2-filter-windows-amd64-${{ github.ref_name }}.exe" > "poe2-filter-windows-amd64-${{ github.ref_name }}.exe.sha256"
       - name: publish Gitea release assets
