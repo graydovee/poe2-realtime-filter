@@ -64,3 +64,18 @@ NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2
 `GET /api/leagues` 返回可选赛季；`GET /api/market?league=<赛季ID>` 返回该赛季快照。生成和 ZIP 导出配置均包含 `league`，结果文件名、文件头和清单标记赛季。
 
 行情按赛季保存到 DATA_DIR/markets/ 独立文件，同一赛季缺失或过期时拉取新数据；失败时仅使用该赛季仍有效的缓存，否则沿用 NeverSink 基线。旧版单文件缓存只会被同名赛季使用。同步 worker 每个周期更新全部可选经济区。`POE2_LEAGUE` 只控制默认选择，用户仍可在网页切换。自定义 `MARKET_SNAPSHOT_URL` 接收 league 查询参数，返回 JSON 的 league 必须与请求完全一致。
+
+## Windows 客户端
+
+登录后保存方案并创建只读订阅链接，在 [Windows 客户端](https://git.graydove.cn/graydove/poe2-filter/releases) 中添加链接。客户端默认定位 `C:\Users\<用户>\Documents\My Games\Path of Exile 2`，托盘常驻，每 30 分钟检查一次；首次需要在游戏内选择客户端生成的本地过滤器。
+
+匿名用户只可在网页内生成和下载，关闭网页后配置不保存。
+
+
+### 登录和方案同步
+
+匿名访问只在当前页面内保存编辑状态，可以生成并下载过滤器。登录后可保存多个方案、上传方案音效、复制方案和创建只读同步链接；客户端使用同步链接，不需要登录网站。
+
+Casdoor OIDC 配置完成后设置 `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET` 和 `PUBLIC_ORIGIN`。未配置 OIDC 时登录按钮会提示尚未配置，匿名功能不受影响。
+
+同步链接只允许读取已发布的固定版本 manifest 和文件，版本使用 SHA-256 校验；方案删除、停用或重置密钥后客户端会停止更新并保留现有文件。

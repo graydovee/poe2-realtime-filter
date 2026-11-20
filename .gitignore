@@ -9,3 +9,6 @@ out/
 coverage/
 data/runtime/
 public/uploads/
+
+desktop/target/
+desktop/diagnostics.json

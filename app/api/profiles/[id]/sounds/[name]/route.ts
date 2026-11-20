@@ -1,0 +1,3 @@
+import { requireUser,apiError,ApiError } from '../../../../../../lib/auth';
+import { db,profileRow,soundBytes } from '../../../../../../worker/profile-store.mjs';
+export async function GET(request:Request,{params}:{params:{id:string;name:string}}){try{const u=requireUser(request);if(!profileRow(params.id,u.owner))throw new ApiError(404,'方案不存在');const row=db().prepare('SELECT hash FROM sounds WHERE profile_id=? AND name=?').get(params.id,params.name);if(!row)throw new ApiError(404,'音效不存在');return new Response(new Uint8Array(soundBytes(row.hash)),{headers:{'content-type':'application/octet-stream','cache-control':'private, no-store'}});}catch(e){return apiError(e);}}
