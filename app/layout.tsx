@@ -1,4 +1,14 @@
 import type { Metadata } from "next";
+
+import "@fontsource/cinzel/400.css";
+import "@fontsource/cinzel/600.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/inter/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,7 +19,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <a href="#main" className="sr-only-focusable fixed left-4 top-3 z-50 rounded-sm border border-gold/50 bg-surface-2 px-3 py-2 text-xs text-ink">
+          跳到主要内容
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

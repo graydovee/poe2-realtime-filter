@@ -32,6 +32,14 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 - 价格或汇率同步失败时保留上一份有效快照；没有有效快照则只使用基础过滤器。
 - Kubernetes 更新只通过项目 Git、Chart 和 ArgoCD 完成，不使用直接 `kubectl` 修改。
 
+## 界面与设计系统
+
+网页端使用 Tailwind CSS + Radix 无样式原语重构，配色取自 PoE2 的暗黑奇幻基调，稀有度沿用游戏官方配色；Cinzel / Inter / JetBrains Mono 全部自托管，不请求外部字体或 CDN。设计 token 与组件规范见 [docs/design-system.md](docs/design-system.md)。
+
+- 页面只保留状态与数据流（`app/page.tsx`），面板拆到 `app/components/sections/*`，基础组件在 `app/components/ui/*`。
+- 字体 token、Tailwind 主题与复合组件样式集中定义，新增界面请复用 `ui/*` 组件。
+- 界面改动后的回归：`npx tsc --noEmit --incremental false && npm run lint && npm run build`。
+
 ## 本地开发
 
 ```bash

@@ -1,30 +1,26 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG, LOCALE_LABELS, STRICTNESS_LABELS, STYLE_LABELS } from "../lib/data";
+
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
 import type { Currency, FilterProfile, FilterStyle, LeagueCatalog, Locale, MarketSnapshot, Strictness, VisualPreset } from "../lib/types";
 
-import { SchemeManager } from "./components/scheme-manager";
-import { PresetEditor } from "./components/preset-editor";
 import { applyTemplateAppearances } from "../lib/neversink-appearance";
-import { ItemPicker } from "./components/item-picker";
 import { DEFAULT_PROFILE } from "../lib/default-profile";
-
 import { currencyDefaultRanges, currencyPriceTiers, formatPrice } from "../lib/pricing";
 
-const currencyLabels: Record<Currency, string> = { divine: "D · 神圣石", chaos: "C · 混沌石", exalted: "E · 崇高石" };
-const currencyShort: Record<Currency, string> = { divine: "D", chaos: "C", exalted: "E" };
+import { AppShell } from "./components/app-shell";
+import { PreviewView, type Generated } from "./components/preview-view";
+import { SchemeManager } from "./components/scheme-manager";
+import { BasicFilterSection } from "./components/sections/basic-filter-section";
+import { PresetsSection } from "./components/sections/presets-section";
+import { SeasonSection } from "./components/sections/season-section";
+import { SummarySidebar } from "./components/sections/summary-sidebar";
+import { VisualsSection } from "./components/sections/visuals-section";
+import { WhitelistSection } from "./components/sections/whitelist-section";
+import { TabBar } from "./components/ui/nav";
+
 const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
-
-
-type Generated = {
-  filterFile: string;
-  fileName: string;
-  baselineFile: string;
-  appliedPresets: Array<{ presetId: string; presetName: string; itemCount: number }>;
-  safetyReport: { passed: boolean; warnings: string[]; unknownItems: number; unpricedItems: number; ambiguousItems: number; hiddenHighValueItems: string[]; coveredItems: number; catalogSize: number };
-  market: MarketSnapshot;
-};
 
 export default function HomePage() {
   const [market, setMarket] = useState<MarketSnapshot>(FALLBACK_SNAPSHOT);
@@ -160,39 +156,104 @@ export default function HomePage() {
   }
 
   return (
-    <main className="shell">
-      <header className="topbar"><div className="brand"><span className="brand-mark">◈</span><div><strong>poe2-filter</strong><span>Path of Exile 2</span></div></div><div className="topbar-meta">基于 NeverSink · 行情来源 poe.ninja</div></header>
-      <section className="page-heading"><h1>PoE2 过滤器编辑器</h1><p>选择基础档位，设置白名单、价格光效和音效，然后下载过滤器。</p></section>
-      <section className="panel season-panel" aria-labelledby="season-title"><div className="season-copy"><span className="eyebrow">当前行情范围</span><h2 id="season-title">选择赛季</h2><p>赛季决定行情、价格区间和生成版本。赛季结束后，已保存方案会保留原始赛季并自动归入对应永久区。</p></div><div className="season-control"><label>当前赛季<select value={profile.league} disabled={leaguesLoading} onChange={(event) => selectLeague(event.target.value)}>{leagueCatalog ? <>{[false, true].map((permanent) => <optgroup key={String(permanent)} label={permanent ? "永久区" : "赛季"}>{leagueCatalog.leagues.filter((league) => league.permanent === permanent).map((league) => <option value={league.id} key={league.id}>{league.label}</option>)}</optgroup>)}</> : <option value={profile.league}>{profile.league}</option>}</select></label><p className="league-market-status" role="status">{marketLoading || leaguesLoading ? "正在加载 " + profile.league + " 行情…" : marketError || (selectedMarket.rates ? "行情更新：" + new Date(selectedMarket.capturedAt).toLocaleString("zh-CN") : "暂无可用行情")}</p>{profile.originalLeague && profile.originalLeague !== profile.league && <p className="original-league">原始赛季：{profile.originalLeague}</p>}</div></section>
-      <SchemeManager profile={profile} sounds={customSounds} leagueCatalog={leagueCatalog} onOpen={(p,sounds)=>{requestVersion.current+=1;setProfile(p);setCustomSounds(sounds);setGenerated(null);setActiveTab("builder");}} /><div className="tabbar"><button className={activeTab === "builder" ? "active" : ""} onClick={() => setActiveTab("builder")}>配置过滤器</button><button className={activeTab === "preview" ? "active" : ""} onClick={() => setActiveTab("preview")}>预览与导出</button><span className="tab-spacer" /><span className="sync-status">价格单位 D / C / E</span></div>
+    <AppShell>
+      <div className="flex min-w-0 flex-col gap-4 pt-6">
+        <SeasonSection
+          profile={profile}
+          leagueCatalog={leagueCatalog}
+          leaguesLoading={leaguesLoading}
+          marketLoading={marketLoading}
+          marketError={marketError}
+          selectedMarket={selectedMarket}
+          onLeagueChange={selectLeague}
+        />
 
-      {activeTab === "builder" ? <section className="workspace"><div className="main-column">
-        <section className="panel"><PanelHeading step="01" title="基础过滤器" description="选择 NeverSink 档位和视觉风格。严格度越高，显示的物品越少。" /><div className="strictness-grid">{(Object.keys(STRICTNESS_LABELS).map(Number) as Strictness[]).map((level) => <button key={level} className={"strictness " + (profile.strictness === level ? "selected" : "")} onClick={() => update("strictness", level)}><span className="strict-number">{level}</span><span><b>{STRICTNESS_LABELS[level]}</b><small>{level < 2 ? "显示更多物品" : level > 4 ? "专注高价值" : "推荐起点"}</small></span></button>)}</div><div className="inline-fields"><label>视觉风格<select value={profile.style} onChange={(event) => update("style", event.target.value as FilterStyle)}>{Object.entries(STYLE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label>客户端语言<select value={profile.locale} onChange={(event) => update("locale", event.target.value as Locale)}>{Object.entries(LOCALE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div></section>
+        <SchemeManager
+          profile={profile}
+          sounds={customSounds}
+          leagueCatalog={leagueCatalog}
+          onOpen={(nextProfile, sounds) => {
+            requestVersion.current += 1;
+            setProfile(nextProfile);
+            setCustomSounds(sounds);
+            setGenerated(null);
+            setActiveTab("builder");
+          }}
+        />
 
-        <section className="panel" aria-labelledby="visibility-title"><div className="panel-heading"><div><span className="step">02</span><div><h2 id="visibility-title">白名单与低价值隐藏</h2><p>按物品种类选择白名单，并设置可选的价格隐藏阈值。</p></div></div></div><div className="hide-settings"><div className="hide-settings-heading"><h3>可选低价值隐藏</h3><label className="hide-toggle"><input type="checkbox" checked={profile.hideBelowEnabled} onChange={(event) => update("hideBelowEnabled", event.target.checked)} />启用低价值隐藏</label></div><div className="hide-price-fields"><label>隐藏价格阈值<input type="number" min="0" step="0.01" value={profile.hideBelowAmount} onChange={(event) => update("hideBelowAmount", Number(event.target.value))} disabled={!profile.hideBelowEnabled} /></label><label>计价单位<select value={profile.hideBelowCurrency} onChange={(event) => update("hideBelowCurrency", event.target.value as Currency)} disabled={!profile.hideBelowEnabled}>{Object.entries(currencyLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div><p className="field-help">启用后隐藏低于阈值的已定价物品；白名单优先，未定价物品沿用所选 NeverSink 规则。</p></div><ItemPicker locale={profile.locale} selectedIds={profile.whitelist.flatMap((entry) => entry.itemIds)} onToggle={toggleWhitelist} /></section>
+        <TabBar
+          value={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { value: "builder", label: "配置过滤器" },
+            { value: "preview", label: "预览与导出" },
+          ]}
+          trailing={<span className="font-mono text-[10px] uppercase tracking-[0.14em]">价格单位 D / C / E</span>}
+        />
 
-        <section className="panel"><PanelHeading step="03" title="价格光效规则" description="默认使用崇高石、混沌石、剥离石、神圣石的原始光效，先统一换算成 E，再从低到高排序划分区间。可改为固定 D / C / E 价格；重叠范围按列表顺序匹配。" /><div className="currency-value-list">{currencyPriceTiers(selectedMarket).map((tier) => <div key={tier.itemId}><span>{tier.name}</span><strong>{formatPrice({ amount: tier.exaltedValue, currency: "exalted" })}</strong></div>)}</div><div className="preset-list">{currencyDefaultRanges(applyTemplateAppearances(profile.visualPresets, profile), selectedMarket).map((preset) => <PresetEditor key={preset.id} preset={preset} template={profile} market={selectedMarket} customFile={customSounds[preset.id]} onChange={(patch) => updatePreset(preset.id, patch)} onRemove={() => removePreset(preset.id)} onSound={(file) => { if (!file) return; setCustomSounds((current) => ({ ...current, [preset.id]: file })); updatePreset(preset.id, { sound: { type: "custom", fileName: safeSoundName(file.name) } }); }} />)}</div><button className="secondary-button" onClick={addPreset}>＋ 新增光效预设</button></section>
+        {activeTab === "builder" ? (
+          <div className="grid min-w-0 gap-4 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(15.5rem,17.5rem)]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <BasicFilterSection
+                profile={profile}
+                onStrictnessChange={(level: Strictness) => update("strictness", level)}
+                onStyleChange={(style: FilterStyle) => update("style", style)}
+                onLocaleChange={(locale: Locale) => update("locale", locale)}
+              />
+              <WhitelistSection
+                profile={profile}
+                onHideEnabled={(enabled) => update("hideBelowEnabled", enabled)}
+                onHideAmount={(amount) => update("hideBelowAmount", amount)}
+                onHideCurrency={(currency: Currency) => update("hideBelowCurrency", currency)}
+                onToggleItem={toggleWhitelist}
+              />
+              <PresetsSection
+                profile={profile}
+                market={selectedMarket}
+                customSounds={customSounds}
+                onPresetChange={updatePreset}
+                onRemovePreset={removePreset}
+                onAddPreset={addPreset}
+                onSound={(id, file) => {
+                  if (!file) return;
+                  setCustomSounds((current) => ({ ...current, [id]: file }));
+                  updatePreset(id, { sound: { type: "custom", fileName: safeSoundName(file.name) } });
+                }}
+              />
+              <VisualsSection
+                visuals={profile.visuals}
+                itemLevelMin={profile.itemLevelMin}
+                areaLevelMin={profile.areaLevelMin}
+                onItemLevelMin={(value) => update("itemLevelMin", value)}
+                onAreaLevelMin={(value) => update("areaLevelMin", value)}
+                onFontSize={(value) => update("visuals", { ...profile.visuals, fontSize: value })}
+                onShowBeams={(value) => update("visuals", { ...profile.visuals, showBeams: value })}
+                onShowMinimapIcons={(value) => update("visuals", { ...profile.visuals, showMinimapIcons: value })}
+              />
+            </div>
 
-        <section className="panel"><PanelHeading step="04" title="等级与基础视觉" description="设置等级条件、字体大小和显示效果。" /><div className="range-grid"><label>物品等级下限<strong>{profile.itemLevelMin}</strong><input type="range" min="1" max="86" value={profile.itemLevelMin} onChange={(event) => update("itemLevelMin", Number(event.target.value))} /></label><label>区域等级下限<strong>{profile.areaLevelMin}</strong><input type="range" min="1" max="86" value={profile.areaLevelMin} onChange={(event) => update("areaLevelMin", Number(event.target.value))} /></label><label>字体大小<strong>{profile.visuals.fontSize}</strong><input type="range" min="18" max="48" value={profile.visuals.fontSize} onChange={(event) => update("visuals", { ...profile.visuals, fontSize: Number(event.target.value) })} /></label></div><div className="checks"><label><input type="checkbox" checked={profile.visuals.showBeams} onChange={(event) => update("visuals", { ...profile.visuals, showBeams: event.target.checked })} />掉落光束</label><label><input type="checkbox" checked={profile.visuals.showMinimapIcons} onChange={(event) => update("visuals", { ...profile.visuals, showMinimapIcons: event.target.checked })} />小地图图标</label></div></section>
-      </div><aside className="side-column"><section className="panel config-summary"><h2>当前配置</h2><dl><dt>赛季</dt><dd>{profile.league}</dd><dt>基础档位</dt><dd>{STRICTNESS_LABELS[profile.strictness]}</dd><dt>视觉风格</dt><dd>{STYLE_LABELS[profile.style]}</dd><dt>客户端语言</dt><dd>{LOCALE_LABELS[profile.locale]}</dd><dt>白名单</dt><dd>{profile.whitelist.flatMap((entry) => entry.itemIds).length} 项</dd><dt>启用光效</dt><dd>{profile.visualPresets.filter((preset) => preset.enabled).length} / {profile.visualPresets.length}</dd><dt>低价值隐藏</dt><dd>{profile.hideBelowEnabled ? "低于 " + profile.hideBelowAmount + " " + currencyShort[profile.hideBelowCurrency] : "未启用"}</dd></dl></section><button className="generate-button" onClick={generate} disabled={busy || marketLoading || leaguesLoading}><span>{busy ? "生成中…" : "生成过滤器"}</span><b>→</b></button>{error && <p className="error-message">{error}</p>}</aside></section> : <Preview generated={generated} profile={profile} sounds={customSounds} onGenerate={generate} onDownload={downloadFilter} onBundle={downloadBundle} busy={busy} />}
-      <footer><span>poe2-filter</span><span>模板：NeverSink · 行情：poe.ninja</span></footer>
-    </main>
+            <SummarySidebar
+              profile={profile}
+              busy={busy}
+              disabled={marketLoading || leaguesLoading}
+              error={error}
+              onGenerate={() => void generate()}
+            />
+          </div>
+        ) : (
+          <div className="pt-2">
+            <PreviewView
+              generated={generated}
+              profile={profile}
+              sounds={customSounds}
+              onGenerate={() => void generate()}
+              onDownload={downloadFilter}
+              onBundle={downloadBundle}
+              busy={busy}
+            />
+          </div>
+        )}
+      </div>
+    </AppShell>
   );
-}
-
-function PanelHeading({ step, title, description }: { step: string; title: string; description: string }) {
-  return <div className="panel-heading"><div><span className="step">{step}</span><div><h2>{title}</h2><p>{description}</p></div></div></div>;
-}
-
-function Preview({ generated, profile, sounds, onGenerate, onDownload, onBundle, busy }: { generated: Generated | null; profile: FilterProfile; sounds: Record<string, File>; onGenerate: () => void; onDownload: () => void; onBundle: () => Promise<void>; busy: boolean }) {
-  if (!generated) return <section className="empty-preview"><div className="empty-icon">⌁</div><h2>还没有生成过滤器</h2><p>在配置页设置规则后，生成并下载 .filter 文件或包含音效的 ZIP。</p><button className="generate-button small" onClick={onGenerate} disabled={busy}>开始生成 →</button></section>;
-  return <section className="preview-layout"><div className="preview-main panel"><div className="preview-toolbar"><div><span className="eyebrow">生成结果</span><h2>{generated.fileName}</h2></div><div className="preview-actions"><button className="generate-button compact" onClick={onDownload}>下载 .filter <b>↓</b></button><button className="generate-button compact" onClick={() => void onBundle()}>导出 ZIP <b>↧</b></button><SaveAsScheme profile={profile} sounds={sounds} /></div></div>{!generated.safetyReport.passed && <div className="generation-error" role="alert"><strong>生成结果存在规则冲突</strong><p>请检查白名单和隐藏规则后重新生成。</p></div>}<pre className="filter-preview">{generated.filterFile.slice(0, 16000)}</pre></div><aside className="preview-side"><div className="panel"><span className="eyebrow">模板与行情</span><h3>{generated.baselineFile}</h3><dl><dt>赛季</dt><dd>{generated.market.league}</dd><dt>市场来源</dt><dd>{generated.market.rates ? "poe.ninja" : "暂无可用行情"}</dd><dt>抓取时间</dt><dd>{generated.market.rates ? new Date(generated.market.capturedAt).toLocaleString("zh-CN") : "尚未更新"}</dd><dt>汇率</dt><dd>{generated.market.rates ? "1D = " + generated.market.rates.divineToChaos + "C / " + generated.market.rates.divineToExalted + "E" : "无有效汇率"}</dd></dl></div><details className="panel data-details"><summary>数据说明</summary><p>目录 {generated.safetyReport.catalogSize} 项 · 未定价 {generated.safetyReport.unpricedItems} 项 · 按原始规则处理 {generated.safetyReport.ambiguousItems} 项</p>{generated.safetyReport.warnings.map((warning) => <p key={warning}>{warning}</p>)}</details></aside></section>;
-}
-
-function SaveAsScheme({ profile, sounds }: { profile: FilterProfile; sounds: Record<string, File> }) {
-  const [configured, setConfigured] = useState(false), [account, setAccount] = useState(false), [open, setOpen] = useState(false), [name, setName] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
-  useEffect(() => { fetch("/api/auth/session").then((response) => response.json()).then((payload) => { setConfigured(payload.configured); setAccount(Boolean(payload.user)); }).catch(() => undefined); }, []);
-  async function save() { setBusy(true); setMessage(""); try { const form = new FormData(); form.set("name", name.trim()); form.set("profile", JSON.stringify(profile)); for (const [id, file] of Object.entries(sounds)) form.set("sound:" + id, file); const response = await fetch("/api/profiles", { method: "POST", body: form }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "保存失败"); setOpen(false); setName(""); setMessage("方案已保存。"); window.dispatchEvent(new Event("poe2:schemes-changed")); } catch (error) { setMessage(error instanceof Error ? error.message : "保存失败"); } finally { setBusy(false); } }
-  if (!configured || !account) return <a className="preview-save-link" href={configured ? "/api/auth/login" : undefined}>{configured ? "登录后保存方案" : "保存方案"}</a>;
-  return <><button className="generate-button compact save-as-button" onClick={() => setOpen(true)}>保存为方案</button>{message && <span className="save-feedback" role="status">{message}</span>}{open && <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-as-title"><h3 id="save-as-title">保存为方案</h3><p>当前配置将按赛季 {profile.league} 保存。</p><label>方案名称<input autoFocus maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：开荒方案" /></label><div className="modal-actions"><button onClick={() => setOpen(false)}>取消</button><button disabled={!name.trim() || busy} onClick={() => void save()}>{busy ? "保存中…" : "保存"}</button></div></div></div>}</>;
 }
