@@ -227,14 +227,42 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); ou
 .league-selection label { font-size: 12px; }
 .league-market-status { margin: 0; padding-bottom: 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 @media (max-width: 680px) { .league-selection { grid-template-columns: 1fr; gap: 8px; } }
+.season-panel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 420px); gap: 26px; align-items: center; margin-bottom: 20px; border-color: rgba(116,240,220,.32); background: linear-gradient(135deg, rgba(30,61,72,.74), rgba(14,21,29,.98)); }
+.season-copy h2 { margin: 7px 0 8px; font-size: 22px; }
+.season-copy p { max-width: 680px; margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.season-control { padding: 15px; border: 1px solid rgba(116,240,220,.18); border-radius: 12px; background: rgba(7,13,18,.42); }
+.season-control label { display: block; color: var(--text); font-size: 12px; font-weight: 700; }
+.season-control select { margin-top: 8px; font-size: 14px; padding: 12px; }
+.season-control .league-market-status { padding: 10px 0 0; }
+.original-league { margin: 0; color: var(--amber); font-size: 11px; }
 
 .schemes-panel { margin-bottom: 20px; }
 .scheme-heading { display:flex;justify-content:space-between;gap:16px;align-items:center; }
 .scheme-heading h2 {font-size:16px;margin:0;} .scheme-heading p {color:var(--muted);font-size:12px;margin-bottom:0;}
 .schemes-panel button,.scheme-heading a {border:1px solid var(--border);border-radius:7px;background:var(--surface-3);color:var(--text);padding:9px 12px;text-decoration:none;font-size:12px;}
-.scheme-actions {display:flex;gap:10px;align-items:end;margin-top:18px;flex-wrap:wrap;} .scheme-actions label {flex:1;min-width:160px;}
+.scheme-import-row { display:flex; gap:10px; align-items:end; margin-top:18px; }
+.scheme-import-row label { flex:1; }
+.scheme-import-row .secondary-button { width:auto; margin:0; white-space:nowrap; }
+.scheme-toolbar { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-top:22px; color:var(--muted); font-size:12px; }
+.scheme-toolbar label { display:flex; align-items:center; gap:8px; }
+.scheme-toolbar select { width:auto; min-width:150px; margin:0; padding:7px 9px; font-size:11px; }
 .schemes-panel input {display:block;width:100%;margin-top:7px;background:var(--surface-3);color:var(--text);border:1px solid var(--border);padding:10px;border-radius:7px;}
 .scheme-list {display:flex;flex-direction:column;gap:12px;margin-top:16px;} .scheme-row {display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:12px;flex-wrap:wrap;} .scheme-row strong {font-size:13px;}.scheme-row small {display:block;color:var(--muted);margin-top:6px;font-size:11px;}.scheme-row-actions {display:flex;gap:6px;flex-wrap:wrap;}.sync-link {margin-top:16px;}.sync-link p {font-size:12px;color:var(--muted);}
+.more-menu { position:relative; }
+.more-menu-popover { position:absolute; z-index:10; right:0; top:calc(100% + 6px); min-width:140px; padding:5px; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); box-shadow:0 14px 35px rgba(0,0,0,.35); }
+.more-menu-popover button { display:block; width:100%; text-align:left; border:0; background:transparent; padding:9px 10px; }
+.more-menu-popover button:hover { background:rgba(116,240,220,.09); }
+.modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px; background:rgba(3,7,11,.76); backdrop-filter:blur(5px); }
+.modal-card { width:min(420px,100%); padding:22px; border:1px solid rgba(116,240,220,.28); border-radius:14px; background:var(--surface-2); box-shadow:0 25px 80px rgba(0,0,0,.5); }
+.modal-card h3 { margin:0 0 10px; font-size:17px; }
+.modal-card p { color:var(--muted); font-size:12px; line-height:1.7; }
+.modal-card label { display:block; margin-top:16px; }
+.modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
+.modal-actions button { min-width:76px; }
+.danger-button { color:#ffb3b3 !important; border-color:rgba(255,100,100,.35) !important; }
+.preview-save-link { align-self:center; color:var(--cyan); font-size:11px; white-space:nowrap; }
+.save-as-button { white-space:nowrap; }
+.save-feedback { align-self:center; color:var(--green); font-size:11px; white-space:nowrap; }
 
 .sync-help { min-height: 70vh; display: grid; place-items: center; }
 .sync-help .panel { max-width: 640px; }
@@ -243,3 +271,4 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); ou
 .sync-help a { color: var(--cyan); }
 
 .scheme-login-disabled { color:var(--muted); font-size:12px; }
+@media (max-width: 680px) { .season-panel { grid-template-columns: 1fr; gap: 14px; } .scheme-import-row, .scheme-toolbar { align-items: stretch; flex-direction: column; } .scheme-import-row .secondary-button { width:100%; } .preview-actions { flex-wrap:wrap; } .preview-save-link, .save-feedback { width:100%; text-align:center; } }

@@ -121,6 +121,8 @@ export type VisualOverrides = {
 
 export type FilterProfile = {
   league: string;
+  /** The league originally selected by the user, even after a retired league is remapped. */
+  originalLeague?: string;
   strictness: Strictness;
   style: FilterStyle;
   locale: Locale;

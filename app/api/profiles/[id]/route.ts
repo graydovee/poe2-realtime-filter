@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireUser,sameOrigin,apiError,ApiError } from '../../../../lib/auth';
-import { db,profileRow,summary } from '../../../../worker/profile-store.mjs';
-import { profileInput,saveProfile } from '../../../../lib/profiles';
+import { db,profileRow } from '../../../../worker/profile-store.mjs';
+import { profileInput,saveProfile,resolvedSummary } from '../../../../lib/profiles';
 export const runtime='nodejs';export const dynamic='force-dynamic';
-export async function GET(request:Request,{params}:{params:{id:string}}){try{const u=requireUser(request),row=profileRow(params.id,u.owner);if(!row)throw new ApiError(404,'方案不存在');return NextResponse.json(summary(row),{headers:{'cache-control':'no-store'}});}catch(e){return apiError(e);}}
+export async function GET(request:Request,{params}:{params:{id:string}}){try{const u=requireUser(request),row=profileRow(params.id,u.owner);if(!row)throw new ApiError(404,'方案不存在');return NextResponse.json(await resolvedSummary(row),{headers:{'cache-control':'no-store'}});}catch(e){return apiError(e);}}
 export async function PUT(request:Request,{params}:{params:{id:string}}){try{sameOrigin(request);const u=requireUser(request);return NextResponse.json(saveProfile(u.owner,await profileInput(request),params.id));}catch(e){return apiError(e);}}
+export async function PATCH(request:Request,{params}:{params:{id:string}}){try{sameOrigin(request);const u=requireUser(request),row=profileRow(params.id,u.owner);if(!row)throw new ApiError(404,'方案不存在');const body=await request.json();const name=typeof body?.name==='string'?body.name.trim():'';if(!name||name.length>80)throw new ApiError(400,'方案名称需要1–80个字符');db().prepare('UPDATE profiles SET name=?,updated=? WHERE id=? AND owner=?').run(name,new Date().toISOString(),params.id,u.owner);return NextResponse.json(await resolvedSummary(profileRow(params.id,u.owner)));}catch(e){return apiError(e);}}
 export async function DELETE(request:Request,{params}:{params:{id:string}}){try{sameOrigin(request);const u=requireUser(request);if(!profileRow(params.id,u.owner))throw new ApiError(404,'方案不存在');db().prepare('UPDATE profiles SET deleted=1,enabled=0,token_hash=NULL WHERE id=? AND owner=?').run(params.id,u.owner);return NextResponse.json({ok:true});}catch(e){return apiError(e);}}

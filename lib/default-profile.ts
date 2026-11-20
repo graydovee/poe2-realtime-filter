@@ -3,6 +3,7 @@ import type { FilterProfile } from "./types";
 
 export const DEFAULT_PROFILE: FilterProfile = {
   league: "Standard",
+  originalLeague: "Standard",
   strictness: 2,
   style: "default",
   locale: "cn",

@@ -6,15 +6,16 @@ import { ApiError } from './auth';
 import { DEFAULT_PROFILE } from './default-profile';
 import { ITEM_CATALOG,STYLE_LABELS } from './data';
 import { generateFilter } from './filter-engine';
-import { loadMarketSnapshot } from './market';
+import { getLeagueCatalog, loadMarketSnapshot } from './market';
 import type { FilterProfile,VisualPreset } from './types';
 const safeName=(value:string)=>value.replace(/[^a-zA-Z0-9._-]/g,'_');
 const effects=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
 const number=(value:unknown,min:number,max:number)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max;
 export function validateProfile(input:unknown):FilterProfile {
  const p={...DEFAULT_PROFILE,...input as object} as FilterProfile;
+ p.originalLeague = typeof p.originalLeague === 'string' && p.originalLeague.trim() ? p.originalLeague.trim() : p.league;
  if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new ApiError(400,'无效的基础过滤器');
- if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120)throw new ApiError(400,'无效赛季');
+ if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new ApiError(400,'无效赛季');
  if(!number(p.itemLevelMin,1,100)||!number(p.areaLevelMin,1,100)||!number(p.hideBelowAmount,0,1e12)||!['divine','chaos','exalted'].includes(p.hideBelowCurrency)||typeof p.hideBelowEnabled!=='boolean')throw new ApiError(400,'无效的等级或隐藏阈值');
  if(!Array.isArray(p.whitelist)||p.whitelist.length>3000||p.whitelist.some(e=>!Array.isArray(e.itemIds)||e.itemIds.some(id=>!ITEM_CATALOG.some(i=>i.id===id))))throw new ApiError(400,'无效白名单');
  if(!Array.isArray(p.visualPresets)||p.visualPresets.length>100)throw new ApiError(400,'光效规则过多');
@@ -29,6 +30,26 @@ export function validateProfile(input:unknown):FilterProfile {
   if(!v.sound || (v.sound.type==='builtin' ? !Number.isInteger(v.sound.id)||!number(v.sound.id,1,16)||!number(v.sound.volume,0,300) : !['custom','neversink'].includes(v.sound.type)||typeof v.sound.fileName!=='string'||safeName(v.sound.fileName)!==v.sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(v.sound.fileName)))throw new ApiError(400,'无效音效');
  }
  return JSON.parse(JSON.stringify(p));
+}
+
+/** Keep the original league for display while moving retired seasons to a permanent league. */
+export async function resolveProfileLeague(profile: FilterProfile): Promise<FilterProfile> {
+ const originalLeague = profile.originalLeague || profile.league;
+ try {
+  const catalog = await getLeagueCatalog();
+  if (catalog.leagues.some((league) => league.id === profile.league)) return { ...profile, originalLeague };
+  const hardcore = originalLeague === 'Hardcore' || /^HC\b/i.test(originalLeague);
+  const fallback = hardcore && catalog.leagues.some((league) => league.id === 'Hardcore') ? 'Hardcore' : catalog.leagues.some((league) => league.id === 'Standard') ? 'Standard' : catalog.defaultLeague;
+  return { ...profile, league: fallback, originalLeague };
+ } catch {
+  return { ...profile, originalLeague };
+ }
+}
+
+export async function resolvedSummary(row:any) {
+ const result = summary(row);
+ result.profile = await resolveProfileLeague(result.profile);
+ return result;
 }
 export async function profileInput(request:Request){
  if(Number(request.headers.get('content-length')||0)>34*1024*1024)throw new ApiError(413,'方案上传过大');
@@ -78,7 +99,7 @@ async function renderManifest(row:any){
  const store=db();const status=store.prepare('SELECT * FROM sync_status WHERE profile_id=?').get(row.id);
  const previous=status?.latest?store.prepare('SELECT manifest FROM revisions WHERE profile_id=? AND revision=?').get(row.id,status.latest):undefined;
  try{
-  const config=validateProfile(JSON.parse(row.config));const market=await loadMarketSnapshot(config.league);
+ const config=await resolveProfileLeague(validateProfile(JSON.parse(row.config)));const market=await loadMarketSnapshot(config.league);
   if(!market.rates||Date.parse(market.expiresAt)<=Date.now())throw new Error('所选赛季行情暂不可用');
   const generated=generateFilter(config,market);if(!generated.safetyReport.passed)throw new Error('生成检查未通过');
   const assets=new Map<string,Buffer>();
