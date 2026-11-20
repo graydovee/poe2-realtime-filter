@@ -61,6 +61,9 @@ auth:
   oidc:
     enabled: false
     issuer: https://auth.qaer.io
+    # Set these only in the private charts overlay; the template creates the Secret.
+    clientId: ""
+    clientSecret: ""
     existingSecret: poe2-filter-oidc
     clientIdKey: client-id
     clientSecretKey: client-secret
