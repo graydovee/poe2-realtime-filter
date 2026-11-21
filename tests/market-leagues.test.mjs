@@ -83,6 +83,30 @@ test("custom adapters must return the exact selected league", async () => {
   assert.equal(validSnapshot(b, "Season A"), false);
 });
 
+test("legacy built-in quotes refresh before expiration and invalid Most Popular quotes fall back", async () => {
+  const { options, calls } = await fixture();
+  const old = { ...await getMarketSnapshot("Season A", options), source: "poe.ninja PoE2 exchange" };
+  await fs.writeFile(leagueSnapshotPath("Season A", options), JSON.stringify(old));
+  const requests = calls.length;
+  const fresh = await getMarketSnapshot("Season A", {
+    ...options,
+    fetcher: async (url) => {
+      const result = await options.fetcher(url);
+      Object.assign(result.lines[0], { maxVolumeCurrency: "exalted", maxVolumeRate: 0 });
+      return result;
+    },
+  });
+  assert.equal(calls.length, requests + 1);
+  assert.match(fresh.source, /Most Popular/);
+  assert.deepEqual(fresh.prices["orb-of-annulment"], { ...old.prices["orb-of-annulment"], capturedAt: fresh.capturedAt });
+  assert.deepEqual(await readLeagueSnapshot("Season A", options), fresh);
+  assert.deepEqual(await getMarketSnapshot("Season A", options), fresh);
+  assert.equal(calls.length, requests + 1);
+  await fs.writeFile(leagueSnapshotPath("Season A", options), JSON.stringify(old));
+  assert.deepEqual(await getMarketSnapshot("Season A", { ...options, sourceUrl: "https://adapter.test/snapshot" }), old);
+  assert.equal(calls.length, requests + 1);
+});
+
 test("unknown league IDs are rejected and cannot choose filesystem paths", async () => {
   const { options } = await fixture();
   await assert.rejects(getMarketSnapshot("../Season A", options), /不支持的赛季/);

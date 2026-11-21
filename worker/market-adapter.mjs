@@ -1,5 +1,8 @@
 export const NINJA_TYPES = ["Currency", "Fragments", "Abyss", "UncutGems", "LineageSupportGems", "Essences", "SoulCores", "Idols", "Runes", "Ritual", "Expedition", "Delirium", "Breach", "Verisium"];
 
+const QUOTE_CURRENCIES = new Set(["divine", "chaos", "exalted"]);
+const isPositiveRate = (value) => Number.isFinite(value) && value > 0;
+
 export function parseExchange(payload, catalog, capturedAt) {
   if (payload?.core?.primary !== "divine" || !Array.isArray(payload.items) || !Array.isArray(payload.lines)) {
     throw new Error("Unsupported poe.ninja exchange schema or primary currency");
@@ -10,13 +13,19 @@ export function parseExchange(payload, catalog, capturedAt) {
   for (const line of payload.lines) {
     const metadata = itemById.get(line.id);
     const item = byName.get(String(metadata?.name || "").toLowerCase());
-    const amount = line.primaryValue;
-    if (!item || typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) continue;
-    prices[item.id] = { itemId: item.id, amount, currency: "divine", confidence: 0.9, capturedAt, source: "poe.ninja" };
+    if (!item) continue;
+    const { maxVolumeCurrency, maxVolumeRate, primaryValue } = line;
+    // Most Popular reports item units per one quote currency. Store the price per item.
+    const popularAmount = isPositiveRate(maxVolumeRate) ? 1 / maxVolumeRate : undefined;
+    const usePopular = QUOTE_CURRENCIES.has(maxVolumeCurrency) && isPositiveRate(popularAmount);
+    const amount = usePopular ? popularAmount : primaryValue;
+    if (!isPositiveRate(amount)) continue;
+    const currency = usePopular ? maxVolumeCurrency : "divine";
+    prices[item.id] = { itemId: item.id, amount, currency, confidence: 0.9, capturedAt, source: "poe.ninja" };
   }
   const raw = payload.core.rates;
   let rates;
-  if (Number.isFinite(raw?.chaos) && raw.chaos > 0 && Number.isFinite(raw?.exalted) && raw.exalted > 0) {
+  if (isPositiveRate(raw?.chaos) && isPositiveRate(raw?.exalted)) {
     rates = { divineToChaos: raw.chaos, divineToExalted: raw.exalted, capturedAt, source: "poe.ninja PoE2 exchange" };
     // Use the same conversion basis for the denominations and threshold anchors.
     for (const [name, amount] of [["Divine Orb", 1], ["Chaos Orb", 1 / raw.chaos], ["Exalted Orb", 1 / raw.exalted]]) {

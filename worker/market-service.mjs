@@ -7,6 +7,9 @@ const pending = new Map();
 const retryAfter = new Map();
 const DEFAULT_INTERVAL = 21600000;
 const FALLBACK_SOURCE = "NeverSink baseline fallback";
+const LEGACY_NINJA_SOURCE = "poe.ninja PoE2 exchange";
+const NINJA_SOURCE = "poe.ninja PoE2 exchange (Most Popular)";
+const sourceUrlFor = (options) => options.sourceUrl ?? process.env.MARKET_SNAPSHOT_URL;
 const dataDirectory = (options) => options.dataDir || process.env.DATA_DIR || path.resolve("data/runtime");
 const validTime = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
 
@@ -82,7 +85,7 @@ export async function readLeagueSnapshot(league, options = {}) {
 }
 async function fetchLeagueSnapshot(league, options) {
   const fetcher = options.fetcher || fetchJson;
-  const sourceUrl = options.sourceUrl ?? process.env.MARKET_SNAPSHOT_URL;
+  const sourceUrl = sourceUrlFor(options);
   if (sourceUrl) {
     const url = new URL(sourceUrl); url.searchParams.set("league", league);
     const snapshot = await fetcher(url.toString());
@@ -95,15 +98,17 @@ async function fetchLeagueSnapshot(league, options) {
   const capturedAt = new Date().toISOString();
   const currency = parseExchange(await fetcher(urlFor("Currency")), catalog, capturedAt);
   if (!currency.rates) throw new Error("Missing exchange rates for selected league");
-  const prices = { ...currency.prices };
+  const prices = {};
   const configured = options.types || (process.env.MARKET_NINJA_TYPES ? process.env.MARKET_NINJA_TYPES.split(",").map((type) => type.trim()).filter(Boolean) : NINJA_TYPES);
   const types = [...new Set(configured)].filter((type) => type !== "Currency");
   for (let offset = 0; offset < types.length; offset += 3) {
     const batch = await Promise.allSettled(types.slice(offset, offset + 3).map(async (type) => parseExchange(await fetcher(urlFor(type)), catalog, capturedAt)));
     for (const result of batch) if (result.status === "fulfilled") Object.assign(prices, result.value.prices);
   }
+  // Keep Currency quotes and denomination anchors paired with the rates from that overview.
+  Object.assign(prices, currency.prices);
   const interval = options.intervalMs || Number(process.env.MARKET_SYNC_INTERVAL_MS || DEFAULT_INTERVAL);
-  return { league, capturedAt, expiresAt: new Date(Date.now() + interval * 2).toISOString(), source: "poe.ninja PoE2 exchange", rates: currency.rates, prices };
+  return { league, capturedAt, expiresAt: new Date(Date.now() + interval * 2).toISOString(), source: NINJA_SOURCE, rates: currency.rates, prices };
 }
 
 export async function getMarketSnapshot(selectedLeague, options = {}) {
@@ -111,7 +116,8 @@ export async function getMarketSnapshot(selectedLeague, options = {}) {
   const leagues = await getLeagueCatalog(options);
   if (!leagues.leagues.some((entry) => entry.id === league)) throw new Error("不支持的赛季：" + league);
   const previous = await readLeagueSnapshot(league, options);
-  if (!options.force && validSnapshot(previous, league)) return previous;
+  const needsQuoteRefresh = !sourceUrlFor(options) && previous.source === LEGACY_NINJA_SOURCE;
+  if (!options.force && !needsQuoteRefresh && validSnapshot(previous, league)) return previous;
   const file = leagueSnapshotPath(league, options);
   if (!options.force && (retryAfter.get(file) || 0) > Date.now()) return previous;
   if (pending.has(file)) return pending.get(file);

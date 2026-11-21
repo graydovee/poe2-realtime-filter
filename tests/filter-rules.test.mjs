@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { cleanup, data, engine, pricing, makeRule, snapshot, blockFor, ruleBlocks, withPrice, DEFAULT_PROFILE, DIVINE } from "./helpers.mjs";
 
+import { parseExchange } from "../worker/market-adapter.mjs";
+
 test.after(cleanup);
 
 const { generateFilter } = engine;
@@ -53,6 +55,30 @@ test("物品集合与价格区间同时使用时取交集", () => {
   const all = ruleBlocks(unselected.filterFile);
   assert.ok(all.some((block) => block.includes("/ Gnawed Jawbone")), "只填价格时应对所有有价物品生效");
   assert.ok(all.length > blocks.length, "只填价格应命中更多物品");
+});
+
+test("Most Popular uses the reciprocal quote and converts D, C and E before matching", () => {
+  const examples = [
+    ["lesser-jeweller-s-orb", "divine", 100, 10],
+    ["greater-jeweller-s-orb", "chaos", 20, 0.5],
+    ["greater-regal-orb", "exalted", 0.25, 4],
+  ];
+  const items = examples.map(([id]) => ({ id, name: data.ITEM_CATALOG.find((item) => item.id === id).marketKey }));
+  const lines = examples.map(([id, maxVolumeCurrency, maxVolumeRate]) => ({ id, maxVolumeCurrency, maxVolumeRate, primaryValue: 1 }));
+  delete lines[2].primaryValue;
+  const { prices, rates } = parseExchange({ core: { primary: "divine", rates: { exalted: 1000, chaos: 100 } }, items, lines }, data.ITEM_CATALOG, snapshot.capturedAt);
+  for (const [id, currency, rate, exalted] of examples) {
+    assert.equal(prices[id].currency, currency);
+    assert.equal(prices[id].amount, 1 / rate);
+    assert.equal(pricing.toExalted(prices[id], rates), exalted);
+  }
+  const generated = generateFilter(profile({ skippedItemIds: [], rules: [makeRule({
+    hidden: true,
+    target: { itemIds: examples.map(([id]) => id), range: { max: { amount: 1, currency: "exalted" } } },
+  })] }), { ...snapshot, rates, prices });
+  const blocks = ruleBlocks(generated.filterFile);
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0], /^Hide .*Greater Jeweller/);
 });
 
 test("规则按列表顺序首个命中，后面的规则不再覆盖", () => {
