@@ -93,18 +93,18 @@ jobs:
           release_status="$(curl -sS -o release.json -w '%{http_code}' \
             -H "Authorization: Basic ${AUTH}" "$API/tags/$RELEASE_TAG")"
           if [ "$release_status" = 404 ]; then
-            python3 -c 'import json,sys; print(json.dumps(dict(tag_name=sys.argv[1], name=sys.argv[1], body="Windows amd64 client")))' \
-              "$RELEASE_TAG" > release-request.json
+            jq -n --arg tag "$RELEASE_TAG" \
+              '{tag_name: $tag, name: $tag, body: "Windows amd64 client"}' > release-request.json
             curl -fsS -H "Authorization: Basic ${AUTH}" -H 'Content-Type: application/json' \
               --data-binary @release-request.json "$API" > release.json
           elif [ "$release_status" != 200 ]; then
             echo "Could not read release for $RELEASE_TAG (HTTP $release_status)" >&2
             exit 1
           fi
-          ID="$(python3 -c 'import json; print(json.load(open("release.json"))["id"])')"
+          ID="$(jq -er '.id' release.json)"
           FILE="poe2-filter-windows-amd64-${RELEASE_TAG}.exe"
           for ASSET in "$FILE" "$FILE.sha256"; do
-            if python3 -c 'import json,sys; sys.exit(not any(a["name"] == sys.argv[1] for a in json.load(open("release.json"))["assets"]))' "$ASSET"; then
+            if jq -e --arg name "$ASSET" 'any(.assets[]?; .name == $name)' release.json >/dev/null; then
               echo "$ASSET is already published"
               continue
             fi
