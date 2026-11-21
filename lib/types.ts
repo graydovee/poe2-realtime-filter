@@ -80,10 +80,14 @@ export type PresetSound =
   | { type: "neversink"; fileName: string }
   | { type: "custom"; fileName: string };
 
-/** 规则适用物品：物品集合与价格区间可单选或同时使用，同时使用时取交集。 */
+/** 规则适用物品：物品集合与价格区间可单独启用或同时启用，同时启用时取交集。 */
 export type RuleTarget = {
   itemIds: string[];
+  /** 关闭时忽略 itemIds（保留已选内容）。 */
+  itemEnabled?: boolean;
   range?: PriceRange;
+  /** 关闭时忽略 range（保留区间内容）。 */
+  priceEnabled?: boolean;
 };
 
 export type RuleFont = {

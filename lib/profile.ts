@@ -17,6 +17,8 @@ export function normalizeProfile(input: unknown): FilterProfile {
       target: {
         itemIds: Array.isArray(candidate.target?.itemIds) ? candidate.target!.itemIds : [],
         ...(candidate.target?.range ? { range: candidate.target.range } : {}),
+        ...(candidate.target?.itemEnabled === false ? { itemEnabled: false } : {}),
+        ...(candidate.target?.priceEnabled === false ? { priceEnabled: false } : {}),
       },
       effects: candidate.effects ?? {},
     } as FilterRule;

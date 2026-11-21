@@ -11,6 +11,8 @@
       "effectPresetId": "look-default-15",
       "target": {
         "itemIds": [],
+        "itemEnabled": true,
+        "priceEnabled": true,
         "range": {
           "min": {
             "amount": 1,
@@ -49,6 +51,8 @@
       "effectPresetId": "look-default-17",
       "target": {
         "itemIds": [],
+        "itemEnabled": true,
+        "priceEnabled": true,
         "range": {
           "min": {
             "amount": 1,
@@ -87,6 +91,8 @@
       "effectPresetId": "look-default-16",
       "target": {
         "itemIds": [],
+        "itemEnabled": true,
+        "priceEnabled": true,
         "range": {
           "min": {
             "amount": 1,
@@ -125,6 +131,8 @@
       "effectPresetId": "look-default-06",
       "target": {
         "itemIds": [],
+        "itemEnabled": true,
+        "priceEnabled": true,
         "range": {
           "min": {
             "amount": 1,

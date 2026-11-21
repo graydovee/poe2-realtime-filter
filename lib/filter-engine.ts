@@ -96,15 +96,22 @@ function withinRange(exaltedValue: number | undefined, range: PriceRange | undef
   return exaltedValue >= min && exaltedValue < max;
 }
 
-function hasTarget(rule: FilterRule): boolean {
-  return (rule.target.itemIds?.length ?? 0) > 0 || Boolean(rule.target.range);
+/** 物品条件 / 价格条件各自可关闭；两个都关闭的规则不会命中任何物品。 */
+function conditionUse(rule: FilterRule) {
+  const itemIds = rule.target.itemIds ?? [];
+  return {
+    itemIds,
+    useItems: rule.target.itemEnabled !== false && itemIds.length > 0,
+    usePrice: rule.target.priceEnabled !== false && Boolean(rule.target.range),
+  };
 }
 
 function matches(rule: FilterRule, item: ItemDefinition, exaltedValue: number | undefined, snapshot: MarketSnapshot): boolean {
-  if (!hasTarget(rule)) return false;
-  const itemIds = rule.target.itemIds ?? [];
-  if (itemIds.length && !itemIds.includes(item.id)) return false;
-  return withinRange(exaltedValue, rule.target.range, snapshot);
+  const { itemIds, useItems, usePrice } = conditionUse(rule);
+  if (!useItems && !usePrice) return false;
+  if (useItems && !itemIds.includes(item.id)) return false;
+  if (usePrice && !withinRange(exaltedValue, rule.target.range, snapshot)) return false;
+  return true;
 }
 
 function snapshotUsable(snapshot: MarketSnapshot): boolean {

@@ -39,7 +39,12 @@ function validateRule(rule:FilterRule,ids:Set<string>){
   if(range.min)validatePoint(range.min,'价格下限');
   if(range.max)validatePoint(range.max,'价格上限');
  }
- if(!itemIds.length&&!range)throw new ApiError(400,'规则至少要选择物品或价格区间');
+ if(rule.target.itemEnabled!==undefined&&typeof rule.target.itemEnabled!=='boolean')throw new ApiError(400,'无效规则');
+ if(rule.target.priceEnabled!==undefined&&typeof rule.target.priceEnabled!=='boolean')throw new ApiError(400,'无效规则');
+ if(rule.target.itemEnabled===false&&rule.target.priceEnabled===false)throw new ApiError(400,'规则至少要启用一个条件');
+ const useItems=rule.target.itemEnabled!==false&&itemIds.length>0;
+ const usePrice=rule.target.priceEnabled!==false&&Boolean(range);
+ if(!useItems&&!usePrice)throw new ApiError(400,'规则至少要选择物品或价格区间');
  const effects=rule.effects??{};
  if(effects.beam!==undefined&&!beamPattern.test(effects.beam))throw new ApiError(400,'无效光柱');
  if(effects.icon!==undefined&&!iconPattern.test(effects.icon))throw new ApiError(400,'无效地图图标');

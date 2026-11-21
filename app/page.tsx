@@ -108,7 +108,7 @@ export default function HomePage() {
           name: "新规则 " + (current.rules.length + 1),
           enabled: true,
           hidden: false,
-          target: { itemIds: [], range: { min: { amount: 1, currency: "exalted" } } },
+          target: { itemIds: [], itemEnabled: true, priceEnabled: true, range: { min: { amount: 1, currency: "exalted" } } },
           effects: {},
         },
       ],

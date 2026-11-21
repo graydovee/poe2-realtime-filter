@@ -71,6 +71,21 @@ test("规则按列表顺序首个命中，后面的规则不再覆盖", () => {
   assert.deepEqual(generated.appliedRules.map((entry) => entry.ruleId), ["first"]);
 });
 
+test("物品条件与价格条件可以单独关闭，但不会两个都关", () => {
+  const priced = withPrice(snapshot, "gnawed-jawbone", 0.5);
+  const target = { itemIds: ["gnawed-jawbone"], range: { min: { amount: 1, currency: "divine" } } };
+  const both = generateFilter(profile({ rules: [makeRule({ target })] }), priced);
+  assert.ok(!ruleBlocks(both.filterFile).some((block) => block.includes("Gnawed Jawbone")), "交集不满足时不应命中");
+  const itemsOnly = generateFilter(profile({ rules: [makeRule({ target: { ...target, priceEnabled: false } })] }), priced);
+  assert.ok(ruleBlocks(itemsOnly.filterFile).some((block) => block.includes("Gnawed Jawbone")), "关闭价格条件后应按物品命中");
+  const priceOnly = generateFilter(profile({ rules: [makeRule({ target: { ...target, itemEnabled: false } })] }), priced);
+  const blocks = ruleBlocks(priceOnly.filterFile);
+  assert.ok(blocks.some((block) => block.includes("Divine Orb")), "关闭物品条件后应按价格命中 1D 以上物品");
+  assert.ok(!blocks.some((block) => block.includes("Gnawed Jawbone")), "价格条件仍然生效（骨骸低于 1D）");
+  const neither = generateFilter(profile({ rules: [makeRule({ target: { ...target, itemEnabled: false, priceEnabled: false } })] }), priced);
+  assert.equal(ruleBlocks(neither.filterFile).length, 0, "两个条件都关闭时规则不命中任何物品");
+});
+
 test("隐藏是规则选项，隐藏块仍可带特效", () => {
   const generated = generateFilter(
     profile({ rules: [makeRule({ hidden: true, target: { itemIds: ["scroll-of-wisdom"] }, effects: { sound: { type: "builtin", id: 6, volume: 300 }, beam: "White" } })] }),

@@ -133,7 +133,7 @@ const rules = DEFAULT_ANCHORS.map((anchor, index) => {
     hidden: false,
     autoRange: true,
     effectPresetId: presetId,
-    target: { itemIds: [], range: { min: pricePoint(anchor.itemId), ...(next ? { max: pricePoint(next.itemId) } : {}) } },
+    target: { itemIds: [], itemEnabled: true, priceEnabled: true, range: { min: pricePoint(anchor.itemId), ...(next ? { max: pricePoint(next.itemId) } : {}) } },
     effects: appearance,
   };
 });

@@ -118,18 +118,30 @@ export function Switch({
   onCheckedChange,
   label,
   className,
+  disabled,
+  title,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   label: string;
   className?: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
-    <label className={cn("flex cursor-pointer items-center gap-2.5 text-xs text-ink-muted transition hover:text-ink", className)}>
+    <label
+      title={title}
+      className={cn(
+        "flex items-center gap-2.5 text-xs text-ink-muted transition hover:text-ink",
+        disabled ? "cursor-not-allowed opacity-45 hover:text-ink-muted" : "cursor-pointer",
+        className,
+      )}
+    >
       <SwitchPrimitive.Root
         checked={checked}
+        disabled={disabled}
         onCheckedChange={onCheckedChange}
-        className="relative h-5 w-9 shrink-0 rounded-full border border-line bg-surface-3 transition focus-visible:outline-none data-[state=checked]:border-gold data-[state=checked]:bg-gold"
+        className="relative h-5 w-9 shrink-0 rounded-full border border-line bg-surface-3 transition focus-visible:outline-none data-[state=checked]:border-gold data-[state=checked]:bg-gold disabled:cursor-not-allowed"
       >
         <SwitchPrimitive.Thumb className="block size-3.5 translate-x-[3px] rounded-full bg-ink-muted transition-transform duration-150 data-[state=checked]:translate-x-[18px] data-[state=checked]:bg-[#0b0805]" />
       </SwitchPrimitive.Root>

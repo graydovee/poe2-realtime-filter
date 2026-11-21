@@ -253,6 +253,10 @@ export function RuleEditor({
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [query, setQuery] = useState("");
   const font = rule.effects.font ?? {};
+  const hasItems = rule.target.itemIds.length > 0;
+  const hasPrice = Boolean(rule.target.range);
+  const itemConditionOn = rule.target.itemEnabled !== false && hasItems;
+  const priceConditionOn = rule.target.priceEnabled !== false && hasPrice;
   const selected = presets.find((preset) => preset.id === rule.effectPresetId);
   const filtered = query.trim() ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(query.trim())) : presets;
   const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "neversink" ? "neversink:" + rule.effects.sound.fileName : "builtin:" + rule.effects.sound.id;
@@ -314,10 +318,20 @@ export function RuleEditor({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-3 rounded-sm border border-line/70 bg-surface-2/40 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[11px] font-medium text-ink">适用物品</span>
-            <span className="font-mono text-[10px] text-ink-muted">{rule.target.itemIds.length ? rule.target.itemIds.length + " 项" : "未选择"}</span>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] text-ink-muted">{rule.target.itemIds.length ? rule.target.itemIds.length + " 项" : "未选择"}</span>
+              <Switch
+                checked={itemConditionOn}
+                disabled={!hasItems || (itemConditionOn && !priceConditionOn)}
+                onCheckedChange={(next) => editTarget({ itemEnabled: next })}
+                label="启用物品条件"
+                title={!hasItems ? "先选择物品（当前只按价格匹配）" : itemConditionOn && !priceConditionOn ? "价格条件已关闭，至少要保留一个条件" : undefined}
+              />
+            </div>
           </div>
+          <div className={cn("flex flex-col gap-3", !itemConditionOn && "opacity-55")}>
           <Disclosure summary={rule.target.itemIds.length ? "修改物品选择（" + rule.target.itemIds.length + " 项）" : "选择物品（可选）"} className="rounded-sm border border-line/60 px-3 py-2">
             <div className="pt-3">
               <ItemPicker
@@ -335,14 +349,31 @@ export function RuleEditor({
               />
             </div>
           </Disclosure>
-          <p className="text-[10px] leading-relaxed text-ink-muted/85">不选物品 = 规则对所有物品生效（配合价格区间使用）。</p>
+          <p className="text-[10px] leading-relaxed text-ink-muted/85">
+            {!hasItems
+              ? "未选择物品：规则只按价格条件匹配。"
+              : itemConditionOn
+                ? "不选物品 = 规则对所有物品生效（配合价格区间使用）。"
+                : "物品条件已关闭，已选内容保留但不参与匹配。"}
+          </p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-3 rounded-sm border border-line/70 bg-surface-2/40 p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-[11px] font-medium text-ink">价格区间</span>
-            {rule.autoRange ? <span className="font-mono text-[10px] text-gold">跟随市价</span> : <span className="font-mono text-[10px] text-ink-muted">固定价格</span>}
+            <div className="flex items-center gap-3">
+              {rule.autoRange ? <span className="font-mono text-[10px] text-gold">跟随市价</span> : <span className="font-mono text-[10px] text-ink-muted">固定价格</span>}
+              <Switch
+                checked={priceConditionOn}
+                disabled={!hasPrice || (priceConditionOn && !itemConditionOn)}
+                onCheckedChange={(next) => editTarget({ priceEnabled: next })}
+                label="启用价格条件"
+                title={!hasPrice ? "先填写价格区间" : priceConditionOn && !itemConditionOn ? "物品条件已关闭，至少要保留一个条件" : undefined}
+              />
+            </div>
           </div>
+          <div className={cn("flex flex-col gap-3", !priceConditionOn && "opacity-55")}>
           <div className="grid gap-2 sm:grid-cols-2">
             <PriceBoundEditor label="下限（含）" point={rule.target.range?.min} market={market} autoRange={rule.autoRange} onChange={(point) => onChange({ autoRange: false, target: { ...rule.target, range: { ...rule.target.range, min: point } } })} />
             <PriceBoundEditor label="上限（不含）" point={rule.target.range?.max} market={market} autoRange={rule.autoRange} onChange={(point) => onChange({ autoRange: false, target: { ...rule.target, range: { ...rule.target.range, max: point } } })} />
@@ -354,6 +385,12 @@ export function RuleEditor({
           ) : (
             <p className="text-[10px] leading-relaxed text-ink-muted/85">留空上限表示不封顶；两条规则区间重叠时，列表靠前的那条先生效。</p>
           )}
+          {!priceConditionOn && (
+            <p className="text-[10px] leading-relaxed text-ink-muted/85">
+              {hasPrice ? "价格条件已关闭，区间保留但不参与匹配。" : "未填写价格区间：规则只按物品条件匹配。"}
+            </p>
+          )}
+          </div>
         </div>
       </div>
 
