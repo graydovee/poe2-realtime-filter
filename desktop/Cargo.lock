@@ -2245,7 +2245,7 @@ dependencies = [
 
 [[package]]
 name = "poe2-filter-client"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "base64",
  "eframe",

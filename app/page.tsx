@@ -33,6 +33,7 @@ export default function HomePage() {
   const [marketLoading, setMarketLoading] = useState(true);
   const [marketError, setMarketError] = useState("");
   const requestVersion = useRef(0);
+  const leagueChosen = useRef(false);
   const selectedMarket: MarketSnapshot = market.league === profile.league ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function HomePage() {
     }).then((catalog) => {
       if (controller.signal.aborted) return;
       setLeagueCatalog(catalog);
-      if (catalog.defaultLeague !== DEFAULT_PROFILE.league) {
+      if (!leagueChosen.current && catalog.defaultLeague !== DEFAULT_PROFILE.league) {
         requestVersion.current += 1;
         setProfile((current) => ({ ...current, league: catalog.defaultLeague, originalLeague: catalog.defaultLeague }));
         setGenerated(null);
@@ -76,6 +77,7 @@ export default function HomePage() {
   }, [profile.league]);
 
   function selectLeague(league: string) {
+    leagueChosen.current = true;
     requestVersion.current += 1;
     setProfile((current) => ({ ...current, league, originalLeague: league }));
     setMarket({ ...FALLBACK_SNAPSHOT, league });
@@ -215,10 +217,13 @@ export default function HomePage() {
           sounds={customSounds}
           leagueCatalog={leagueCatalog}
           onOpen={(nextProfile, sounds) => {
+            leagueChosen.current = true;
             requestVersion.current += 1;
             setProfile(nextProfile);
             setCustomSounds(sounds);
             setGenerated(null);
+            setBusy(false);
+            setError("");
             setActiveTab("builder");
           }}
         />
@@ -267,8 +272,6 @@ export default function HomePage() {
           <div className="pt-2">
             <PreviewView
               generated={generated}
-              profile={profile}
-              sounds={customSounds}
               onGenerate={() => void generate()}
               onDownload={downloadFilter}
               onBundle={downloadBundle}

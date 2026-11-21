@@ -2,8 +2,7 @@
 
 import { Download, FileArchive, Sparkles } from "lucide-react";
 
-import type { FilterProfile, MarketSnapshot } from "../../lib/types";
-import { SaveAsScheme } from "./save-as-scheme";
+import type { MarketSnapshot } from "../../lib/types";
 import { Disclosure } from "./ui/nav";
 import { Alert, Button, EmptyState, Panel } from "./ui/primitives";
 
@@ -27,16 +26,12 @@ export type Generated = {
 
 export function PreviewView({
   generated,
-  profile,
-  sounds,
   onGenerate,
   onDownload,
   onBundle,
   busy,
 }: {
   generated: Generated | null;
-  profile: FilterProfile;
-  sounds: Record<string, File>;
   onGenerate: () => void;
   onDownload: () => void;
   onBundle: () => Promise<void>;
@@ -76,7 +71,6 @@ export function PreviewView({
               <FileArchive aria-hidden="true" className="size-3.5" />
               导出 ZIP
             </Button>
-            <SaveAsScheme profile={profile} sounds={sounds} />
           </div>
         </div>
 

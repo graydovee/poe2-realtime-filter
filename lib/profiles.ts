@@ -87,10 +87,10 @@ export async function resolvedSummary(row:any) {
  result.profile = await resolveProfileLeague(result.profile);
  return result;
 }
-export async function profileInput(request:Request){
+export async function profileInput(request:Request, requireName = true){
  if(Number(request.headers.get('content-length')||0)>34*1024*1024)throw new ApiError(413,'方案上传过大');
- const form=await request.formData();const profile=validateProfile(JSON.parse(String(form.get('profile'))));const name=String(form.get('name')||'').trim();
- if(!name||name.length>80)throw new ApiError(400,'方案名称需要1–80个字符');
+ const form=await request.formData();const profile=validateProfile(JSON.parse(String(form.get('profile'))));const name = form.has('name') ? String(form.get('name')).trim() : undefined;
+ if((requireName || name !== undefined) && (!name || name.length > 80))throw new ApiError(400,'方案名称需要1–80个字符');
  const sounds=new Map<string,string>();let total=0;
  for(const [key,value] of form.entries()){
   if(!key.startsWith('sound:')||typeof value==='string'||value.size===0)continue;
@@ -102,20 +102,37 @@ export async function profileInput(request:Request){
  }
  return {name,profile,sounds,version:Number(form.get('version')||0)};
 }
-export function saveProfile(owner:string,input:Awaited<ReturnType<typeof profileInput>>,id?:string){
- const store=db(),existing=id?profileRow(id,owner):undefined;if(id&&!existing)throw new ApiError(404,'方案不存在');
- const profileId=id||crypto.randomUUID();
- const retained=new Map<string,string>((existing?store.prepare('SELECT name,hash FROM sounds WHERE profile_id=?').all(profileId):[]).map((r:any)=>[r.name,r.hash]));
- for(const [name,hash] of input.sounds)retained.set(name,hash);
- for(const rule of input.profile.rules)if(rule.effects.sound?.type==='custom'&&!retained.has(rule.effects.sound.fileName))throw new ApiError(400,'请上传音效：'+rule.effects.sound.fileName);
+export function saveProfile(owner: string, input: Awaited<ReturnType<typeof profileInput>>, id?: string) {
+ const store = db();
+ const profileId = id || crypto.randomUUID();
  store.exec('BEGIN IMMEDIATE');
- try{
-  if(existing){if(existing.version!==input.version)throw new ApiError(409,'方案已被其他页面修改，请重新打开');store.prepare('UPDATE profiles SET name=?,config=?,version=version+1,updated=? WHERE id=? AND owner=?').run(input.name,JSON.stringify(input.profile),new Date().toISOString(),profileId,owner);}
-  else store.prepare('INSERT INTO profiles(id,owner,name,config,updated) VALUES(?,?,?,?,?)').run(profileId,owner,input.name,JSON.stringify(input.profile),new Date().toISOString());
-  for(const [name,hash] of retained)store.prepare('INSERT OR REPLACE INTO sounds VALUES(?,?,?)').run(profileId,name,hash);
+ try {
+  const existing = id ? profileRow(id, owner) : undefined;
+  if (id && !existing) throw new ApiError(404, '方案不存在');
+  if (existing && existing.version !== input.version) throw new ApiError(409, '方案已被其他页面修改，请重新打开');
+  const name = input.name ?? existing?.name;
+  if (!name) throw new ApiError(400, '请输入方案名称');
+  const retained = new Map<string, string>((existing ? store.prepare('SELECT name,hash FROM sounds WHERE profile_id=?').all(profileId) : []).map((row: { name: string; hash: string }) => [row.name, row.hash]));
+  for (const [sound, hash] of input.sounds) retained.set(sound, hash);
+  for (const rule of input.profile.rules) {
+   const sound = rule.effects.sound;
+   if (sound?.type === 'custom' && !retained.has(sound.fileName)) throw new ApiError(400, '请上传音效：' + sound.fileName);
+  }
+  const config = JSON.stringify(input.profile);
+  const updated = new Date().toISOString();
+  if (existing) {
+   store.prepare('UPDATE profiles SET name=?,config=?,version=version+1,updated=? WHERE id=? AND owner=?').run(name, config, updated, profileId, owner);
+  } else {
+   store.prepare('INSERT INTO profiles(id,owner,name,config,updated) VALUES(?,?,?,?,?)').run(profileId, owner, name, config, updated);
+  }
+  for (const [sound, hash] of input.sounds) store.prepare('INSERT OR REPLACE INTO sounds VALUES(?,?,?)').run(profileId, sound, hash);
+  const result = summary(profileRow(profileId, owner));
   store.exec('COMMIT');
- }catch(e){store.exec('ROLLBACK');throw e;}
- return summary(profileRow(profileId,owner));
+  return result;
+ } catch (error) {
+  store.exec('ROLLBACK');
+  throw error;
+ }
 }
 export function subscription(owner:string,id:string,action:string){
  if(!profileRow(id,owner))throw new ApiError(404,'方案不存在');
