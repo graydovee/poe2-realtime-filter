@@ -103,12 +103,25 @@
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 8.5rem;
+    min-height: 11rem;
     overflow: hidden;
     border-radius: 6px;
     background:
       radial-gradient(circle at 50% 118%, rgb(38 27 17 / 0.9), transparent 62%),
       #060403;
+  }
+
+  /* 地面光斑：颜色由规则里的光柱颜色注入（--loot-beam-color）。 */
+  .loot-glow {
+    position: absolute;
+    left: 50%;
+    bottom: -18%;
+    width: 78%;
+    height: 62%;
+    translate: -50% 0;
+    opacity: 0.55;
+    filter: blur(14px);
+    pointer-events: none;
   }
 
   .loot-scene::after {
@@ -121,19 +134,33 @@
 
   .loot-beam {
     position: absolute;
-    top: -12%;
+    top: -18%;
     left: 50%;
-    width: 3.5rem;
-    height: 124%;
+    width: 5.5rem;
+    height: 136%;
     translate: -50% 0;
-    opacity: 0.45;
-    filter: blur(12px);
+    opacity: 0.9;
+    filter: blur(9px) saturate(1.2);
     pointer-events: none;
+  }
+
+  /* 光束核心：更窄更亮的一条，让光柱在小尺寸预设卡片里也能看清。 */
+  .loot-beam::after {
+    content: "";
+    position: absolute;
+    inset: 0 42%;
+    background: linear-gradient(to top, currentColor, transparent 88%);
+    filter: blur(2px);
+    opacity: 0.95;
   }
 
   .loot-label {
     position: relative;
     z-index: 1;
+    max-width: 82%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     padding: 0.25rem 1.15rem;
     border-width: 2px;
     border-style: solid;

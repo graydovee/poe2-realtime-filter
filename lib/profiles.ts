@@ -29,6 +29,7 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  if(typeof rule.name!=='string'||!rule.name.trim()||rule.name.length>100||/[\r\n]/.test(rule.name))throw new ApiError(400,'规则名称需要1–100个字符');
  if(typeof rule.enabled!=='boolean'||typeof rule.hidden!=='boolean')throw new ApiError(400,'无效规则');
  if(rule.autoRange!==undefined&&typeof rule.autoRange!=='boolean')throw new ApiError(400,'无效规则');
+ if(rule.effectPresetId!==undefined&&(typeof rule.effectPresetId!=='string'||rule.effectPresetId.length>60||!/^[a-zA-Z0-9_-]+$/.test(rule.effectPresetId)))throw new ApiError(400,'无效特效预设');
  if(!rule.target||typeof rule.target!=='object')throw new ApiError(400,'规则缺少适用物品');
  const itemIds=rule.target.itemIds;
  if(!Array.isArray(itemIds)||itemIds.length>2000||itemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new ApiError(400,'规则物品无效');

@@ -61,27 +61,25 @@ for (const [name, entry] of Object.entries(mapping)) {
 }
 
 const effects = JSON.parse(fs.readFileSync(path.join(root, "data", "neversink-effects.json"), "utf8"));
-for (const key of ["beams", "icons", "fonts", "sounds", "customSounds"]) {
-  if (!Array.isArray(effects[key]) || effects[key].length === 0) problems.push("effect presets: empty " + key);
-}
-const colorPattern = /^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/;
-for (const font of effects.fonts || []) {
-  if (font.fontSize !== undefined && (!Number.isInteger(font.fontSize) || font.fontSize < 18 || font.fontSize > 45)) problems.push("effect presets: bad font size " + JSON.stringify(font));
-  for (const color of [font.textColor, font.borderColor, font.backgroundColor]) {
-    if (color !== undefined && !colorPattern.test(color)) problems.push("effect presets: bad color " + color);
+const styleNames = ["default", "aura", "cobalt", "customsounds", "darkmode", "mythic", "vaal", "zen"];
+for (const style of styleNames) {
+  const presets = effects.styles?.[style];
+  if (!Array.isArray(presets) || presets.length < 20) problems.push("effect presets: missing or empty style " + style);
+  const ids = new Set();
+  for (const preset of presets || []) {
+    if (!preset.id || ids.has(preset.id) || !/^[a-zA-Z0-9_-]+$/.test(preset.id)) problems.push("effect presets: bad id in " + style + " " + preset.id);
+    ids.add(preset.id);
+    if (!preset.beam && !preset.icon && !preset.font) problems.push("effect presets: empty preset " + preset.id);
+    if (preset.font?.fontSize !== undefined && (!Number.isInteger(preset.font.fontSize) || preset.font.fontSize < 18 || preset.font.fontSize > 45)) problems.push("effect presets: bad font size " + JSON.stringify(preset));
   }
 }
-for (const sound of effects.sounds || []) {
-  if (sound.type === "builtin" ? !Number.isInteger(sound.id) : typeof sound.fileName !== "string") problems.push("effect presets: bad sound " + JSON.stringify(sound));
-}
+if (!Array.isArray(effects.sounds) || effects.sounds.length === 0) problems.push("effect presets: empty sounds");
+if (!Array.isArray(effects.customSounds)) problems.push("effect presets: missing customSounds");
 
 const defaultRules = JSON.parse(fs.readFileSync(path.join(root, "data", "default-rules.json"), "utf8")).rules || [];
 if (defaultRules.length !== 4) problems.push("default rules: expected 4 price tiers, found " + defaultRules.length);
 const anchors = ["exalted-orb", "chaos-orb", "orb-of-annulment", "divine-orb"];
-const beams = new Set(effects.beams || []);
-const icons = new Set(effects.icons || []);
-const fonts = new Set((effects.fonts || []).map((font) => JSON.stringify(font)));
-const sounds = new Set((effects.sounds || []).map((sound) => JSON.stringify(sound)));
+const defaultPresets = new Map((effects.styles?.default || []).map((preset) => [preset.id, preset]));
 const ruleIds = new Set();
 for (const rule of defaultRules) {
   if (!rule.id || ruleIds.has(rule.id)) problems.push("default rules: duplicate id " + rule.id);
@@ -90,10 +88,12 @@ for (const rule of defaultRules) {
   if (!Array.isArray(rule.target?.itemIds) || rule.target.itemIds.length !== 0) problems.push("default rules: price tier must not select items " + rule.id);
   const anchor = rule.target?.range?.min?.referenceItemId;
   if (!anchors.includes(anchor)) problems.push("default rules: bad anchor " + anchor + " for " + rule.id);
-  if (rule.effects?.beam && !beams.has(rule.effects.beam)) problems.push("default rules: beam not in palette " + rule.effects.beam);
-  if (rule.effects?.icon && !icons.has(rule.effects.icon)) problems.push("default rules: icon not in palette " + rule.effects.icon);
-  if (rule.effects?.font && !fonts.has(JSON.stringify(rule.effects.font))) problems.push("default rules: font not in palette " + rule.id);
-  if (rule.effects?.sound && !sounds.has(JSON.stringify(rule.effects.sound))) problems.push("default rules: sound not in palette " + rule.id);
+  const preset = defaultPresets.get(rule.effectPresetId);
+  if (!preset) problems.push("default rules: effectPresetId not in default style " + rule.id + " " + rule.effectPresetId);
+  else {
+    const expected = { ...(preset.beam ? { beam: preset.beam } : {}), ...(preset.icon ? { icon: preset.icon } : {}), ...(preset.font ? { font: preset.font } : {}), ...(preset.sound ? { sound: preset.sound } : {}) };
+    if (JSON.stringify(expected) !== JSON.stringify(rule.effects)) problems.push("default rules: effects differ from preset " + rule.id);
+  }
 }
 
 if (unmapped.length) {
@@ -105,4 +105,4 @@ if (problems.length) {
   for (const problem of problems) console.error("FAIL: " + problem);
   process.exit(1);
 }
-console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + effects.beams.length + " beams / " + effects.icons.length + " icons / " + effects.fonts.length + " font styles / " + effects.sounds.length + " sounds, " + defaultRules.length + " default rules)");
+console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + styleNames.map((style) => style + " " + (effects.styles?.[style]?.length ?? 0)).join(" / ") + " presets, " + defaultRules.length + " default rules)");

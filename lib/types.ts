@@ -107,6 +107,8 @@ export type FilterRule = {
   enabled: boolean;
   hidden: boolean;
   autoRange?: boolean;
+  /** 选中的完整特效预设 id（仅用于回显，生成器只读 effects）。 */
+  effectPresetId?: string;
   target: RuleTarget;
   effects: RuleEffects;
 };
@@ -122,12 +124,19 @@ export type FilterProfile = {
   skippedItemIds: string[];
 };
 
-/** 从基础过滤器里抽取的特效预设集合（data/neversink-effects.json）。 */
+/** 一套完整特效：光柱 + 地图图标 + 字体 + 音效。 */
+export type EffectPreset = {
+  id: string;
+  beam?: string;
+  icon?: string;
+  font?: RuleFont;
+  sound?: PresetSound;
+};
+
+/** 从基础过滤器里抽取的完整特效预设（data/neversink-effects.json），按视觉风格分组。 */
 export type EffectPresets = {
   version: number;
-  beams: string[];
-  icons: string[];
-  fonts: RuleFont[];
+  styles: Record<string, EffectPreset[]>;
   sounds: PresetSound[];
   customSounds: string[];
 };

@@ -72,6 +72,7 @@ export function RulesSection({
             index={index}
             total={profile.rules.length}
             locale={profile.locale}
+            style={profile.style}
             market={market}
             customFile={customSounds[rule.id]}
             onChange={(patch) => onRuleChange(rule.id, patch)}

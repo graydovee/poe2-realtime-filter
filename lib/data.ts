@@ -51,8 +51,13 @@ export const TAXONOMY = mechanicsData as {
   items: Record<string, { mechanic: string; evidence: string }>;
 };
 
-/** 基础过滤器里出现过的光柱 / 图标 / 字体组合 / 音效，作为规则编辑器的预设。 */
+/** 基础过滤器里出现过的完整特效（光柱 + 图标 + 字体 + 音效），按视觉风格分组。 */
 export const EFFECT_PRESETS = effectsData as EffectPresets;
+
+/** 某些风格在 vendored 文件里缺失时回落到 default 的预设。 */
+export function effectPresetsFor(style: string) {
+  return EFFECT_PRESETS.styles[style] ?? EFFECT_PRESETS.styles.default ?? [];
+}
 
 /** 默认 4 条价格规则（崇高石 / 混沌石 / 剥离石 / 神圣石），由 scripts/extract-neversink-effects.mjs 生成。 */
 export const DEFAULT_RULES = (rulesData as { rules: FilterRule[] }).rules;

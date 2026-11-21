@@ -147,14 +147,16 @@ for item of ITEM_CATALOG:
 
 `autoRange` 规则把区间重排成 `[锚点_i, 锚点_{i+1})`，锚点是崇高石 / 混沌石 / 剥离石 / 神圣石，最高档无上限。四枚锚点任一缺价 → 该规则被禁用并在 warnings 里点名；规则顺序保持用户列表顺序（区间互不重叠，不需要重排）。
 
-## 7. 特效预设集合
+## 7. 完整特效预设集合
 
-`scripts/extract-neversink-effects.mjs` 扫描全部 56 个 vendored 过滤器（default + 7 套 STYLE × 7 档），生成：
+`scripts/extract-neversink-effects.mjs` 扫描全部 56 个 vendored 过滤器（default + 7 套 STYLE × 7 档），按视觉风格抽取**完整外观**：一个预设 = 光柱 + 地图图标 + 字体（字号与三色）+ 音效，写入 `data/neversink-effects.json` 的 `styles[style][]`（每套 60–104 个，按在基线里出现的频次排序）。
 
-- `data/neversink-effects.json`：`beams`（PlayEffect）、`icons`（MinimapIcon）、`fonts`（字号 + 文字/边框/背景色的组合）、`sounds`（内置与模板音效）、`customSounds`。
-- `data/default-rules.json`：4 条默认规则（`default-exalted` / `default-chaos` / `default-annulment` / `default-divine`），把 default 风格 2-SEMI-STRICT 里对应通货的 beam/icon/font/sound 直接写成具体值。
+- 预设 id 形如 `look-default-15`，规则用 `effectPresetId` 记住来源（只用于回显；生成器读的是 `effects` 里的具体值）。
+- 选择预设会把四项一次性填入 `rule.effects`；之后任何字段的手改都会清掉 `effectPresetId`，变成「自定义」。
+- 编辑器同时保留一个掉落预览（光柱、标签配色、图标），实时反映当前 `effects`。
+- `data/default-rules.json`：4 条默认规则（`default-exalted` / `default-chaos` / `default-annulment` / `default-divine`），`effectPresetId` 指向 default 风格里对应通货的预设，`effects` 与预设逐项一致。
 
-UI 里的下拉只是预设：选中元素后把对应字段填满，字段本身是普通文本/数字，可以继续编辑；生成器不读取集合，只读取规则里存的具体值，所以生成过程保持离线、确定。
+生成过程不读取预设数据，只读取规则里的具体值，因此保持离线、确定。
 
 ## 8. 输出拼装
 

@@ -1,35 +1,227 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
 
-import { EFFECT_PRESETS } from "../../lib/data";
-import { CURRENCY_ANCHORS, formatPrice, toExalted } from "../../lib/pricing";
-import type { Currency, FilterRule, Locale, MarketSnapshot, PresetSound, PricePoint, RuleFont } from "../../lib/types";
+import { EFFECT_PRESETS, effectPresetsFor } from "../../lib/data";
+import { formatPrice, toExalted } from "../../lib/pricing";
+import type {
+  Currency,
+  EffectPreset,
+  FilterRule,
+  Locale,
+  MarketSnapshot,
+  PresetSound,
+  PricePoint,
+  RuleEffects,
+  RuleFont,
+} from "../../lib/types";
 import { cn } from "../../lib/cn";
 import { ItemPicker, type ItemPickerToggle } from "./item-picker";
-import { Checkbox, FileInput, Select, Switch, TextInput } from "./ui/controls";
+import { Checkbox, FileInput, SearchInput, Select, Switch, TextInput } from "./ui/controls";
 import { Disclosure } from "./ui/nav";
 import { Button, Field } from "./ui/primitives";
 
 const currencyLabels: Record<Currency, string> = { divine: "D · 神圣石", chaos: "C · 混沌石", exalted: "E · 崇高石" };
-const NONE = "__inherit";
-const CUSTOM = "__custom";
+const NONE = "__none";
+const CUSTOM_SOUND = "__custom";
 
-const hex = (color?: string) => {
-  if (!color) return "—";
-  const parts = color.split(/\s+/).map(Number);
-  if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) return color;
-  return "#" + parts.slice(0, 3).map((value) => value.toString(16).padStart(2, "0")).join("");
+const colorNames: Record<string, string> = {
+  Red: "红色", Orange: "橙色", Yellow: "黄色", Green: "绿色", Blue: "蓝色", Cyan: "青色",
+  Purple: "紫色", Pink: "粉色", White: "白色", Brown: "棕色", Grey: "灰色",
+};
+const colorValues: Record<string, string> = {
+  Red: "#ff4040", Orange: "#ff9c38", Yellow: "#ffe14d", Green: "#6bdc68", Blue: "#4995ff", Cyan: "#5ee4eb",
+  Purple: "#b380f5", Pink: "#ff91cb", White: "#fff", Brown: "#a87950", Grey: "#9a9a9a",
+};
+const shapeNames: Record<string, string> = {
+  Circle: "圆形", Star: "星形", Diamond: "菱形", Square: "方形", Pentagon: "五边形", Hexagon: "六边形",
+  Triangle: "三角", Cross: "十字", Kite: "风筝", UpsideDownHouse: "倒屋",
 };
 
-const soundLabel = (sound: PresetSound) =>
-  sound.type === "builtin" ? "内置 " + sound.id + " · 音量 " + sound.volume : sound.fileName;
+function rgbaFromHex(value: string, alpha: number) {
+  const hexValue = value.replace("#", "");
+  const full = hexValue.length === 3 ? hexValue.split("").map((part) => part + part).join("") : hexValue;
+  const number = Number.parseInt(full, 16);
+  if (!Number.isFinite(number) || full.length !== 6) return "rgba(255,255,255," + alpha + ")";
+  const red = (number >> 16) & 255;
+  const green = (number >> 8) & 255;
+  const blue = number & 255;
+  return "rgba(" + red + "," + green + "," + blue + "," + alpha + ")";
+}
+
+function rgba(value?: string, fallback = "transparent") {
+  if (!value) return fallback;
+  const parts = value.split(/\s+/).map(Number);
+  if (parts.length < 3 || parts.some((part) => !Number.isFinite(part))) return fallback;
+  return "rgba(" + parts[0] + ", " + parts[1] + ", " + parts[2] + ", " + (parts[3] ?? 255) / 255 + ")";
+}
+
+function hex(value?: string) {
+  if (!value) return "—";
+  const parts = value.split(/\s+/).map(Number);
+  if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) return value;
+  return "#" + parts.slice(0, 3).map((part) => part.toString(16).padStart(2, "0")).join("");
+}
+
+function iconParts(icon?: string) {
+  const [size, color, shape] = icon?.split(" ") ?? [];
+  return { size, color, shape };
+}
+
+/** 把一套完整特效描述成中文，用于预设列表与「当前预设」回显。 */
+export function describeEffects(effects: RuleEffects): string {
+  const parts: string[] = [];
+  if (effects.beam) {
+    const [color, temporary] = effects.beam.split(" ");
+    parts.push((colorNames[color] ?? color) + "光柱" + (temporary ? "（临时）" : ""));
+  }
+  if (effects.icon) {
+    const { size, color, shape } = iconParts(effects.icon);
+    parts.push((colorNames[color] ?? color ?? "") + (shapeNames[shape] ?? shape ?? "") + "图标" + (size ? "·" + size : ""));
+  }
+  if (effects.font) {
+    const font = effects.font;
+    const bits = [font.fontSize ? font.fontSize + "号" : "", hex(font.textColor), hex(font.borderColor), hex(font.backgroundColor)].filter(Boolean);
+    parts.push("字体 " + bits.join(" / "));
+  }
+  if (effects.sound) {
+    parts.push(effects.sound.type === "builtin" ? "音效 " + effects.sound.id : "音效 " + effects.sound.fileName);
+  }
+  return parts.length ? parts.join(" · ") : "跟随基础过滤器";
+}
+
+function pickEffects(preset: EffectPreset): RuleEffects {
+  return {
+    ...(preset.beam ? { beam: preset.beam } : {}),
+    ...(preset.icon ? { icon: preset.icon } : {}),
+    ...(preset.font ? { font: preset.font } : {}),
+    ...(preset.sound ? { sound: preset.sound } : {}),
+  };
+}
+
+function AppearancePreview({ effects, name }: { effects: RuleEffects; name: string }) {
+  const { color: iconColor, shape } = iconParts(effects.icon);
+  const [beamColor] = (effects.beam ?? "").split(" ");
+  const beam = colorValues[beamColor] ?? "transparent";
+  const font = effects.font ?? {};
+  return (
+    <div className="grid gap-4 rounded-sm border border-line bg-surface-2/50 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.85fr)]">
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold">实时预览</span>
+          <span className="text-[10px] text-ink-muted">改任意字段都会立刻更新</span>
+        </div>
+        <div className="loot-scene border border-line/70">
+        <span aria-hidden="true" className="loot-glow" style={{ background: "radial-gradient(ellipse at center, " + rgbaFromHex(beam === "transparent" ? "#8a7a5c" : beam, 0.45) + ", transparent 70%)" }} />
+        <span
+          aria-hidden="true"
+          className="loot-beam"
+          style={{ color: beam, background: "linear-gradient(to top, " + rgbaFromHex(beam === "transparent" ? "#8a7a5c" : beam, 0.95) + " 0%, " + rgbaFromHex(beam === "transparent" ? "#8a7a5c" : beam, 0.55) + " 55%, transparent 92%)" }}
+        />
+        <span
+          className="loot-label"
+          style={{
+            color: rgba(font.textColor, "#c8c8c8"),
+            borderColor: rgba(font.borderColor),
+            backgroundColor: rgba(font.backgroundColor, "rgba(0,0,0,.7)"),
+          }}
+        >
+          {name}
+        </span>
+        {shape && (
+          <svg viewBox="0 0 24 24" className="loot-icon" style={{ color: colorValues[iconColor] ?? "#9a9a9a" }} aria-label={iconColor + shape}>
+            {shape === "Star" ? (
+              <path fill="currentColor" d="m12 1 3.1 7.1 7.8.7-5.9 5.1 1.8 7.6L12 17.5 5.2 21.5 7 13.9 1.1 8.8l7.8-.7z" />
+            ) : shape === "Circle" ? (
+              <circle cx="12" cy="12" r="9" fill="currentColor" />
+            ) : (
+              <path d="M12 2 22 12 12 22 2 12z" fill="currentColor" />
+            )}
+          </svg>
+        )}
+        </div>
+      </div>
+      <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] content-center gap-x-3 gap-y-2 text-[11px] leading-relaxed">
+        <dt className="text-ink-muted">光柱</dt>
+        <dd className="text-ink/90">{effects.beam ? (colorNames[effects.beam.split(" ")[0]] ?? effects.beam) + (effects.beam.endsWith("Temp") ? "（临时）" : "") : "沿用基础"}</dd>
+        <dt className="text-ink-muted">地图图标</dt>
+        <dd className="text-ink/90">{effects.icon ? describeIcon(effects.icon) : "沿用基础"}</dd>
+        <dt className="text-ink-muted">字体</dt>
+        <dd className="text-ink/90">{font.fontSize ? font.fontSize + " 号" : "沿用基础"}</dd>
+        <dt className="text-ink-muted">音效</dt>
+        <dd className="text-ink/90">{effects.sound ? (effects.sound.type === "builtin" ? "内置 " + effects.sound.id + " · 音量 " + effects.sound.volume : effects.sound.fileName) : "沿用基础"}</dd>
+      </dl>
+    </div>
+  );
+}
+
+function describeIcon(icon: string) {
+  const { size, color, shape } = iconParts(icon);
+  return (colorNames[color] ?? color) + (shapeNames[shape] ?? shape) + " · 尺寸 " + (size ?? "?");
+}
+
+function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active: boolean; onSelect: () => void }) {
+  const { color: iconColor, shape } = iconParts(preset.icon);
+  const [beamColor] = (preset.beam ?? "").split(" ");
+  const font = preset.font ?? {};
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={cn(
+        "group flex flex-col gap-2 rounded-sm border p-2 text-left transition",
+        active ? "border-gold/70 bg-gold/[0.08]" : "border-line bg-surface-2/60 hover:border-line-strong",
+      )}
+    >
+      <span className="loot-scene" style={{ minHeight: "4.25rem" }}>
+        <span aria-hidden="true" className="loot-glow" style={{ background: "radial-gradient(ellipse at center, " + rgbaFromHex(colorValues[beamColor] ?? "#8a7a5c", 0.4) + ", transparent 70%)" }} />
+        <span
+          aria-hidden="true"
+          className="loot-beam"
+          style={{
+            color: colorValues[beamColor] ?? "transparent",
+            background: "linear-gradient(to top, " + rgbaFromHex(colorValues[beamColor] ?? "#8a7a5c", 0.9) + " 0%, " + rgbaFromHex(colorValues[beamColor] ?? "#8a7a5c", 0.5) + " 55%, transparent 92%)",
+          }}
+        />
+        <span
+          className="loot-label"
+          style={{
+            color: rgba(font.textColor, "#c8c8c8"),
+            borderColor: rgba(font.borderColor),
+            backgroundColor: rgba(font.backgroundColor, "rgba(0,0,0,.7)"),
+            fontSize: "10px",
+          }}
+        >
+          示例
+        </span>
+        {shape && (
+          <svg viewBox="0 0 24 24" className="loot-icon" style={{ color: colorValues[iconColor] ?? "#9a9a9a" }}>
+            {shape === "Star" ? (
+              <path fill="currentColor" d="m12 1 3.1 7.1 7.8.7-5.9 5.1 1.8 7.6L12 17.5 5.2 21.5 7 13.9 1.1 8.8l7.8-.7z" />
+            ) : shape === "Circle" ? (
+              <circle cx="12" cy="12" r="9" fill="currentColor" />
+            ) : (
+              <path d="M12 2 22 12 12 22 2 12z" fill="currentColor" />
+            )}
+          </svg>
+        )}
+      </span>
+      <span className="flex items-start gap-1 text-[10px] leading-tight text-ink-muted group-hover:text-ink/90">
+        {active && <Check aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-gold" />}
+        <span className="line-clamp-2">{describeEffects(pickEffects(preset))}</span>
+      </span>
+    </button>
+  );
+}
 
 export function RuleEditor({
   rule,
   index,
   total,
   locale,
+  style,
   market,
   customFile,
   onChange,
@@ -41,6 +233,7 @@ export function RuleEditor({
   index: number;
   total: number;
   locale: Locale;
+  style: string;
   market: MarketSnapshot;
   customFile?: File;
   onChange: (patch: Partial<FilterRule>) => void;
@@ -48,26 +241,36 @@ export function RuleEditor({
   onMove: (delta: number) => void;
   onSound: (file: File | undefined) => void;
 }) {
+  const presets = useMemo(() => effectPresetsFor(style), [style]);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const font = rule.effects.font ?? {};
-  const fontOptions = EFFECT_PRESETS.fonts
-    .filter((candidate) => font.fontSize === undefined || candidate.fontSize === font.fontSize)
-    .map((candidate) => ({ value: JSON.stringify(candidate), label: fontLabel(candidate) }));
-  const currentFont = rule.effects.font && Object.keys(rule.effects.font).length ? JSON.stringify(rule.effects.font) : NONE;
-  const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM : rule.effects.sound.type === "neversink" ? "neversink:" + rule.effects.sound.fileName : "builtin:" + rule.effects.sound.id;
+  const selected = presets.find((preset) => preset.id === rule.effectPresetId);
+  const filtered = query.trim() ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(query.trim())) : presets;
+  const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "neversink" ? "neversink:" + rule.effects.sound.fileName : "builtin:" + rule.effects.sound.id;
 
-  function patchEffects(patch: Partial<FilterRule["effects"]>) {
-    onChange({ effects: { ...rule.effects, ...patch } });
+  function applyPreset(preset: EffectPreset) {
+    onChange({ effectPresetId: preset.id, effects: pickEffects(preset) });
   }
 
-  function patchFont(patch: Partial<RuleFont>) {
+  function editEffects(patch: Partial<RuleEffects>) {
+    const next: RuleEffects = { ...rule.effects, ...patch };
+    for (const key of Object.keys(next) as Array<keyof RuleEffects>) {
+      const value = next[key];
+      if (value === undefined || value === "" || (key === "font" && (!value || Object.keys(value).length === 0))) delete next[key];
+    }
+    onChange({ effectPresetId: undefined, effects: next });
+  }
+
+  function editFont(patch: Partial<RuleFont>) {
     const next: RuleFont = { ...font, ...patch };
     for (const key of Object.keys(next) as Array<keyof RuleFont>) {
       if (next[key] === undefined || next[key] === "") delete next[key];
     }
-    patchEffects({ font: Object.keys(next).length ? next : undefined });
+    editEffects({ font: Object.keys(next).length ? next : undefined });
   }
 
-  function patchTarget(patch: Partial<FilterRule["target"]>) {
+  function editTarget(patch: Partial<FilterRule["target"]>) {
     onChange({ target: { ...rule.target, ...patch } });
   }
 
@@ -118,9 +321,9 @@ export function RuleEditor({
                     if (toggle.checked) current.add(id);
                     else current.delete(id);
                   }
-                  patchTarget({ itemIds: [...current] });
+                  editTarget({ itemIds: [...current] });
                 }}
-                onRemoveEntry={() => patchTarget({ itemIds: [] })}
+                onRemoveEntry={() => editTarget({ itemIds: [] })}
               />
             </div>
           </Disclosure>
@@ -130,11 +333,7 @@ export function RuleEditor({
         <div className="flex flex-col gap-3 rounded-sm border border-line/70 bg-surface-2/40 p-3">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-medium text-ink">价格区间</span>
-            {rule.autoRange ? (
-              <span className="font-mono text-[10px] text-gold">跟随市价</span>
-            ) : (
-              <span className="font-mono text-[10px] text-ink-muted">固定价格</span>
-            )}
+            {rule.autoRange ? <span className="font-mono text-[10px] text-gold">跟随市价</span> : <span className="font-mono text-[10px] text-ink-muted">固定价格</span>}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <PriceBoundEditor label="下限（含）" point={rule.target.range?.min} market={market} autoRange={rule.autoRange} onChange={(point) => onChange({ autoRange: false, target: { ...rule.target, range: { ...rule.target.range, min: point } } })} />
@@ -150,57 +349,47 @@ export function RuleEditor({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 rounded-sm border border-line/70 bg-surface-2/40 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-[11px] font-medium text-ink">完整特效预设</span>
+            <p className="mt-1 truncate text-[10px] text-ink-muted" title={selected ? describeEffects(pickEffects(selected)) : describeEffects(rule.effects)}>
+              {selected ? describeEffects(pickEffects(selected)) : "自定义（逐项填写）"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] text-ink-muted">{presets.length} 种可用</span>
+            <Button variant="secondary" size="sm" onClick={() => setGalleryOpen((open) => !open)} aria-expanded={galleryOpen}>
+              {galleryOpen ? "收起预设" : "选择预设"}
+            </Button>
+          </div>
+        </div>
+
+        {galleryOpen && (
+          <div className="mt-3 flex flex-col gap-2">
+            <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} aria-label="筛选特效预设" placeholder="筛选预设，例如 星形 / 40号 / 白边" />
+            <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+              {filtered.map((preset) => (
+                <PresetCard key={preset.id} preset={preset} active={preset.id === rule.effectPresetId} onSelect={() => applyPreset(preset)} />
+              ))}
+              {filtered.length === 0 && <p className="col-span-full py-4 text-center text-[11px] text-ink-muted">没有匹配的预设。</p>}
+            </div>
+            <p className="text-[10px] leading-relaxed text-ink-muted/85">预设是一次性填入光柱、地图图标、字体和音效；填好之后下面的字段仍可继续修改（改完会变成「自定义」）。</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} />
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Field label="光柱">
-          <div className="flex gap-2">
-            <Select
-              ariaLabel={rule.name + " 光柱预设"}
-              className="flex-1"
-              value={rule.effects.beam ?? NONE}
-              onValueChange={(value) => patchEffects({ beam: value === NONE ? undefined : value })}
-              options={[{ value: NONE, label: "不设置（沿用基础）" }, ...EFFECT_PRESETS.beams.map((beam) => ({ value: beam, label: beam }))]}
-            />
-            <TextInput
-              className="w-28 shrink-0"
-              aria-label={rule.name + " 光柱值"}
-              placeholder="PlayEffect"
-              value={rule.effects.beam ?? ""}
-              onChange={(event) => patchEffects({ beam: event.target.value || undefined })}
-            />
-          </div>
+          <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
         </Field>
-
         <Field label="地图图标">
-          <div className="flex gap-2">
-            <Select
-              ariaLabel={rule.name + " 地图图标预设"}
-              className="flex-1"
-              value={rule.effects.icon ?? NONE}
-              onValueChange={(value) => patchEffects({ icon: value === NONE ? undefined : value })}
-              options={[{ value: NONE, label: "不设置（沿用基础）" }, ...EFFECT_PRESETS.icons.map((icon) => ({ value: icon, label: icon }))]}
-            />
-            <TextInput
-              className="w-32 shrink-0"
-              aria-label={rule.name + " 地图图标值"}
-              placeholder="MinimapIcon"
-              value={rule.effects.icon ?? ""}
-              onChange={(event) => patchEffects({ icon: event.target.value || undefined })}
-            />
-          </div>
+          <TextInput aria-label={rule.name + " 地图图标"} placeholder="MinimapIcon，留空沿用基础" value={rule.effects.icon ?? ""} onChange={(event) => editEffects({ icon: event.target.value })} />
         </Field>
-
-        <Field label="字体预设" hint="选中后会把字号和三种颜色一起填好，之后可以继续改。">
-          <Select
-            ariaLabel={rule.name + " 字体预设"}
-            value={currentFont}
-            onValueChange={(value) => {
-              if (value === NONE) patchEffects({ font: undefined });
-              else patchEffects({ font: JSON.parse(value) as RuleFont });
-            }}
-            options={[{ value: NONE, label: "不设置（沿用基础）" }, ...fontOptions]}
-          />
-        </Field>
-
         <Field label="字号" hint="18–45">
           <div className="flex gap-2">
             <TextInput
@@ -208,14 +397,13 @@ export function RuleEditor({
               min={18}
               max={45}
               aria-label={rule.name + " 字号"}
-              value={font.fontSize ?? ""}
               placeholder="沿用基础"
-              onChange={(event) => patchFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
+              value={font.fontSize ?? ""}
+              onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
             />
             <ColorSwatch color={font.textColor} />
           </div>
         </Field>
-
         {(
           [
             ["textColor", "文字颜色"],
@@ -225,33 +413,31 @@ export function RuleEditor({
         ).map(([key, label]) => (
           <Field key={key} label={label}>
             <div className="flex gap-2">
-              <TextInput
-                aria-label={rule.name + " " + label}
-                placeholder="R G B (A)，留空沿用基础"
-                value={font[key] ?? ""}
-                onChange={(event) => patchFont({ [key]: event.target.value || undefined })}
-              />
+              <TextInput aria-label={rule.name + " " + label} placeholder="R G B (A)，留空沿用基础" value={font[key] ?? ""} onChange={(event) => editFont({ [key]: event.target.value })} />
               <ColorSwatch color={font[key]} />
             </div>
           </Field>
         ))}
-
         <Field label="音效">
           <div className="flex flex-col gap-2">
             <Select
-              ariaLabel={rule.name + " 音效预设"}
+              ariaLabel={rule.name + " 音效"}
               value={soundValue}
               onValueChange={(value) => {
-                if (value === NONE) patchEffects({ sound: undefined });
-                else if (value === CUSTOM) patchEffects({ sound: { type: "custom", fileName: rule.effects.sound?.type === "custom" ? rule.effects.sound.fileName : "" } });
-                else if (value.startsWith("builtin:")) patchEffects({ sound: { type: "builtin", id: Number(value.slice(8)), volume: 300 } });
-                else patchEffects({ sound: { type: "neversink", fileName: value.slice(10) } });
+                if (value === NONE) editEffects({ sound: undefined });
+                else if (value === CUSTOM_SOUND) editEffects({ sound: { type: "custom", fileName: rule.effects.sound?.type === "custom" ? rule.effects.sound.fileName : "" } });
+                else if (value.startsWith("builtin:")) {
+                  const id = Number(value.slice(8));
+                  editEffects({ sound: { type: "builtin", id, volume: rule.effects.sound?.type === "builtin" && rule.effects.sound.id === id ? rule.effects.sound.volume : 300 } });
+                } else editEffects({ sound: { type: "neversink", fileName: value.slice(10) } });
               }}
               options={[
-                { value: NONE, label: "不设置（沿用基础）" },
-                ...Array.from({ length: 6 }, (_, index) => ({ value: "builtin:" + (index + 1), label: "内置音效 " + (index + 1) + " · 音量 300" })),
-                ...EFFECT_PRESETS.customSounds.map((fileName) => ({ value: "neversink:" + fileName, label: "模板音效 · " + fileName })),
-                { value: CUSTOM, label: "自定义上传…" },
+                { value: NONE, label: "沿用基础" },
+                ...EFFECT_PRESETS.sounds.map((sound) => ({
+                  value: sound.type === "builtin" ? "builtin:" + sound.id : "neversink:" + sound.fileName,
+                  label: sound.type === "builtin" ? "内置音效 " + sound.id + " · 音量 " + sound.volume : "模板音效 · " + sound.fileName,
+                })),
+                { value: CUSTOM_SOUND, label: "自定义上传…" },
               ]}
             />
             {rule.effects.sound?.type === "custom" && (
@@ -262,7 +448,6 @@ export function RuleEditor({
                 onFile={onSound}
               />
             )}
-            <span className="font-mono text-[10px] text-ink-muted/85">当前：{rule.effects.sound ? soundLabel(rule.effects.sound) : "沿用基础过滤器"}</span>
           </div>
         </Field>
       </div>
@@ -270,19 +455,11 @@ export function RuleEditor({
   );
 }
 
-function fontLabel(font: RuleFont) {
-  return "字号 " + (font.fontSize ?? "—") + " · " + hex(font.textColor) + " / " + hex(font.borderColor) + " / " + hex(font.backgroundColor);
-}
-
 function ColorSwatch({ color }: { color?: string }) {
   const parts = (color ?? "").split(/\s+/).map(Number);
   const valid = parts.length >= 3 && parts.slice(0, 3).every((value) => Number.isFinite(value));
   return (
-    <span
-      aria-hidden="true"
-      className="grid size-10 shrink-0 place-items-center rounded-sm border border-line bg-surface-3"
-      title={color || "沿用基础"}
-    >
+    <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-sm border border-line bg-surface-3" title={color || "沿用基础"}>
       <span className="size-6 rounded-sm border border-line/60" style={{ background: valid ? "rgb(" + parts.slice(0, 3).join(",") + ")" : "transparent" }} />
     </span>
   );
