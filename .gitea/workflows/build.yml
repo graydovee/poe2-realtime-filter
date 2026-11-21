@@ -64,42 +64,52 @@ jobs:
 
   desktop-release:
     name: desktop Windows amd64 release
-    if: ${{ vars.WINDOWS_DESKTOP_RELEASE_ENABLED == 'true' }}
-    needs: [merge]
     runs-on: linux-amd64
     env:
       CI_GIT_USER: ${{ secrets.CI_GIT_USER }}
       CI_GIT_TOKEN: ${{ secrets.CI_GIT_TOKEN }}
+      RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - name: checkout
         run: |
           set -eu
-          git clone --branch '${{ github.ref_name }}' --depth 1 \
+          git clone --branch "$RELEASE_TAG" --depth 1 \
             "https://${CI_GIT_USER}:${CI_GIT_TOKEN}@${REPO}" .
       - name: build Windows amd64
         run: |
           set -eu
-          test -f desktop/Cargo.lock
-          command -v docker >/dev/null
-          docker run --rm -v "$PWD:/src" -w /src/desktop harbor.graydove.cn/library/node:22-alpine \
-            sh -lc 'apk add --no-cache rust cargo rustup mingw-w64-gcc && rustup target add x86_64-pc-windows-gnu && cargo build --release --target x86_64-pc-windows-gnu --locked'
-          cp desktop/target/x86_64-pc-windows-gnu/release/poe2-filter-client.exe "poe2-filter-windows-amd64-${{ github.ref_name }}.exe"
-          sha256sum "poe2-filter-windows-amd64-${{ github.ref_name }}.exe" > "poe2-filter-windows-amd64-${{ github.ref_name }}.exe.sha256"
+          BUILD_IMAGE="poe2-filter-windows-build:${RELEASE_TAG}"
+          docker build --file .gitea/windows-amd64.Dockerfile --tag "$BUILD_IMAGE" .
+          CONTAINER="$(docker create "$BUILD_IMAGE")"
+          trap 'docker rm "$CONTAINER" >/dev/null' EXIT
+          FILE="poe2-filter-windows-amd64-${RELEASE_TAG}.exe"
+          docker cp "${CONTAINER}:/poe2-filter-client.exe" "$FILE"
+          sha256sum "$FILE" > "$FILE.sha256"
       - name: publish Gitea release assets
         run: |
           set -eu
-          TAG='${{ github.ref_name }}'
+          API="https://git.graydove.cn/api/v1/repos/graydove/poe2-filter/releases"
           AUTH="$(printf '%s' "${CI_GIT_USER}:${CI_GIT_TOKEN}" | base64 | tr -d '\n')"
-          RELEASE="$(curl -fsS -X POST -H "Authorization: Basic ${AUTH}" -H 'Content-Type: application/json' \
-            -d "{\"tag_name\":\"${TAG}\",\"name\":\"${TAG}\",\"body\":\"Windows amd64 client\"}" \
-            "https://git.graydove.cn/api/v1/repos/graydove/poe2-filter/releases" || true)"
-          ID="$(printf '%s' "$RELEASE" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id", ""))')"
-          if [ -z "$ID" ]; then
-            ID="$(curl -fsS -H "Authorization: Basic ${AUTH}" "https://git.graydove.cn/api/v1/repos/graydove/poe2-filter/releases/tags/${TAG}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+          release_status="$(curl -sS -o release.json -w '%{http_code}' \
+            -H "Authorization: Basic ${AUTH}" "$API/tags/$RELEASE_TAG")"
+          if [ "$release_status" = 404 ]; then
+            python3 -c 'import json,sys; print(json.dumps(dict(tag_name=sys.argv[1], name=sys.argv[1], body="Windows amd64 client")))' \
+              "$RELEASE_TAG" > release-request.json
+            curl -fsS -H "Authorization: Basic ${AUTH}" -H 'Content-Type: application/json' \
+              --data-binary @release-request.json "$API" > release.json
+          elif [ "$release_status" != 200 ]; then
+            echo "Could not read release for $RELEASE_TAG (HTTP $release_status)" >&2
+            exit 1
           fi
-          for FILE in "poe2-filter-windows-amd64-${TAG}.exe" "poe2-filter-windows-amd64-${TAG}.exe.sha256"; do
-            curl -fsS -X POST -H "Authorization: Basic ${AUTH}" \
-              -F "attachment=@${FILE}" "https://git.graydove.cn/api/v1/repos/graydove/poe2-filter/releases/${ID}/assets?name=${FILE}"
+          ID="$(python3 -c 'import json; print(json.load(open("release.json"))["id"])')"
+          FILE="poe2-filter-windows-amd64-${RELEASE_TAG}.exe"
+          for ASSET in "$FILE" "$FILE.sha256"; do
+            if python3 -c 'import json,sys; sys.exit(not any(a["name"] == sys.argv[1] for a in json.load(open("release.json"))["assets"]))' "$ASSET"; then
+              echo "$ASSET is already published"
+              continue
+            fi
+            curl -fsS -H "Authorization: Basic ${AUTH}" \
+              -F "attachment=@${ASSET}" "$API/${ID}/assets?name=${ASSET}"
           done
 
   bump-chart:

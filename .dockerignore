@@ -4,3 +4,4 @@ node_modules
 .gitignore
 vendor/neversink/.git
 *.log
+desktop/target
