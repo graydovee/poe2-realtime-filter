@@ -9,7 +9,7 @@ use std::{
 
 use eframe::egui::{self, Align, Color32, Frame, Layout, Margin, RichText, Stroke, Vec2};
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS},
+    Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE},
     System::Threading::CreateMutexW,
     UI::WindowsAndMessaging::{
         FindWindowW, MessageBoxW, SetForegroundWindow, ShowWindow, MB_ICONERROR, MB_OK, SW_RESTORE,
@@ -59,6 +59,7 @@ pub struct App {
     minutes: String,
     autostart: bool,
     selected: Option<usize>,
+    pending_removal: Option<usize>,
     busy: bool,
     failures: u32,
     next_attempt: Instant,
@@ -95,6 +96,7 @@ impl App {
             minutes,
             autostart,
             selected: None,
+            pending_removal: None,
             busy: false,
             failures: 0,
             next_attempt: Instant::now(),
@@ -129,7 +131,7 @@ impl App {
     }
 
     fn start_update(&mut self, indices: Option<Vec<usize>>) {
-        if self.busy {
+        if self.busy || self.pending_removal.is_some() {
             return;
         }
         let entries: Vec<Entry> = match indices {
@@ -147,6 +149,7 @@ impl App {
         self.notice_set("正在检查更新…".to_owned(), Tone::Gold);
         let root = self.root.clone();
         let sender = self.sender.clone();
+        let subscriptions = self.settings.entries.clone();
         thread::spawn(move || {
             let mut list = entries;
             let mut changed = false;
@@ -155,7 +158,7 @@ impl App {
                 if entry.paused || entry.revoked {
                     continue;
                 }
-                match sync::update(&root, entry) {
+                match sync::update(&root, entry, &subscriptions) {
                     Ok(updated) => changed |= updated,
                     Err(message) => {
                         entry.status = message;
@@ -168,7 +171,7 @@ impl App {
     }
 
     fn start_rollback(&mut self, index: usize) {
-        if self.busy {
+        if self.busy || self.pending_removal.is_some() {
             return;
         }
         let Some(entry) = self.settings.entries.get(index).cloned() else {
@@ -178,9 +181,10 @@ impl App {
         self.notice_set("正在回滚上一版…".to_owned(), Tone::Gold);
         let root = self.root.clone();
         let sender = self.sender.clone();
+        let subscriptions = self.settings.entries.clone();
         thread::spawn(move || {
             let mut entry = entry;
-            let outcome = match sync::rollback(&root, &mut entry) {
+            let outcome = match sync::rollback(&root, &mut entry, &subscriptions) {
                 Ok(()) => Ok(entry),
                 Err(error) => Err((entry, error)),
             };
@@ -204,7 +208,6 @@ impl App {
                     }
                     self.busy = false;
                     self.schedule(failed);
-                    self.persist();
                     if failed {
                         self.notice_set(
                             "部分更新失败，原有过滤器已保留。请选择条目查看详情。".to_owned(),
@@ -212,12 +215,13 @@ impl App {
                         );
                     } else if changed {
                         self.notice_set(
-                            "更新完成。首次请在游戏内选择 poe2-filter 过滤器；更新后重新加载。".to_owned(),
+                            "更新完成。请在游戏内按方案名选择过滤器，或重新加载。".to_owned(),
                             Tone::Gold,
                         );
                     } else {
                         self.notice_set("检查完成，已是最新版本。".to_owned(), Tone::Muted);
                     }
+                    self.persist();
                 }
                 Message::Rolled { index, outcome } => {
                     match outcome {
@@ -315,6 +319,7 @@ impl App {
                 if entry.directory != directory {
                     entry.directory = directory;
                     entry.current = None;
+                    entry.filter_filename = None;
                 }
             }
         }
@@ -333,6 +338,9 @@ impl App {
     }
 
     fn toggle_all(&mut self) {
+        if self.busy || self.pending_removal.is_some() {
+            return;
+        }
         let paused = self.settings.entries.iter().any(|entry| !entry.paused);
         for entry in &mut self.settings.entries {
             entry.paused = paused;
@@ -345,14 +353,72 @@ impl App {
         );
     }
 
-    fn remove_entry(&mut self, index: usize) {
-        if index >= self.settings.entries.len() {
+    fn remove_entry(&mut self, index: usize, delete_file: bool) {
+        let Some(entry) = self.settings.entries.get(index) else { return };
+        if self.busy {
             return;
         }
-        self.settings.entries.remove(index);
+        if delete_file {
+            if let Err(error) = sync::delete_filter(&self.root, entry, &self.settings.entries) {
+                self.notice_set(error, Tone::Ember);
+                return;
+            }
+        }
+        let mut settings = self.settings.clone();
+        settings.entries.remove(index);
+        if let Err(error) = sync::save_settings(&self.root, &settings) {
+            if delete_file {
+                self.settings.entries[index].paused = true;
+            }
+            self.notice_set(format!("无法保存移除操作：{error}"), Tone::Ember);
+            return;
+        }
+        self.settings = settings;
         self.selected = None;
-        self.persist();
-        self.notice_set("已移除方案".to_owned(), Tone::Muted);
+        let message = if delete_file { "已移除方案并清理本地过滤器" } else { "已移除方案，本地文件已保留" };
+        self.notice_set(message.to_owned(), Tone::Sage);
+    }
+
+    fn removal_dialog(&mut self, ctx: &egui::Context) {
+        let Some(index) = self.pending_removal else { return };
+        let Some(entry) = self.settings.entries.get(index) else {
+            self.pending_removal = None;
+            return;
+        };
+        let name = if entry.name.is_empty() { "未命名方案" } else { &entry.name };
+        let path = sync::filter_path(entry);
+        let dialog = egui::Modal::new(egui::Id::unique("remove-scheme")).show(ctx, |ui| {
+            ui.set_width(420.0);
+            ui.heading("移除方案");
+            ui.label(format!("移除「{name}」后将停止同步。"));
+            match &path {
+                Ok(Some(path)) => {
+                    ui.label("是否同时删除以下本地过滤器？");
+                    ui.label(path.display().to_string());
+                }
+                Ok(None) => { ui.label("此方案尚未安装本地过滤器。"); }
+                Err(error) => { ui.colored_label(theme::EMBER, error); }
+            }
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
+                if widgets::secondary_button(ui, "取消", true, 0.0).clicked() {
+                    ui.close();
+                }
+                if widgets::secondary_button(ui, "仅移除方案", true, 0.0).clicked() {
+                    return Some(false);
+                }
+                if matches!(path, Ok(Some(_))) && widgets::danger_button(ui, "移除并删除文件", true).clicked() {
+                    return Some(true);
+                }
+                None
+            }).inner
+        });
+        if let Some(delete_file) = dialog.inner {
+            self.pending_removal = None;
+            self.remove_entry(index, delete_file);
+        } else if dialog.should_close() {
+            self.pending_removal = None;
+        }
     }
 
     fn next_check_label(&self) -> String {
@@ -516,7 +582,7 @@ impl App {
                     self.start_rollback(index);
                 }
                 if widgets::danger_button(ui, "移除", !self.busy).clicked() {
-                    self.remove_entry(index);
+                    self.pending_removal = Some(index);
                 }
             });
         }
@@ -583,10 +649,13 @@ impl eframe::App for App {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_tray(ctx);
         self.poll_worker();
-        if !self.busy && Instant::now() >= self.next_attempt {
+        if !self.busy && self.pending_removal.is_none() && !self.settings.entries.is_empty()
+            && Instant::now() >= self.next_attempt
+        {
             self.start_update(None);
         }
         if !self.quit && ctx.input(|input| input.viewport().close_requested()) {
+            self.pending_removal = None;
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
         }
@@ -632,32 +701,56 @@ impl eframe::App for App {
                     );
                 });
             });
+        self.removal_dialog(ui.ctx());
+    }
+}
+
+pub(crate) struct Instance(HANDLE);
+
+impl Instance {
+    pub(crate) fn acquire() -> sync::Result<Option<Self>> {
+        unsafe {
+            let name = platform::wide("Local\\poe2-filter-client");
+            let mutex = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
+            if mutex.is_null() {
+                return Err(platform::err("无法锁定客户端"));
+            }
+            let already_running = GetLastError() == ERROR_ALREADY_EXISTS;
+            let instance = Self(mutex);
+            Ok((!already_running).then_some(instance))
+        }
+    }
+}
+
+impl Drop for Instance {
+    fn drop(&mut self) {
+        unsafe { CloseHandle(self.0); }
     }
 }
 
 pub fn run(tray_only: bool) -> eframe::Result<()> {
     unsafe {
-        let mutex = CreateMutexW(
-            std::ptr::null(),
-            0,
-            platform::wide("Local\\poe2-filter-client").as_ptr(),
-        );
-        if GetLastError() == ERROR_ALREADY_EXISTS {
-            let existing = FindWindowW(std::ptr::null(), platform::wide(WINDOW_TITLE).as_ptr());
-            if !existing.is_null() {
-                ShowWindow(existing, SW_RESTORE);
-                SetForegroundWindow(existing);
+        let _instance = match Instance::acquire() {
+            Ok(Some(instance)) => instance,
+            Ok(None) => {
+                let existing = FindWindowW(std::ptr::null(), platform::wide(WINDOW_TITLE).as_ptr());
+                if !existing.is_null() {
+                    ShowWindow(existing, SW_RESTORE);
+                    SetForegroundWindow(existing);
+                }
+                return Ok(());
             }
-            CloseHandle(mutex);
-            return Ok(());
-        }
+            Err(error) => {
+                error_box(&error);
+                return Ok(());
+            }
+        };
 
         let root = sync::state_root();
         let settings = match sync::read_settings(&root) {
             Ok(settings) => settings,
             Err(error) => {
                 error_box(&error);
-                CloseHandle(mutex);
                 return Ok(());
             }
         };
@@ -684,7 +777,6 @@ pub fn run(tray_only: bool) -> eframe::Result<()> {
             options,
             Box::new(move |cc| Ok(Box::new(App::new(cc, root, settings, tray)))),
         );
-        CloseHandle(mutex);
         result
     }
 }

@@ -46,9 +46,12 @@ pub fn pick_directory()->Option<std::path::PathBuf>{unsafe{
 pub fn open_directory(path:&std::path::Path){unsafe{
  let target=path.to_string_lossy().to_string();ShellExecuteW(ptr::null_mut(),wide("open").as_ptr(),wide(&target).as_ptr(),ptr::null(),ptr::null(),SW_SHOWNORMAL);
 }}
-pub fn replace(from:&std::path::Path,to:&std::path::Path)->Result<(),String>{unsafe{
+pub fn replace(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
+    move_file(from, to, true)
+}
+pub fn move_file(from:&std::path::Path,to:&std::path::Path,replace:bool)->Result<(),String>{unsafe{
  use std::os::windows::ffi::OsStrExt;let a:Vec<u16>=from.as_os_str().encode_wide().chain(Some(0)).collect();let b:Vec<u16>=to.as_os_str().encode_wide().chain(Some(0)).collect();
- if MoveFileExW(a.as_ptr(),b.as_ptr(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)==0{return Err(err("文件占用或无法替换"));}Ok(())
+ if MoveFileExW(a.as_ptr(),b.as_ptr(),(if replace { MOVEFILE_REPLACE_EXISTING } else { 0 }) | MOVEFILE_WRITE_THROUGH)==0{return Err(err("文件占用或无法替换"));}Ok(())
 }}
 pub fn autostart(enabled:bool)->Result<(),String>{unsafe{
  let mut key=ptr::null_mut();if RegCreateKeyExW(HKEY_CURRENT_USER,wide("Software\\Microsoft\\Windows\\CurrentVersion\\Run").as_ptr(),0,ptr::null(),0,KEY_SET_VALUE,ptr::null(),&mut key,ptr::null_mut())!=0{return Err("无法设置开机启动".into());}
