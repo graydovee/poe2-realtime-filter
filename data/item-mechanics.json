@@ -1,9 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "updatedAt": "2026-11-21",
   "generatedBy": "scripts/build-item-mechanics.mjs",
   "sources": [
-    "poe2wiki.net：条目 tags 与 drop_text 判定来源玩法",
+    "poe2wiki.net / Category：Abyss、Breach、Delirium、Expedition、Ritual、Fate of the Vaal 等显式分类",
+    "poe2wiki.net：条目 tags 与 drop_text（分类缺失时兜底）",
     "poe.ninja PoE2 economy：Currency / Fragments / Abyss / Expedition / Delirium / Breach / Ritual / Verisium 分类交叉核对"
   ],
   "mechanics": {
@@ -121,223 +122,877 @@
     }
   },
   "items": {
-    "Adaptive Alloy": "expedition",
-    "Adaptive Catalyst": "breach",
-    "Albino Rhoa Feather": "basic",
-    "Alchemy Shard": "basic",
-    "Aldur's Saga": "expedition",
-    "Altered Collarbone": "abyss",
-    "Ancient Collarbone": "abyss",
-    "Ancient Concentrated Liquid Fear": "delirium",
-    "Ancient Concentrated Liquid Isolation": "delirium",
-    "Ancient Concentrated Liquid Suffering": "delirium",
-    "Ancient Diluted Liquid Greed": "delirium",
-    "Ancient Diluted Liquid Guilt": "delirium",
-    "Ancient Diluted Liquid Ire": "delirium",
-    "Ancient Infuser": "temple",
-    "Ancient Jawbone": "abyss",
-    "Ancient Liquid Despair": "delirium",
-    "Ancient Liquid Disgust": "delirium",
-    "Ancient Liquid Envy": "delirium",
-    "Ancient Liquid Paranoia": "delirium",
-    "Ancient Potent Liquid Contempt": "delirium",
-    "Ancient Potent Liquid Ferocity": "delirium",
-    "Ancient Potent Liquid Melancholy": "delirium",
-    "Ancient Rib": "abyss",
-    "Arcanist's Etcher": "basic",
-    "Architect's Orb": "temple",
-    "Armourer's Scrap": "basic",
-    "Artificer's Orb": "basic",
-    "Artificer's Shard": "basic",
-    "Blacksmith's Whetstone": "basic",
-    "Blazing Flux": "expedition",
-    "Breach Splinter": "breach",
-    "Bronze Key": "trial",
-    "Carapace Catalyst": "breach",
-    "Celestial Alloy": "expedition",
-    "Chance Shard": "basic",
-    "Chaos Orb": "basic",
-    "Chayula's Catalyst": "breach",
-    "Chilling Flux": "expedition",
-    "Concentrated Liquid Fear": "delirium",
-    "Concentrated Liquid Isolation": "delirium",
-    "Concentrated Liquid Suffering": "delirium",
-    "Core Destabiliser": "temple",
-    "Crackling Flux": "expedition",
-    "Cryptic Key": "basic",
-    "Crystallised Corruption": "temple",
-    "Cyclonic Alloy": "expedition",
-    "Diluted Liquid Greed": "delirium",
-    "Diluted Liquid Guilt": "delirium",
-    "Diluted Liquid Ire": "delirium",
-    "Divine Orb": "basic",
-    "Esh's Catalyst": "breach",
-    "Exalted Orb": "basic",
-    "Exceptional Verisium": "expedition",
-    "Expansive Alloy": "expedition",
-    "Flesh Catalyst": "breach",
-    "Fracturing Orb": "basic",
-    "Gemcutter's Prism": "basic",
-    "Glassblower's Bauble": "basic",
-    "Gnawed Collarbone": "abyss",
-    "Gnawed Jawbone": "abyss",
-    "Gnawed Rib": "abyss",
-    "Gold": "basic",
-    "Gold Key": "trial",
-    "Greater Chaos Orb": "basic",
-    "Greater Exalted Orb": "basic",
-    "Greater Jeweller's Orb": "basic",
-    "Greater Orb of Augmentation": "basic",
-    "Greater Orb of Transmutation": "basic",
-    "Greater Regal Orb": "basic",
-    "Hinekora's Lock": "basic",
-    "Kamasa's Orb of Sacrifice": "temple",
-    "Kopec's Orb of Sacrifice": "temple",
-    "Lesser Jeweller's Orb": "basic",
-    "Liquid Despair": "delirium",
-    "Liquid Disgust": "delirium",
-    "Liquid Envy": "delirium",
-    "Liquid Paranoia": "delirium",
-    "Liquid Verisium": "expedition",
-    "Medved's Crest of the Circle": "expedition",
-    "Medved's Saga": "expedition",
-    "Mirror of Kalandra": "basic",
-    "Mystic Alloy": "expedition",
-    "Necrotic Catalyst": "breach",
-    "Neural Catalyst": "breach",
-    "Olroth's Crest of the Sun": "expedition",
-    "Olroth's Saga": "expedition",
-    "Omen of Abyssal Echoes": "abyss",
-    "Omen of Amelioration": "ritual",
-    "Omen of Answered Prayers": "ritual",
-    "Omen of Bartering": "ritual",
-    "Omen of Catalysing Exaltation": "ritual",
-    "Omen of Chance": "ritual",
-    "Omen of Chaotic Effectiveness": "ritual",
-    "Omen of Chaotic Monsters": "ritual",
-    "Omen of Chaotic Quantity": "ritual",
-    "Omen of Chaotic Rarity": "ritual",
-    "Omen of Corruption": "ritual",
-    "Omen of Dextral Annulment": "ritual",
-    "Omen of Dextral Crystallisation": "ritual",
-    "Omen of Dextral Erasure": "ritual",
-    "Omen of Dextral Exaltation": "ritual",
-    "Omen of Dextral Necromancy": "abyss",
-    "Omen of Gambling": "ritual",
-    "Omen of Greater Exaltation": "ritual",
-    "Omen of Light": "abyss",
-    "Omen of Putrefaction": "abyss",
-    "Omen of Refreshment": "ritual",
-    "Omen of Reinforcements": "ritual",
-    "Omen of Resurgence": "ritual",
-    "Omen of Sanctification": "ritual",
-    "Omen of Secret Compartments": "ritual",
-    "Omen of Sinistral Annulment": "ritual",
-    "Omen of Sinistral Crystallisation": "ritual",
-    "Omen of Sinistral Erasure": "ritual",
-    "Omen of Sinistral Exaltation": "ritual",
-    "Omen of Sinistral Necromancy": "abyss",
-    "Omen of the Ancients": "ritual",
-    "Omen of the Blackblooded": "abyss",
-    "Omen of the Blessed": "ritual",
-    "Omen of the Hunt": "ritual",
-    "Omen of the Liege": "abyss",
-    "Omen of the Sovereign": "abyss",
-    "Omen of Whittling": "ritual",
-    "Orb of Alchemy": "basic",
-    "Orb of Annulment": "basic",
-    "Orb of Augmentation": "basic",
-    "Orb of Chance": "basic",
-    "Orb of Extraction": "temple",
-    "Orb of Transmutation": "basic",
-    "Perfect Chaos Orb": "basic",
-    "Perfect Exalted Orb": "basic",
-    "Perfect Flux": "expedition",
-    "Perfect Jeweller's Orb": "basic",
-    "Perfect Orb of Augmentation": "basic",
-    "Perfect Orb of Transmutation": "basic",
-    "Perfect Regal Orb": "basic",
-    "Petition Splinter": "ritual",
-    "Potent Liquid Contempt": "delirium",
-    "Potent Liquid Ferocity": "delirium",
-    "Potent Liquid Melancholy": "delirium",
-    "Preserved Collarbone": "abyss",
-    "Preserved Cranium": "abyss",
-    "Preserved Jawbone": "abyss",
-    "Preserved Rib": "abyss",
-    "Prismatic Alloy": "expedition",
-    "Protective Alloy": "expedition",
-    "Reaver Catalyst": "breach",
-    "Refined Adaptive Catalyst": "breach",
-    "Refined Carapace Catalyst": "breach",
-    "Refined Chayula's Catalyst": "breach",
-    "Refined Esh's Catalyst": "breach",
-    "Refined Flesh Catalyst": "breach",
-    "Refined Necrotic Catalyst": "breach",
-    "Refined Neural Catalyst": "breach",
-    "Refined Reaver Catalyst": "breach",
-    "Refined Sibilant Catalyst": "breach",
-    "Refined Skittering Catalyst": "breach",
-    "Refined Tul's Catalyst": "breach",
-    "Refined Uul-Netol's Catalyst": "breach",
-    "Refined Xoph's Catalyst": "breach",
-    "Regal Orb": "basic",
-    "Regal Shard": "basic",
-    "Revered Starlit Ore": "expedition",
-    "Runic Alloy": "expedition",
-    "Runic Splinter": "expedition",
-    "Scroll of Wisdom": "basic",
-    "Shattered Triskelion": "expedition",
-    "Sibilant Catalyst": "breach",
-    "Silver Key": "trial",
-    "Simulacrum Splinter": "delirium",
-    "Skittering Catalyst": "breach",
-    "Sovereign Alloy": "expedition",
-    "Starlit Ore": "expedition",
-    "Swift Alloy": "expedition",
-    "Thaumaturgic Flux (Level 1)": "expedition",
-    "Thaumaturgic Flux (Level 10)": "expedition",
-    "Thaumaturgic Flux (Level 11)": "expedition",
-    "Thaumaturgic Flux (Level 12)": "expedition",
-    "Thaumaturgic Flux (Level 13)": "expedition",
-    "Thaumaturgic Flux (Level 14)": "expedition",
-    "Thaumaturgic Flux (Level 15)": "expedition",
-    "Thaumaturgic Flux (Level 16)": "expedition",
-    "Thaumaturgic Flux (Level 17)": "expedition",
-    "Thaumaturgic Flux (Level 18)": "expedition",
-    "Thaumaturgic Flux (Level 19)": "expedition",
-    "Thaumaturgic Flux (Level 2)": "expedition",
-    "Thaumaturgic Flux (Level 20)": "expedition",
-    "Thaumaturgic Flux (Level 3)": "expedition",
-    "Thaumaturgic Flux (Level 4)": "expedition",
-    "Thaumaturgic Flux (Level 5)": "expedition",
-    "Thaumaturgic Flux (Level 6)": "expedition",
-    "Thaumaturgic Flux (Level 7)": "expedition",
-    "Thaumaturgic Flux (Level 8)": "expedition",
-    "Thaumaturgic Flux (Level 9)": "expedition",
-    "The Runebinder's Alloy": "expedition",
-    "The Runefather's Alloy": "expedition",
-    "Transcendent Alloy": "expedition",
-    "Transmutation Shard": "basic",
-    "Tul's Catalyst": "breach",
-    "Uhtred's Crest of the Chalice": "expedition",
-    "Uhtred's Saga": "expedition",
-    "Uul-Netol's Catalyst": "breach",
-    "Vaal Arcanist's Infuser": "temple",
-    "Vaal Armourer's Infuser": "temple",
-    "Vaal Blacksmith's Infuser": "temple",
-    "Vaal Catalysing Infuser": "temple",
-    "Vaal Cultivation Orb": "temple",
-    "Vaal Orb": "basic",
-    "Venerable Starlit Ore": "expedition",
-    "Veridical Starlit Ore": "expedition",
-    "Verisium": "expedition",
-    "Void Flux": "expedition",
-    "Vorana's Crest of the Scythe": "expedition",
-    "Vorana's Saga": "expedition",
-    "Warding Starlit Ore": "expedition",
-    "Xoph's Catalyst": "breach",
-    "Yaomac's Orb of Sacrifice": "temple",
-    "Yugul's Orb of Sacrifice": "temple"
+    "Adaptive Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Adaptive Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Albino Rhoa Feather": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Alchemy Shard": {
+      "mechanic": "basic",
+      "evidence": "manual: wiki 缺条目，按基础通货碎片处理"
+    },
+    "Aldur's Saga": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Altered Collarbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Ancient Collarbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Ancient Concentrated Liquid Fear": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Concentrated Liquid Isolation": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Concentrated Liquid Suffering": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Diluted Liquid Greed": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Diluted Liquid Guilt": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Diluted Liquid Ire": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Infuser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Ancient Jawbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Ancient Liquid Despair": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Liquid Disgust": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Liquid Envy": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Liquid Paranoia": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Potent Liquid Contempt": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Potent Liquid Ferocity": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Potent Liquid Melancholy": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Ancient Rib": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Arcanist's Etcher": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Architect's Orb": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Armourer's Scrap": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Artificer's Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Artificer's Shard": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Blacksmith's Whetstone": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Blazing Flux": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Breach Splinter": {
+      "mechanic": "breach",
+      "evidence": "wiki-category: Breach"
+    },
+    "Bronze Key": {
+      "mechanic": "trial",
+      "evidence": "wiki-drop: Trial of the Sekhemas"
+    },
+    "Carapace Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Celestial Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Chance Shard": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Chaos Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Chayula's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Chilling Flux": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Concentrated Liquid Fear": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Concentrated Liquid Isolation": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Concentrated Liquid Suffering": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Core Destabiliser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Crackling Flux": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Cryptic Key": {
+      "mechanic": "basic",
+      "evidence": "manual: 扎多谍报强箱钥匙，不属于任何赛季玩法"
+    },
+    "Crystallised Corruption": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Cyclonic Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Diluted Liquid Greed": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Diluted Liquid Guilt": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Diluted Liquid Ire": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Divine Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Esh's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Exalted Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Exceptional Verisium": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Expansive Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Flesh Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Fracturing Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Gemcutter's Prism": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Glassblower's Bauble": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Gnawed Collarbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Gnawed Jawbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Gnawed Rib": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Gold": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Gold Key": {
+      "mechanic": "trial",
+      "evidence": "wiki-drop: Trial of the Sekhemas"
+    },
+    "Greater Chaos Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Greater Exalted Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Greater Jeweller's Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Greater Orb of Augmentation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Greater Orb of Transmutation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Greater Regal Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Hinekora's Lock": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Kamasa's Orb of Sacrifice": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Kopec's Orb of Sacrifice": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Lesser Jeweller's Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Liquid Despair": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Liquid Disgust": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Liquid Envy": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Liquid Paranoia": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Liquid Verisium": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Medved's Crest of the Circle": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Medved's Saga": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Mirror of Kalandra": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Mystic Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Necrotic Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Neural Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Olroth's Crest of the Sun": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Olroth's Saga": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Omen of Abyssal Echoes": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of Amelioration": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Answered Prayers": {
+      "mechanic": "ritual",
+      "evidence": "name: omen"
+    },
+    "Omen of Bartering": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Catalysing Exaltation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Chance": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Chaotic Effectiveness": {
+      "mechanic": "ritual",
+      "evidence": "name: omen"
+    },
+    "Omen of Chaotic Monsters": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Chaotic Quantity": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Chaotic Rarity": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Corruption": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Dextral Annulment": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Dextral Crystallisation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Dextral Erasure": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Dextral Exaltation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Dextral Necromancy": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of Gambling": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Greater Exaltation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Light": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of Putrefaction": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of Refreshment": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Reinforcements": {
+      "mechanic": "ritual",
+      "evidence": "name: omen"
+    },
+    "Omen of Resurgence": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Sanctification": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Secret Compartments": {
+      "mechanic": "ritual",
+      "evidence": "name: omen"
+    },
+    "Omen of Sinistral Annulment": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Sinistral Crystallisation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Sinistral Erasure": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Sinistral Exaltation": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of Sinistral Necromancy": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of the Ancients": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of the Blackblooded": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of the Blessed": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Omen of the Hunt": {
+      "mechanic": "ritual",
+      "evidence": "name: omen"
+    },
+    "Omen of the Liege": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of the Sovereign": {
+      "mechanic": "abyss",
+      "evidence": "wiki-category: Abyss"
+    },
+    "Omen of Whittling": {
+      "mechanic": "ritual",
+      "evidence": "wiki-drop: Ritual"
+    },
+    "Orb of Alchemy": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Orb of Annulment": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Orb of Augmentation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Orb of Chance": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Orb of Extraction": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Orb of Transmutation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Chaos Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Exalted Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Flux": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Perfect Jeweller's Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Orb of Augmentation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Orb of Transmutation": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Perfect Regal Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Petition Splinter": {
+      "mechanic": "ritual",
+      "evidence": "wiki-category: Ritual"
+    },
+    "Potent Liquid Contempt": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Potent Liquid Ferocity": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Potent Liquid Melancholy": {
+      "mechanic": "delirium",
+      "evidence": "wiki-tag: mushrune"
+    },
+    "Preserved Collarbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Preserved Cranium": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Preserved Jawbone": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Preserved Rib": {
+      "mechanic": "abyss",
+      "evidence": "name: abyssal bones"
+    },
+    "Prismatic Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Protective Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Reaver Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Adaptive Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Carapace Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Chayula's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Esh's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Flesh Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Necrotic Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Neural Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Reaver Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Sibilant Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Skittering Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Tul's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Uul-Netol's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Refined Xoph's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Regal Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Regal Shard": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Revered Starlit Ore": {
+      "mechanic": "expedition",
+      "evidence": "name: verisium ore"
+    },
+    "Runic Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Runic Splinter": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Scroll of Wisdom": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Shattered Triskelion": {
+      "mechanic": "expedition",
+      "evidence": "manual: 掉落自探险巅峰首领欧罗什"
+    },
+    "Sibilant Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Silver Key": {
+      "mechanic": "trial",
+      "evidence": "wiki-drop: Trial of the Sekhemas"
+    },
+    "Simulacrum Splinter": {
+      "mechanic": "delirium",
+      "evidence": "wiki-category: Delirium"
+    },
+    "Skittering Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Sovereign Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Starlit Ore": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Expedition"
+    },
+    "Swift Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Thaumaturgic Flux (Level 1)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 10)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 11)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 12)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 13)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 14)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 15)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 16)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 17)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 18)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 19)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 2)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 20)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 3)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 4)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 5)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 6)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 7)": {
+      "mechanic": "expedition",
+      "evidence": "name: flux"
+    },
+    "Thaumaturgic Flux (Level 8)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Thaumaturgic Flux (Level 9)": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "The Runebinder's Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "The Runefather's Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Transcendent Alloy": {
+      "mechanic": "expedition",
+      "evidence": "wiki-tag: verisium"
+    },
+    "Transmutation Shard": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Tul's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Uhtred's Crest of the Chalice": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Uhtred's Saga": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Uul-Netol's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Vaal Arcanist's Infuser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Vaal Armourer's Infuser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Vaal Blacksmith's Infuser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Vaal Catalysing Infuser": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Vaal Cultivation Orb": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Vaal Orb": {
+      "mechanic": "basic",
+      "evidence": "default: 通用通货"
+    },
+    "Venerable Starlit Ore": {
+      "mechanic": "expedition",
+      "evidence": "name: verisium ore"
+    },
+    "Veridical Starlit Ore": {
+      "mechanic": "expedition",
+      "evidence": "name: verisium ore"
+    },
+    "Verisium": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Void Flux": {
+      "mechanic": "expedition",
+      "evidence": "wiki-drop: Verisium Remnant"
+    },
+    "Vorana's Crest of the Scythe": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Vorana's Saga": {
+      "mechanic": "expedition",
+      "evidence": "wiki-category: Expedition"
+    },
+    "Warding Starlit Ore": {
+      "mechanic": "expedition",
+      "evidence": "name: verisium ore"
+    },
+    "Xoph's Catalyst": {
+      "mechanic": "breach",
+      "evidence": "wiki-tag: catalyst"
+    },
+    "Yaomac's Orb of Sacrifice": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    },
+    "Yugul's Orb of Sacrifice": {
+      "mechanic": "temple",
+      "evidence": "wiki-category: Fate of the Vaal"
+    }
   }
 }

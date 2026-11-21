@@ -80,7 +80,14 @@ NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2
 | 神庙 | 阿兹里神庙专属宝珠与注能装置 | 14 |
 | 试炼 | 赛克玛试炼钥匙 | 3 |
 
-归属来自 <https://www.poe2wiki.net> 条目的 `tags` 与 `drop_text`（例如 `incursion_currency` → 神庙、`verisium_*` → 探险、深渊稀有怪的预兆 → 深渊），并用 poe.ninja PoE2 经济分类交叉核对。映射写在 `data/item-mechanics.json`，由脚本生成、可人工校正：
+归属按优先级判定，并逐条记录判定依据（`data/item-mechanics.json` 的 `evidence` 字段）：
+
+1. **wiki 分类**：<https://www.poe2wiki.net> 条目上的显式分类 —— `Abyss`、`Breach`、`Delirium`、`Expedition`、`Ritual`、`Fate of the Vaal`（神庙）、`Incursion`。38 件物品由分类直接判定，神庙 14 件全部来自 `Fate of the Vaal`。
+2. **wiki tags**：分类缺失时用 `verisium_*`、`incursion_currency`、`catalyst`、`mushrune`、`breachstone_splinter` 等标签（65 件）。
+3. **wiki drop_text**：再退一步看掉落来源，例如 `Verisium Remnant` → 探险、`Lichborn` → 深渊、`Trial of the Sekhemas` → 试炼（46 件）。
+4. **名称族**：合金 / 溶剂 / 星辉矿 / 徽记 / 传说 / 预兆 / 液化情绪等只在单一玩法产出的词条（27 件），以及 `manual` 人工校正（3 件，例如 wiki 把 `Altered Collarbone` 标成 Breach，实际是深渊骨骸）。
+
+poe.ninja PoE2 的 Currency / Fragments / Abyss / Expedition / Delirium / Breach / Ritual / Verisium 分类用于交叉核对。映射由脚本生成、可人工校正：
 
 ```bash
 node scripts/build-item-mechanics.mjs   # 抓取 wiki 元数据并重写映射（需要网络）
@@ -89,6 +96,8 @@ node scripts/validate-data.mjs          # 校验玩法词条、分类路径和�
 ```
 
 更新 NeverSink 或客户端数据后，如果新物品没有玩法归属，`validate:data` 和 `tests/item-taxonomy.test.mjs` 会直接失败并点名，避免新通货又静默堆回「基础通货」。整类白名单在过滤器里展开成合并的 `BaseType ==` 列表块（每 24 个一组），单件物品仍是独立规则。
+
+wiki 分类与三语对照的检索方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill（分类列表页 harvest + 客户端数据本地查询）。
 
 通货样式从全部 56 个 NeverSink 模板提取，预览和生成器共用 `data/neversink-currency-appearances.json`。运行 `node scripts/extract-neversink-appearances.mjs --check` 验证源文件及样式数据一致；更新模板后可去掉 `--check` 重建。
 

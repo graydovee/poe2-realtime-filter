@@ -55,8 +55,9 @@ for (const item of catalog.items || []) {
   if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2 && !kindKeys.includes(item.categoryPath[2])) problems.push("catalog: unknown crafting kind '" + item.categoryPath[2] + "' on " + item.id);
   if (mechanicKeys.includes(mechanic) && !mapped.has(item.name)) unmapped.push(item.name);
 }
-for (const [name, mechanic] of Object.entries(mapping)) {
-  if (!mechanicKeys.includes(mechanic)) problems.push("item mechanics: unknown mechanic " + mechanic + " for " + name);
+for (const [name, entry] of Object.entries(mapping)) {
+  if (!mechanicKeys.includes(entry?.mechanic)) problems.push("item mechanics: unknown mechanic " + entry?.mechanic + " for " + name);
+  if (typeof entry?.evidence !== "string" || !entry.evidence.trim()) problems.push("item mechanics: missing evidence for " + name);
 }
 
 const visuals = JSON.parse(fs.readFileSync(path.join(root, "data", "visual-presets.json"), "utf8"));

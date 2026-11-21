@@ -39,45 +39,79 @@ export const KINDS = {
 /** 本模块负责的旧分类路径：这些组里的物品会按玩法重新归类。 */
 export const CLASSIFIED_GROUPS = new Set(["crafting/currency", "crafting/catalysts", "crafting/emotions", "crafting/omens", "crafting/shards"]);
 
+/** wiki 条目分类 → 玩法。分类是 wiki 编辑者的显式标注，优先于掉落文本推断。 */
+export const CATEGORY_MECHANICS = {
+  Abyss: "abyss",
+  Breach: "breach",
+  Delirium: "delirium",
+  Expedition: "expedition",
+  Ritual: "ritual",
+  "Fate of the Vaal": "temple",
+  Incursion: "temple",
+};
+
 const BONES = /(?:Jawbone|Rib|Collarbone|Cranium)$/;
 const ORE = /(?:Verisium|Starlit Ore)/;
 
 /**
- * 依据 wiki 元数据判定来源玩法。
- * @param {{name: string, tags?: string|null, drop?: string|null}} item
- * @returns {keyof typeof MECHANICS}
+ * 判定来源玩法，返回玩法键与判定依据（依据会写进 data/item-mechanics.json，便于复核）。
+ * 顺序：人工校正 → 骨骸族名（颚骨/肋骨/锁骨/头骨只在深渊产出）→ wiki 分类 →
+ * wiki tags → drop_text → 名称族 → 基础通货。
+ * @param {{name: string, tags?: string|null, drop?: string|null, categories?: string[]}} item
+ * @returns {{mechanic: keyof typeof MECHANICS, evidence: string}}
  */
-export function classifyMechanic(item) {
+export function classifyItem(item) {
+  const name = item.name;
   const tags = item.tags ?? "";
   const drop = item.drop ?? "";
-  const name = item.name;
+  const categories = item.categories ?? [];
 
-  // 神庙：incursion 标签最可靠，其次是阿兹里神庙掉落文本。
-  if (/incursion_currency/.test(tags) || /Atziri's Temple|Royal Trove/.test(drop)) return "temple";
+  if (item.override) return { mechanic: item.override, evidence: "manual: " + (item.reason ?? "人工校正") };
 
-  // 探险：维金残迹、远征日志、合金 / 溶剂 / 星辉矿 / 徽记 / 传说。先于深渊判定，
-  // 因为「在创生之树孵化」会出现在多种玩法的掉落文本里，不能当作深渊证据。
-  if (/verisium_/.test(tags) || ORE.test(name) || /Alloy$|Flux(?: \(Level \d+\))?$|Crest of the|Saga$/.test(name) || /Verisium Remnant|Expedition|Logbook/.test(drop)) return "expedition";
+  // 骨骸是深渊专属材料：wiki 上 Altered Collarbone 误标为 Breach，这里以族名和掉落文本为准。
+  if (BONES.test(name)) return { mechanic: "abyss", evidence: "name: abyssal bones" };
 
-  // 催化剂带 catalyst / jewel_catalyst 标签，掉落文本里的创生之树只是替代来源。
-  if (/catalyst/.test(tags) || /Catalyst$/.test(name)) return "breach";
-  if (/breachstone_splinter/.test(tags) || /^Breach Splinter$/.test(name)) return "breach";
+  for (const category of categories) {
+    const mechanic = CATEGORY_MECHANICS[category];
+    if (mechanic) return { mechanic, evidence: "wiki-category: " + category };
+  }
 
-  // 液态情绪统一带 mushrune 标签；幻影碎片带 affliction_orb。
-  if (/mushrune/.test(tags) || /^Liquid /.test(name)) return "delirium";
-  if (/affliction_orb/.test(tags) || /^Simulacrum Splinter$/.test(name) || /Delirium/.test(drop)) return "delirium";
+  // 神庙：incursion 标签与神庙掉落文本。
+  if (/incursion_currency/.test(tags)) return { mechanic: "temple", evidence: "wiki-tag: incursion_currency" };
+  if (/Atziri's Temple|Royal Trove/.test(drop)) return { mechanic: "temple", evidence: "wiki-drop: Atziri's Temple" };
 
-  // 预兆的来源分三类：深渊稀有怪、仪式祭坛、紫林祭坛。紫林归入仪式候选集。
-  if (/^Omen of/.test(name)) return /Abyssal|Lichborn/.test(drop) ? "abyss" : "ritual";
+  // 探险：维金残迹、远征日志、合金 / 溶剂 / 星辉矿 / 徽记 / 传说。
+  if (/verisium_/.test(tags)) return { mechanic: "expedition", evidence: "wiki-tag: verisium" };
+  if (/Verisium Remnant/.test(drop)) return { mechanic: "expedition", evidence: "wiki-drop: Verisium Remnant" };
+  if (/Expedition|Logbook/.test(drop)) return { mechanic: "expedition", evidence: "wiki-drop: Expedition" };
 
-  if (BONES.test(name)) return "abyss";
+  if (/catalyst/.test(tags)) return { mechanic: "breach", evidence: "wiki-tag: catalyst" };
+  if (/breachstone_splinter/.test(tags)) return { mechanic: "breach", evidence: "wiki-tag: breachstone_splinter" };
 
-  if (/\bRitual\b/.test(drop)) return "ritual";
-  if (/\bBreach\b/.test(drop)) return "breach";
-  if (/Abyss|Abyssal Depths/.test(drop)) return "abyss";
-  if (/Sekhemas/.test(drop)) return "trial";
+  if (/mushrune/.test(tags)) return { mechanic: "delirium", evidence: "wiki-tag: mushrune" };
+  if (/affliction_orb/.test(tags)) return { mechanic: "delirium", evidence: "wiki-tag: affliction_orb" };
+  if (/Delirium/.test(drop)) return { mechanic: "delirium", evidence: "wiki-drop: Delirium" };
 
-  return "basic";
+  if (/Abyssal|Lichborn/.test(drop)) return { mechanic: "abyss", evidence: "wiki-drop: Abyssal/Lichborn" };
+  if (/\bRitual\b/.test(drop)) return { mechanic: "ritual", evidence: "wiki-drop: Ritual" };
+  if (/\bBreach\b/.test(drop)) return { mechanic: "breach", evidence: "wiki-drop: Breach" };
+  if (/Abyss|Abyssal Depths/.test(drop)) return { mechanic: "abyss", evidence: "wiki-drop: Abyss" };
+  if (/Sekhemas/.test(drop)) return { mechanic: "trial", evidence: "wiki-drop: Trial of the Sekhemas" };
+
+  // 名称回落：这些词条只在对应玩法里产出。
+  if (ORE.test(name)) return { mechanic: "expedition", evidence: "name: verisium ore" };
+  if (/Alloy$/.test(name)) return { mechanic: "expedition", evidence: "name: alloy" };
+  if (/Flux(?: \(Level \d+\))?$/.test(name)) return { mechanic: "expedition", evidence: "name: flux" };
+  if (/Crest of the/.test(name)) return { mechanic: "expedition", evidence: "name: crest" };
+  if (/Saga$/.test(name)) return { mechanic: "expedition", evidence: "name: saga" };
+  if (/^Omen of/.test(name)) return { mechanic: "ritual", evidence: "name: omen" };
+  if (/Catalyst$/.test(name)) return { mechanic: "breach", evidence: "name: catalyst" };
+  if (/^Simulacrum Splinter$/.test(name)) return { mechanic: "delirium", evidence: "name: simulacrum splinter" };
+  if (/^Petition Splinter$/.test(name)) return { mechanic: "ritual", evidence: "name: petition splinter" };
+  if (/^Breach Splinter$/.test(name)) return { mechanic: "breach", evidence: "name: breach splinter" };
+  if (/^Liquid /.test(name)) return { mechanic: "delirium", evidence: "name: liquid emotion" };
+
+  return { mechanic: "basic", evidence: "default: 通用通货" };
 }
 
 /**

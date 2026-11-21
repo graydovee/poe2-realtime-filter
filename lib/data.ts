@@ -47,7 +47,7 @@ export const CATEGORY_LABELS: Record<string, Record<Locale, string>> = {
 export const TAXONOMY = mechanicsData as {
   mechanics: Record<string, Record<Locale, string>>;
   kinds: Record<string, Record<Locale, string>>;
-  items: Record<string, string>;
+  items: Record<string, { mechanic: string; evidence: string }>;
 };
 
 export const ITEM_CATALOG = catalogData.items as ItemDefinition[];

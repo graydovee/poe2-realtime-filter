@@ -20,8 +20,8 @@ const mechanics = JSON.parse(fs.readFileSync(mechanicsFile, "utf8"));
 const mapping = mechanics.items ?? {};
 const executable = new Set(Object.keys(MECHANICS));
 
-for (const [name, mechanic] of Object.entries(mapping)) {
-  if (!executable.has(mechanic)) throw new Error("data/item-mechanics.json 里有未知玩法：" + name + " -> " + mechanic);
+for (const [name, entry] of Object.entries(mapping)) {
+  if (!executable.has(entry?.mechanic)) throw new Error("data/item-mechanics.json 里有未知玩法：" + name + " -> " + entry?.mechanic);
 }
 
 // 整类匹配（Stackable Currency / Omen）只是「保持原始规则」的标记，不归属任何玩法。
@@ -37,13 +37,13 @@ let applied = 0;
 
 for (const item of catalog.items) {
   if (!CLASSIFIED_GROUPS.has(item.categoryPath.join("/")) && !stale.has(item.name)) continue;
-  const mechanic = mapping[item.name];
-  if (!mechanic) {
+  const entry = mapping[item.name];
+  if (!entry) {
     unmapped.push(item.name);
     continue;
   }
   stale.delete(item.name);
-  item.categoryPath = categoryPathFor(item, mechanic);
+  item.categoryPath = categoryPathFor(item, entry.mechanic);
   applied += 1;
 }
 

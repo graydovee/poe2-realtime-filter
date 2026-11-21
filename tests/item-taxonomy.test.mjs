@@ -24,8 +24,9 @@ test("每件通货与材料都有可追溯的玩法归属", () => {
     (item) => item.categoryPath[0] === "crafting" && keys.has(item.categoryPath[1]) && !mechanics.items[item.name],
   );
   assert.deepEqual(unmapped.map((item) => item.name), []);
-  for (const [name, mechanic] of Object.entries(mechanics.items)) {
-    assert.ok(keys.has(mechanic), name + " 的玩法键无效：" + mechanic);
+  for (const [name, entry] of Object.entries(mechanics.items)) {
+    assert.ok(keys.has(entry.mechanic), name + " 的玩法键无效：" + entry.mechanic);
+    assert.ok(entry.evidence && entry.evidence.trim(), name + " 缺少判定依据");
   }
 });
 
@@ -46,6 +47,19 @@ test("玩法归属与掉落来源一致", () => {
   assert.equal(pathOf("Liquid Paranoia"), "crafting/delirium/emotions");
   assert.equal(pathOf("Simulacrum Splinter"), "crafting/delirium/splinters");
   assert.equal(pathOf("Bronze Key"), "crafting/trial/keys");
+});
+
+test("wiki 分类是首选依据，神庙整组都由分类判定", () => {
+  const entries = Object.entries(mechanics.items);
+  const fromCategory = entries.filter(([, entry]) => entry.evidence.startsWith("wiki-category:"));
+  assert.ok(fromCategory.length >= 30, "wiki 分类只判定了 " + fromCategory.length + " 条");
+  const categoryKeys = new Set(Object.keys(mechanics.mechanics));
+  for (const [name, entry] of fromCategory) {
+    assert.ok(categoryKeys.has(entry.mechanic), name + " 的玩法键无效：" + entry.mechanic);
+  }
+  const temple = entries.filter(([, entry]) => entry.mechanic === "temple");
+  assert.equal(temple.length, 14);
+  for (const [name, entry] of temple) assert.equal(entry.evidence, "wiki-category: Fate of the Vaal", name);
 });
 
 test("玩法与细分小组都有三种语言的词条", () => {
