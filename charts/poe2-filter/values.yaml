@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: harbor.graydove.cn/apps/poe2-filter
-  tag: v0.3.2
+  tag: v0.3.3
   pullPolicy: IfNotPresent
 
 nameOverride: ""
