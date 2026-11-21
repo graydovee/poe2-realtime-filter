@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { DesktopUpdate } from "./desktop-update";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ title, navigation, children }: { title: string; navigation: ReactNode; children: ReactNode }) {
   return (
     <div className="app-vignette min-h-screen">
       <header className="border-b border-line bg-surface">
@@ -11,6 +11,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Image src="/brand/poe2-filter.png" alt="" width={36} height={36} className="shrink-0" unoptimized />
             <strong className="font-display text-[15px] font-semibold tracking-wide text-ink">PoE2 Realtime Filter</strong>
           </div>
+          {navigation}
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-xs font-medium text-ink-muted">{"v" + process.env.NEXT_PUBLIC_APP_VERSION}</span>
             <DesktopUpdate />
@@ -20,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="mx-auto w-full max-w-[1440px] px-4 pb-8 sm:px-8 lg:px-10">
         <section className="pb-5 pt-6 sm:pb-6 sm:pt-8">
-          <h1 className="text-[clamp(1.5rem,3vw,2rem)] font-semibold leading-tight text-ink">PoE2 过滤器编辑器</h1>
+          <h1 className="text-[clamp(1.5rem,3vw,2rem)] font-semibold leading-tight text-ink">{title}</h1>
         </section>
 
         <main id="main">{children}</main>

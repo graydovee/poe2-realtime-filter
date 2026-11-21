@@ -2,7 +2,7 @@
 
 import type { FilterProfile, LeagueCatalog, MarketSnapshot } from "../../../lib/types";
 import { Select, type SelectGroup } from "../ui/controls";
-import { Panel, Skeleton, StatusDot } from "../ui/primitives";
+import { Button, Panel, Skeleton, StatusDot } from "../ui/primitives";
 
 export function SeasonSection({
   profile,
@@ -12,6 +12,7 @@ export function SeasonSection({
   marketError,
   selectedMarket,
   onLeagueChange,
+  onRefresh,
 }: {
   profile: FilterProfile;
   leagueCatalog: LeagueCatalog | null;
@@ -20,6 +21,7 @@ export function SeasonSection({
   marketError: string;
   selectedMarket: MarketSnapshot;
   onLeagueChange: (league: string) => void;
+  onRefresh: () => void;
 }) {
   const loading = leaguesLoading || marketLoading;
   const usable = selectedMarket.rates && Date.parse(selectedMarket.expiresAt) >= Date.now();
@@ -51,14 +53,19 @@ export function SeasonSection({
           </p>
         </div>
         <div className="min-w-0">
-          <Select
-            value={profile.league}
-            onValueChange={onLeagueChange}
-            groups={leagueGroups}
-            options={leagueOptions}
-            disabled={leaguesLoading}
-            ariaLabel="选择赛季"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <Select
+                value={profile.league}
+                onValueChange={onLeagueChange}
+                groups={leagueGroups}
+                options={leagueOptions}
+                disabled={loading}
+                ariaLabel="选择赛季"
+              />
+            </div>
+            <Button size="sm" disabled={loading} onClick={onRefresh}>刷新行情</Button>
+          </div>
           <div className="mt-2 flex items-center gap-2">
             <StatusDot tone={tone} className={loading ? "animate-pulse" : undefined} />
             {loading && !marketError ? (

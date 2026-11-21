@@ -1,168 +1,208 @@
 "use client";
 
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
-import { explain, fileToBase64, isDesktop, local, readSound, type Library, type LocalScheme } from "../../lib/desktop";
-import type { FilterProfile } from "../../lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { explain, isDesktop, local, type Library, type LocalScheme, type Settings } from "../../lib/desktop";
 import { TextInput } from "./ui/controls";
-import { Button, Panel } from "./ui/primitives";
+import { ConfirmDialog } from "./ui/confirm-dialog";
+import { Badge, Button, Panel } from "./ui/primitives";
 
 type Props = {
-  profile: FilterProfile;
-  sounds: Record<string, File>;
-  onOpen: (profile: FilterProfile, sounds: Record<string, File>, id: string | null) => void;
-  onRefresh: () => Promise<void>;
+  revision: number;
+  busy: boolean;
+  onBusy: (busy: boolean) => void;
+  onOpen: (scheme: LocalScheme) => void;
   onNew: () => void;
+  onRemove: (id: string) => void;
 };
 
-export function SchemeManager({ profile, sounds, onOpen, onRefresh, onNew }: Props) {
+export function SchemeManager({ revision, busy, onBusy, onOpen, onNew, onRemove }: Props) {
   const [library, setLibrary] = useState<Library>();
-  const [editing, setEditing] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const [interval, setIntervalValue] = useState("30");
+  const [error, setError] = useState("");
+  const [interval, setInterval] = useState<string>();
   const [shareCode, setShareCode] = useState("");
   const [importName, setImportName] = useState("");
-  const [openShare, setOpenShare] = useState(false);
+  const [shareOutput, setShareOutput] = useState("");
   const [remove, setRemove] = useState<LocalScheme>();
   const [removeFile, setRemoveFile] = useState(false);
+  const requestVersion = useRef(0);
+
+  const reload = useCallback(async () => {
+    const version = ++requestVersion.current;
+    try {
+      const value = await local<Library>("library");
+      if (version === requestVersion.current) setLibrary(value);
+    } catch (cause) {
+      if (version === requestVersion.current) setError(explain(cause));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isDesktop()) void reload();
+  }, [reload, revision]);
 
   useEffect(() => {
     if (!isDesktop()) return;
-    let active = true;
-    const update = () => local<Library>("library").then((value) => { if (active) setLibrary(value); });
-    void update().then(() => local<Library>("library")).then((value) => { if (active) setIntervalValue(String(value.settings.intervalMinutes)); }).catch((error) => { if (active) setFeedback(explain(error)); });
-    const listener = listen("local-refresh", () => { void update().catch(() => {}); });
-    return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
-  }, []);
+    const listener = listen("local-refresh", () => { void reload(); });
+    return () => { void listener.then((unlisten) => unlisten()).catch(() => {}); };
+  }, [reload]);
 
   async function run(action: () => Promise<void>) {
-    setBusy(true);
+    onBusy(true);
+    setError("");
     setFeedback("");
-    try { await action(); }
-    catch (error) { setFeedback(explain(error)); }
-    finally {
-      try { setLibrary(await local<Library>("library")); }
-      catch (error) { setFeedback(explain(error)); }
-      setBusy(false);
+    try {
+      await action();
+    } catch (cause) {
+      setError(explain(cause));
+    } finally {
+      await reload();
+      onBusy(false);
     }
   }
 
-  async function open(scheme: LocalScheme) {
-    const cached = new Map<string, Promise<File>>();
-    const files = await Promise.all(scheme.profile.rules.map(async (rule) => {
-      const sound = rule.effects.sound;
-      if (sound?.type !== "custom") return undefined;
-      if (!cached.has(sound.fileName)) cached.set(sound.fileName, readSound(sound.fileName, scheme.id, true));
-      try { return [rule.id, await cached.get(sound.fileName)!] as const; }
-      catch { return undefined; }
-    }));
-    setEditing(scheme.id);
-    setName(scheme.name);
-    onOpen(scheme.profile, Object.fromEntries(files.filter((file) => file !== undefined)), scheme.id);
+  async function updateSettings(settings: Settings) {
+    await local("save_settings", { settings });
+    setInterval(undefined);
+    setFeedback("刷新设置已保存");
   }
 
-  async function save(asNew = false) {
-    const uploads: Record<string, string> = {};
-    let bytes = 0;
-    for (const rule of profile.rules) {
-      const sound = rule.effects.sound;
-      const file = sounds[rule.id];
-      if (sound?.type !== "custom" || !file || uploads[sound.fileName] !== undefined) continue;
-      bytes += file.size;
-      if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
-      uploads[sound.fileName] = await fileToBase64(file);
-    }
-    const id = await local<string>("scheme_save", { edit: { id: asNew ? null : editing, name, profile, sounds: uploads } });
-    const saved = (await local<Library>("library")).schemes.find((item) => item.id === id);
-    setEditing(id);
-    if (saved) { setName(saved.name); onOpen(saved.profile, sounds, id); }
-    setFeedback("方案已保存");
-    return id;
+  const byLeague = new Map<string, LocalScheme[]>();
+  for (const scheme of library?.schemes ?? []) {
+    const league = scheme.profile.league;
+    const group = byLeague.get(league);
+    if (group) group.push(scheme);
+    else byLeague.set(league, [scheme]);
   }
 
-  return <Panel>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="text-sm font-semibold text-ink">本地方案</h2>
-      <Button size="sm" disabled={busy} onClick={() => { setEditing(null); setName(""); setFeedback(""); onNew(); }}>新建方案</Button>
-    </div>
-    <form className="my-3 flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void run(async () => { await save(); }); }}>
-      <label className="min-w-48 text-xs text-ink-muted">{editing ? "方案名称（可改名）" : "新方案名称"}
-        <TextInput className="mt-1" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
-      </label>
-      <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !name.trim()}>保存方案</Button>
-      {editing && <Button type="button" size="sm" disabled={busy || !name.trim()} onClick={() => void run(async () => { await save(true); })}>另存为</Button>}
-      <Button type="button" size="sm" disabled={busy || !library || !name.trim()} onClick={() => void run(async () => {
-        const id = await save();
-        await local("scheme_install", { id });
-        setFeedback("过滤器已保存到游戏目录");
-      })}>保存并安装到游戏</Button>
-      <Button type="button" size="sm" disabled={!library} aria-expanded={openShare} onClick={() => setOpenShare(!openShare)}>导入分享码</Button>
-    </form>
-    {openShare && <form className="my-3 grid gap-2 rounded border border-line p-3" onSubmit={(event) => {
-      event.preventDefault();
-      void run(async () => {
-        const result = await local<{ id: string; missing: string[] }>("scheme_import", { code: shareCode, name: importName.trim() || null });
-        const imported = (await local<Library>("library")).schemes.find((item) => item.id === result.id);
-        if (imported) await open(imported);
-        setFeedback(result.missing.length ? `已导入。请在规则中补齐音效：${result.missing.join("、")}` : "已导入方案");
-        setShareCode("");
-        setImportName("");
-        setOpenShare(false);
-      });
-    }}>
-      <textarea aria-label="分享码" className="min-h-24 rounded border border-line bg-surface px-3 py-2 font-mono text-sm" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1400000} onChange={(event) => setShareCode(event.target.value)} />
-      <div className="flex flex-wrap gap-2">
-        <TextInput aria-label="导入名称" className="max-w-xs" placeholder="可选：指定新名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
-        <Button type="submit" size="sm" disabled={busy || !shareCode.trim()}>导入</Button>
+  return (
+    <div className="grid min-w-0 gap-4">
+      <Panel title="导入分享码" description="导入后可直接安装到游戏，也可以打开方案修改规则。">
+        <form className="grid gap-3" onSubmit={(event) => {
+          event.preventDefault();
+          void run(async () => {
+            const { missing } = await local<{ id: string; missing: string[] }>("scheme_import", { code: shareCode, name: importName.trim() || null });
+            setShareCode("");
+            setImportName("");
+            setFeedback(missing.length
+              ? `已导入方案。请打开编辑补齐自定义音效：${missing.join("、")}`
+              : "方案已导入到下方列表");
+          });
+        }}>
+          <textarea aria-label="分享码" className="min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1400000} onChange={(event) => setShareCode(event.target.value)} />
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="max-w-full text-xs text-ink-muted">导入名称（可选）
+              <TextInput className="mt-1 w-64 max-w-full" placeholder="留空使用原名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
+            </label>
+            <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !shareCode.trim()}>导入方案</Button>
+          </div>
+        </form>
+      </Panel>
+
+      <div aria-live="polite" className="empty:hidden">
+        {error ? <p className="rounded border border-ember/45 bg-surface px-4 py-3 text-sm text-ember" role="alert">{error}</p>
+          : feedback && <p className="rounded border border-line bg-surface px-4 py-3 text-sm text-ink" role="status">{feedback}</p>}
       </div>
-    </form>}
-    <ul className="grid gap-2">
-      {library?.schemes.map((scheme) => <li key={scheme.id} className="flex flex-wrap justify-between gap-2 rounded border border-line bg-surface px-3 py-2">
-        <div className="min-w-0">
-          <strong className="block break-words text-sm text-ink">{scheme.name}</strong>
-          <span className="break-words text-xs text-ink-muted">{scheme.profile.league} · {scheme.installed ? (scheme.status || "已安装") : (scheme.status || "未安装")}</span>
+
+      <Panel title="我的方案" action={<Button size="sm" disabled={busy} onClick={onNew}>新建方案</Button>}>
+        {!library && !error && <p className="text-sm text-ink-muted">正在读取本地方案…</p>}
+        {library && !library.schemes.length && <p className="text-sm text-ink-muted">还没有方案。可以导入分享码，或在制作页新建方案。</p>}
+        {shareOutput && (
+          <div className="mb-4 grid gap-2">
+            <label className="text-sm text-ink">手动复制分享码
+              <textarea className="mt-1 min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm" value={shareOutput} readOnly onFocus={(event) => event.currentTarget.select()} />
+            </label>
+            <Button className="justify-self-start" size="sm" onClick={() => setShareOutput("")}>收起分享码</Button>
+          </div>
+        )}
+        {[...byLeague].map(([league, schemes]) => (
+          <section key={league} className="mb-5 last:mb-0" aria-label={league}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink">{league}</h3>
+              <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+                await local("refresh_market", { league });
+                setFeedback(`${league} 行情已刷新。过滤器更新结果见方案状态。`);
+              })}>刷新行情</Button>
+            </div>
+            <ul className="grid gap-2">
+              {schemes.map((scheme) => (
+                <li key={scheme.id} className="grid min-w-0 gap-3 rounded border border-line bg-surface-2 p-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <strong className="min-w-0 break-words text-sm text-ink">{scheme.name}</strong>
+                      <Badge tone={scheme.installed ? "sage" : "muted"}>{scheme.installed ? "已安装" : "未安装"}</Badge>
+                    </div>
+                    {scheme.status && <p className="mt-1 break-words text-xs text-ink-muted">{scheme.status}</p>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {scheme.installed && <label className="mr-1 flex items-center gap-1.5 text-xs text-ink">
+                      <input type="checkbox" checked={scheme.autoRefresh} disabled={busy} onChange={(event) => {
+                        const enabled = event.target.checked;
+                        void run(() => local("scheme_auto", { id: scheme.id, enabled }));
+                      }} />自动刷新
+                    </label>}
+                    <Button size="sm" variant={scheme.installed ? "secondary" : "primary"} disabled={busy} onClick={() => void run(async () => {
+                      await local("scheme_install", { id: scheme.id });
+                      setFeedback(scheme.installed ? `「${scheme.name}」已完成重新生成` : `「${scheme.name}」已安装到游戏目录`);
+                    })}>{scheme.installed ? "重新生成" : "安装到游戏"}</Button>
+                    <Button size="sm" disabled={busy} onClick={() => onOpen(scheme)}>打开编辑</Button>
+                    <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+                      const code = await local<string>("scheme_share", { id: scheme.id });
+                      try {
+                        await navigator.clipboard.writeText(code);
+                        setShareOutput("");
+                        setFeedback("分享码已复制");
+                      } catch {
+                        setShareOutput(code);
+                      }
+                    })}>分享码</Button>
+                    <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+                      await local("scheme_copy", { id: scheme.id });
+                      setFeedback("方案已复制");
+                    })}>复制</Button>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setRemove(scheme); setRemoveFile(false); }}>删除</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </Panel>
+
+      <Panel title="刷新设置" description="托盘会定时更新已安装且开启自动刷新的方案。刷新行情也会更新同赛季开启自动刷新的方案。">
+        <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => {
+          event.preventDefault();
+          if (library) void run(() => updateSettings({ ...library.settings, intervalMinutes: Number(interval ?? library.settings.intervalMinutes) }));
+        }}>
+          <label className="text-xs text-ink-muted">刷新间隔（分钟）
+            <TextInput className="mt-1 w-28" type="number" min="1" max="1440" required disabled={!library || busy} value={interval ?? library?.settings.intervalMinutes ?? ""} onChange={(event) => setInterval(event.target.value)} />
+          </label>
+          <Button type="submit" size="sm" disabled={!library || busy}>应用间隔</Button>
+          <label className="flex min-h-9 items-center gap-2 text-sm text-ink">
+            <input type="checkbox" checked={library?.settings.paused ?? false} disabled={!library || busy} onChange={(event) => {
+              const paused = event.target.checked;
+              if (library) void run(() => updateSettings({ ...library.settings, paused }));
+            }} />暂停后台刷新
+          </label>
+        </form>
+      </Panel>
+
+      {remove && <ConfirmDialog title={`删除「${remove.name}」？`} busy={busy} onCancel={() => setRemove(undefined)}>
+        {remove.installed && <label className="flex items-center gap-2">
+          <input type="checkbox" checked={removeFile} disabled={busy} onChange={(event) => setRemoveFile(event.target.checked)} />同时删除游戏里的过滤器文件
+        </label>}
+        <div className="modal-actions">
+          <Button size="sm" disabled={busy} onClick={() => setRemove(undefined)}>取消</Button>
+          <Button size="sm" variant="danger" disabled={busy} onClick={() => void run(async () => {
+            await local("scheme_remove", { id: remove.id, removeFile });
+            onRemove(remove.id);
+            setRemove(undefined);
+            setFeedback(remove.installed && !removeFile ? "方案已删除，游戏过滤器已保留" : "方案已删除");
+          })}>确认删除</Button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {scheme.installed && <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={scheme.autoRefresh} disabled={busy} onChange={(event) => {
-            const enabled = event.target.checked;
-            void run(() => local("scheme_auto", { id: scheme.id, enabled }));
-          }} />自动刷新</label>}
-          <Button size="sm" disabled={busy} onClick={() => void run(() => open(scheme))}>编辑</Button>
-          <Button size="sm" disabled={busy} onClick={() => void run(async () => { await local("scheme_copy", { id: scheme.id }); setFeedback("已复制方案"); })}>复制</Button>
-          <Button size="sm" disabled={busy} onClick={() => void run(async () => {
-            const code = await local<string>("scheme_share", { id: scheme.id });
-            try { await navigator.clipboard.writeText(code); setFeedback("分享码已复制"); }
-            catch { setShareCode(code); setOpenShare(true); setFeedback("请手动复制分享码"); }
-          })}>分享码</Button>
-          <Button size="sm" disabled={busy} onClick={() => { setRemove(scheme); setRemoveFile(false); }}>删除</Button>
-        </div>
-      </li>)}
-    </ul>
-    {remove && <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-label="删除方案">
-      <h3>删除「{remove.name}」？</h3>
-      {remove.installed && <label className="flex items-center gap-2"><input type="checkbox" checked={removeFile} onChange={(event) => setRemoveFile(event.target.checked)} />同时删除游戏里的过滤器文件</label>}
-      <div className="modal-actions"><Button size="sm" onClick={() => setRemove(undefined)}>取消</Button><Button size="sm" disabled={busy} onClick={() => void run(async () => {
-        await local("scheme_remove", { id: remove.id, removeFile });
-        if (editing === remove.id) { setEditing(null); setName(""); onNew(); }
-        setRemove(undefined);
-        setFeedback("方案已删除");
-      })}>确认删除</Button></div>
-    </div></div>}
-    {feedback && <p role="status" className="my-2 text-sm text-ink">{feedback}</p>}
-    <form className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3" onSubmit={(event) => {
-      event.preventDefault();
-      if (!library) return;
-      void run(() => local("save_settings", { settings: { ...library.settings, intervalMinutes: Number(interval) } }));
-    }}>
-      <label className="text-xs text-ink-muted">刷新间隔（分钟）<TextInput className="mt-1 w-28" type="number" min="1" max="1440" value={interval} onChange={(event) => setIntervalValue(event.target.value)} /></label>
-      <Button type="submit" size="sm" disabled={!library || busy}>应用间隔</Button>
-      <label className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={library?.settings.paused ?? false} disabled={!library || busy} onChange={(event) => {
-        const paused = event.target.checked;
-        if (library) void run(() => local("save_settings", { settings: { ...library.settings, paused } }));
-      }} />暂停后台刷新</label>
-      <Button type="button" size="sm" disabled={!library || busy} onClick={() => void run(async () => { await onRefresh(); setFeedback("行情已刷新"); })}>刷新当前赛季</Button>
-    </form>
-  </Panel>;
+        {error && <p className="mt-2 text-sm text-ember">{error}</p>}
+      </ConfirmDialog>}
+    </div>
+  );
 }

@@ -1,6 +1,6 @@
 {
   "name": "poe2-realtime-filter",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Safety-first Path of Exile 2 loot filter generator built on NeverSink.",
   "scripts": {
