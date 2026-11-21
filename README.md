@@ -9,7 +9,7 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 
 - 七个 NeverSink PoE2 基础档位和多种官方视觉风格。
 - 从 NeverSink 基础规则解析的完整物品目录（当前包含 1417 个 BaseType/Class 条目）。
-- 白名单按「玩法 → 材料种类 → 物品」逐级选择；每个分类都可以整类勾选（例如深渊、探险、裂痕、神庙），也可以只勾分类下的单件物品，支持三语搜索、已选汇总和移除。
+- 白名单按 poe.ninja 的经济分组逐级选择（基础通货 / 碎片 / 深渊骨骸 / 精华 / 预兆 / 探险 / 液化情绪 / 催化剂 / 维金 / 神庙，再往上是装备等分支）；每个分类都可以整类勾选，也可以只勾分类下的单件物品，支持三语搜索、已选汇总和移除。
 - 白名单和低价值隐藏在同一板块；隐藏默认关闭，预填阈值为 0.1 E。
 - 每个 NeverSink 光效可以单独设置价格范围、启用状态、优先级和音效。
 - 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效（从所选 NeverSink 档位与风格读取），先按 poe.ninja 汇率统一换算成 E，再从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
@@ -65,41 +65,43 @@ NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2
 
 物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。
 
-### 通货与材料的玩法分组
+### 通货与材料的分组
 
-`crafting`（通货与材料）分支不再是一个大杂烩，而是按掉落来源玩法分组：
+`crafting`（通货与材料）分支的口径**直接跟随 [poe.ninja PoE2 经济侧栏](https://poe.ninja/poe2/economy/forbiddenrites/currency)**，只额外把「神庙」从基础通货里拆出来：
 
-| 分类 | 内容 | 数量 |
+| 分组 | 对应 poe.ninja 标签页 | 数量 |
 |---|---|---|
-| 基础通货 | 宝珠、品质通货、通货碎片、金币等通用产出 | 41 |
-| 深渊 | 亵渎骨骸（颚骨 / 肋骨 / 锁骨 / 头骨）与深渊预兆 | 19 |
-| 探险 | 合金、溶剂（Flux）、维金与星辉矿、徽记、远征传说与碎片 | 57 |
-| 裂痕 | 催化剂与裂痕碎片 | 27 |
-| 仪式 | 仪式预兆与请愿碎片 | 30 |
-| 迷雾 | 液化情绪与幻影碎片 | 26 + 1 |
-| 神庙 | 阿兹里神庙专属宝珠与注能装置 | 14 |
-| 试炼 | 赛克玛试炼钥匙 | 3 |
+| 基础通货 | Currency（去掉神庙） | 36 |
+| 碎片 | Fragments（通货碎片与各种碎片） | 10 |
+| 深渊骨骸 | Abyssal Bones | 11 |
+| 精华 | Essences | 82 |
+| 预兆 | Omens | 37 |
+| 探险 | Expedition（溶剂与远征传说） | 30 |
+| 液化情绪 | Liquid Emotions | 26 |
+| 催化剂 | Catalysts | 26 |
+| 维金 | Verisium（合金 / 维金 / 星辉矿 / 徽记） | 25 |
+| 神庙 | 自己拆出来的：阿兹里神庙专属通货 | 14 |
+| 试炼钥匙 | poe.ninja 未收录：赛克玛试炼钥匙 | 3 |
 
-归属按优先级判定，并逐条记录判定依据（`data/item-mechanics.json` 的 `evidence` 字段）：
+判定与复核方式：每件物品在 `data/item-mechanics.json` 里都有 `{ mechanic, evidence }`，其中 `evidence` 说明依据。优先级是
 
-1. **wiki 分类**：<https://www.poe2wiki.net> 条目上的显式分类 —— `Abyss`、`Breach`、`Delirium`、`Expedition`、`Ritual`、`Fate of the Vaal`（神庙）、`Incursion`。38 件物品由分类直接判定，神庙 14 件全部来自 `Fate of the Vaal`。
-2. **wiki tags**：分类缺失时用 `verisium_*`、`incursion_currency`、`catalyst`、`mushrune`、`breachstone_splinter` 等标签（65 件）。
-3. **wiki drop_text**：再退一步看掉落来源，例如 `Verisium Remnant` → 探险、`Lichborn` → 深渊、`Trial of the Sekhemas` → 试炼（46 件）。
-4. **名称族**：合金 / 溶剂 / 星辉矿 / 徽记 / 传说 / 预兆 / 液化情绪等只在单一玩法产出的词条（27 件），以及 `manual` 人工校正（3 件，例如 wiki 把 `Altered Collarbone` 标成 Breach，实际是深渊骨骸）。
+1. **poe.ninja 标签页**（153 件）：直接按商店分类，和界面里看到的一致；
+2. **wiki 分类 / tags / drop_text**（20 件）：poe.ninja 未收录的条目回落到 poe2wiki 的 `Category:Abyss`、`verisium_*` 标签、`Verisium Remnant` 掉落文本等；
+3. **名称族与人工校正**（45 件）：`Thaumaturgic Flux (Level N)`、`Aldur's Saga`、`* Key` 等；另有 2 条人工校正写在脚本里。
 
-poe.ninja PoE2 的 Currency / Fragments / Abyss / Expedition / Delirium / Breach / Ritual / Verisium 分类用于交叉核对。映射由脚本生成、可人工校正：
+两个刻意的偏差：poe.ninja 会把同一族材料拆到两个标签页（部分溶剂在 Verisium、部分星辉矿在 Expedition），这里按材料族归一；`Breach Splinter` 在商店属于 Breach 标签页，但这里和其他碎片一起进「碎片」。
+
+更新流程：
 
 ```bash
-node scripts/build-item-mechanics.mjs   # 抓取 wiki 元数据并重写映射（需要网络）
-node scripts/apply-catalog-mechanics.mjs # 把映射写回 data/item-catalog.json（离线、确定）
-node scripts/validate-data.mjs          # 校验玩法词条、分类路径和未归类条目
+node scripts/build-item-mechanics.mjs    # 抓 poe.ninja 标签页 + wiki 兜底（需要网络）
+node scripts/apply-catalog-mechanics.mjs # 写回 data/item-catalog.json（离线、确定）
+node scripts/validate-data.mjs           # 校验分组词条、展示顺序与未归类条目
 ```
 
-更新 NeverSink 或客户端数据后，如果新物品没有玩法归属，`validate:data` 和 `tests/item-taxonomy.test.mjs` 会直接失败并点名，避免新通货又静默堆回「基础通货」。整类白名单在过滤器里展开成合并的 `BaseType ==` 列表块（每 24 个一组），单件物品仍是独立规则。
+更新 NeverSink 或客户端数据后，如果新物品没有分组归属，`validate:data` 和 `tests/item-taxonomy.test.mjs` 会直接失败并点名。整类白名单在过滤器里展开成合并的 `BaseType ==` 列表块（每 24 个一组），单件物品仍是独立规则。
 
-wiki 分类与三语对照的检索方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill（分类列表页 harvest + 客户端数据本地查询）。
-
-通货样式从全部 56 个 NeverSink 模板提取，预览和生成器共用 `data/neversink-currency-appearances.json`。运行 `node scripts/extract-neversink-appearances.mjs --check` 验证源文件及样式数据一致；更新模板后可去掉 `--check` 重建。
+wiki 侧的分类与三语对照方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill。
 
 ## 赛季行情
 

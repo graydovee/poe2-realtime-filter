@@ -35,15 +35,15 @@ for (const item of catalog.items || []) {
 }
 
 const mechanics = JSON.parse(fs.readFileSync(path.join(root, "data", "item-mechanics.json"), "utf8"));
-const mechanicKeys = Object.keys(mechanics.mechanics || {});
-const kindKeys = Object.keys(mechanics.kinds || {});
-if (!mechanicKeys.length) problems.push("item mechanics: missing mechanic vocabulary");
-for (const [key, labels] of Object.entries(mechanics.mechanics || {})) {
+const groupLabels = mechanics.groups || {};
+const mechanicKeys = Object.keys(groupLabels);
+if (!mechanicKeys.length) problems.push("item mechanics: missing group vocabulary");
+for (const [key, labels] of Object.entries(groupLabels)) {
   if (!labels?.cn || !labels?.tw || !labels?.us) problems.push("item mechanics: missing labels for " + key);
 }
-for (const [key, labels] of Object.entries(mechanics.kinds || {})) {
-  if (!labels?.cn || !labels?.tw || !labels?.us) problems.push("item mechanics: missing kind labels for " + key);
-}
+const order = mechanics.order || [];
+for (const key of mechanicKeys) if (!order.includes(key)) problems.push("item mechanics: group missing from display order: " + key);
+for (const key of order) if (!mechanicKeys.includes(key) && !["essences", "socketables"].includes(key)) problems.push("item mechanics: unknown key in display order: " + key);
 const mapping = mechanics.items || {};
 const mapped = new Set(Object.keys(mapping));
 const unmapped = [];
@@ -52,7 +52,7 @@ for (const item of catalog.items || []) {
   const mechanic = item.categoryPath[1];
   const known = mechanicKeys.includes(mechanic) || ["essences", "socketables", "class-selection"].includes(mechanic);
   if (!known) problems.push("catalog: unknown crafting group '" + mechanic + "' on " + item.id);
-  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2 && !kindKeys.includes(item.categoryPath[2])) problems.push("catalog: unknown crafting kind '" + item.categoryPath[2] + "' on " + item.id);
+  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2) problems.push("catalog: unexpected extra level under " + mechanic + " on " + item.id);
   if (mechanicKeys.includes(mechanic) && !mapped.has(item.name)) unmapped.push(item.name);
 }
 for (const [name, entry] of Object.entries(mapping)) {

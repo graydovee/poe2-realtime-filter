@@ -228,7 +228,7 @@ export function ItemPicker({
       <p className="font-mono text-[10px] tracking-tight text-ink-muted">
         {query.trim()
           ? "搜索匹配 " + matchingItems.length + " 项，可按分类整类勾选。"
-          : "按玩法与种类逐级选择，整类或单件都可以直接勾选，共 " + ITEM_CATALOG.length + " 项。"}
+          : "按 poe.ninja 的分组逐级选择，整类或单件都可以直接勾选，共 " + ITEM_CATALOG.length + " 项。"}
       </p>
 
       <div className="border-t border-line/70 pt-4">

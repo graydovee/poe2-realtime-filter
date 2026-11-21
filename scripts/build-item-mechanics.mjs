@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { CLASSIFIED_GROUPS, KINDS, MECHANICS, classifyItem } from "./lib/item-taxonomy.mjs";
+import { GROUPS, GROUP_ORDER, NINJA_TABS, UNMANAGED_GROUPS, classifyItem } from "./lib/item-taxonomy.mjs";
 
 /**
- * 从 poe2wiki 抓取通货与材料条目的分类、tags 与 drop_text，判定每件物品的来源玩法，
- * 写出 data/item-mechanics.json。只在升级 NeverSink / 客户端数据后运行：
+ * 按 poe.ninja 的 PoE2 经济标签页归类「通货与材料」，商店没收录的条目回落到 poe2wiki
+ * 的分类 / tags / drop_text，写出 data/item-mechanics.json。只在升级 NeverSink、客户端数据
+ * 或 poe.ninja 标签页调整后运行：
  *
  *   node scripts/build-item-mechanics.mjs
  *   node scripts/apply-catalog-mechanics.mjs
@@ -13,29 +14,28 @@ import { CLASSIFIED_GROUPS, KINDS, MECHANICS, classifyItem } from "./lib/item-ta
  * 生成结果离线生效，构建和测试都不需要网络。
  */
 
-const API = "https://www.poe2wiki.net/api.php";
+const NINJA_INDEX = "https://poe.ninja/poe2/api/data/index-state";
+const NINJA_OVERVIEW = "https://poe.ninja/poe2/api/economy/exchange/current/overview";
+const WIKI_API = "https://www.poe2wiki.net/api.php";
 const OUTPUT = path.resolve("data/item-mechanics.json");
 const BATCH = 40;
 const USER_AGENT = "poe2-filter/0.3 (+https://git.graydove.cn/graydove/poe2-filter)";
 
-/** 人工校正：少数条目 wiki 元数据与实际情况不符，或归属需要按玩法解释。 */
+/** 人工校正：wiki / 商店元数据与实际情况不符，或归属需要按玩法解释。 */
 const OVERRIDES = {
-  // 扎多谍报产出的强箱钥匙不是赛季玩法通货，放回基础通货。
-  "Cryptic Key": { mechanic: "basic", reason: "扎多谍报强箱钥匙，不属于任何赛季玩法" },
-  // wiki 上没有独立条目，但它是基础通货碎片。
-  "Alchemy Shard": { mechanic: "basic", reason: "wiki 缺条目，按基础通货碎片处理" },
-  // 掉落自欧罗什（探险巅峰首领），因此归入探险。
-  "Shattered Triskelion": { mechanic: "expedition", reason: "掉落自探险巅峰首领欧罗什" },
+  // 扎多谍报产出的强箱钥匙属于通用通货，poe.ninja 也把它放在 Currency。
+  "Cryptic Key": { mechanic: "currency", reason: "扎多谍报强箱钥匙，通用通货" },
+  // wiki 没有独立条目，但它是基础通货碎片。
+  "Alchemy Shard": { mechanic: "shards", reason: "wiki 缺条目，按通货碎片处理" },
 };
 
 const catalog = JSON.parse(fs.readFileSync("data/item-catalog.json", "utf8"));
-const MECHANIC_KEYS = new Set(Object.keys(MECHANICS));
+const GROUP_KEYS = new Set(Object.keys(GROUPS));
 
-/** 目标集合：旧的单一通货分组，以及已经按玩法归类过的条目（重跑时保持一致）。 */
 function isClassified(item) {
   const path = item.categoryPath ?? [];
-  if (path[path.length - 1] === "class-selection") return false;
-  return CLASSIFIED_GROUPS.has(path.join("/")) || (path[0] === "crafting" && MECHANIC_KEYS.has(path[1]));
+  if (path[0] !== "crafting" || path.length < 2) return false;
+  return !UNMANAGED_GROUPS.has(path[1]);
 }
 
 const targets = catalog.items
@@ -46,21 +46,36 @@ const targets = catalog.items
 
 if (!targets.length) throw new Error("catalog 中没有可分类的通货与材料条目");
 
-async function fetchBatch(names) {
-  const params = new URLSearchParams({
-    action: "query",
-    prop: "categories|revisions",
-    cllimit: "max",
-    rvslots: "main",
-    rvprop: "content",
-    format: "json",
-    formatversion: "2",
-    redirects: "1",
-    titles: names.join("|"),
-  });
-  const response = await fetch(API + "?" + params, { headers: { "user-agent": USER_AGENT } });
-  if (!response.ok) throw new Error("poe2wiki 返回 " + response.status);
+async function fetchJson(url) {
+  const response = await fetch(url, { headers: { accept: "application/json", "user-agent": USER_AGENT } });
+  if (!response.ok) throw new Error(url + " 返回 " + response.status);
   return response.json();
+}
+
+/** 选一个经济区拉标签页；分类归属与赛季无关，优先环境变量指定的赛季。 */
+async function pickLeague() {
+  if (process.env.POE2_CATEGORY_LEAGUE) return process.env.POE2_CATEGORY_LEAGUE;
+  const index = await fetchJson(NINJA_INDEX);
+  const leagues = (index?.economyLeagues ?? []).filter((league) => !league.isPrivate && !league.hardcore);
+  const league = leagues[0] ?? (index?.economyLeagues ?? [])[0];
+  if (!league?.name) throw new Error("poe.ninja 没有可用的经济区");
+  return league.name;
+}
+
+async function readNinjaTabs(league) {
+  const tabs = {};
+  for (const type of Object.keys(NINJA_TABS)) {
+    const url = NINJA_OVERVIEW + "?" + new URLSearchParams({ league, type });
+    const payload = await fetchJson(url);
+    const items = new Map([...(payload.items ?? []), ...(payload.core?.items ?? [])].map((item) => [item.id, item.name]));
+    for (const line of payload.lines ?? []) {
+      const name = items.get(line.id);
+      if (name) tabs[name] = type;
+    }
+    process.stdout.write(".");
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return tabs;
 }
 
 function pick(text, key) {
@@ -68,75 +83,89 @@ function pick(text, key) {
   return match ? match[1].trim() : "";
 }
 
-function readPage(page) {
-  const text = page?.revisions?.[0]?.slots?.main?.content ?? "";
-  return {
-    tags: pick(text, "tags"),
-    drop: pick(text, "drop_text"),
-    categories: (page?.categories ?? []).map((category) => category.title.replace(/^Category:/, "")),
-  };
+async function readWiki(names) {
+  const pages = {};
+  for (let offset = 0; offset < names.length; offset += BATCH) {
+    const batch = names.slice(offset, offset + BATCH);
+    const params = new URLSearchParams({
+      action: "query",
+      prop: "categories|revisions",
+      cllimit: "max",
+      rvslots: "main",
+      rvprop: "content",
+      format: "json",
+      formatversion: "2",
+      redirects: "1",
+      titles: batch.join("|"),
+    });
+    const response = await fetch(WIKI_API + "?" + params, { headers: { "user-agent": USER_AGENT } });
+    if (!response.ok) throw new Error("poe2wiki 返回 " + response.status);
+    const payload = await response.json();
+    for (const page of payload?.query?.pages ?? []) {
+      const text = page?.revisions?.[0]?.slots?.main?.content ?? "";
+      pages[page.title] = {
+        tags: pick(text, "tags"),
+        drop: pick(text, "drop_text"),
+        categories: (page?.categories ?? []).map((category) => category.title.replace(/^Category:/, "")),
+      };
+    }
+    process.stdout.write(".");
+    if (offset + BATCH < names.length) await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return pages;
 }
+
+const league = await pickLeague();
+const ninjaTabs = await readNinjaTabs(league);
+const wiki = await readWiki(targets);
+process.stdout.write("\n");
 
 const missing = [];
 const items = {};
-
-for (let offset = 0; offset < targets.length; offset += BATCH) {
-  const names = targets.slice(offset, offset + BATCH);
-  const payload = await fetchBatch(names);
-  for (const page of payload?.query?.pages ?? []) {
-    const text = page?.revisions?.[0]?.slots?.main?.content;
-    if (!text) {
-      missing.push(page.title);
-      continue;
-    }
-    const override = OVERRIDES[page.title];
-    items[page.title] = classifyItem({
-      name: page.title,
-      ...readPage(page),
-      override: override?.mechanic,
-      reason: override?.reason,
-    });
-  }
-  process.stdout.write(".");
-  if (offset + BATCH < targets.length) await new Promise((resolve) => setTimeout(resolve, 250));
-}
-process.stdout.write("\n");
-
-// wiki 缺条目的物品：优先用人工校正，其次按名称规则兜底，并在输出里点名，避免静默归类。
 for (const name of targets) {
-  if (items[name]) continue;
+  const page = wiki[name];
   const override = OVERRIDES[name];
-  items[name] = classifyItem({ name, override: override?.mechanic, reason: override?.reason });
-  if (!missing.includes(name)) missing.push(name);
+  if (!page) missing.push(name);
+  items[name] = classifyItem({
+    name,
+    tags: page?.tags,
+    drop: page?.drop,
+    categories: page?.categories,
+    ninjaTab: ninjaTabs[name],
+    override: override?.mechanic,
+    reason: override?.reason,
+  });
+  if (!GROUP_KEYS.has(items[name].mechanic)) throw new Error("未知分组：" + name + " -> " + items[name].mechanic);
 }
 
 const counts = {};
-const evidenceKinds = {};
+const evidenceFamilies = {};
 for (const entry of Object.values(items)) {
   counts[entry.mechanic] = (counts[entry.mechanic] ?? 0) + 1;
   const family = entry.evidence.split(":")[0];
-  evidenceKinds[family] = (evidenceKinds[family] ?? 0) + 1;
+  evidenceFamilies[family] = (evidenceFamilies[family] ?? 0) + 1;
+}
+for (const key of Object.keys(GROUPS)) {
+  if (!counts[key]) throw new Error("分组 " + key + " 没有任何物品，检查标签页口径");
 }
 
-const byName = Object.fromEntries(Object.entries(items).sort(([a], [b]) => a.localeCompare(b)));
 const payload = {
-  version: 2,
+  version: 3,
   updatedAt: new Date().toISOString().slice(0, 10),
   generatedBy: "scripts/build-item-mechanics.mjs",
+  league,
   sources: [
-    "poe2wiki.net / Category：Abyss、Breach、Delirium、Expedition、Ritual、Fate of the Vaal 等显式分类",
-    "poe2wiki.net：条目 tags 与 drop_text（分类缺失时兜底）",
-    "poe.ninja PoE2 economy：Currency / Fragments / Abyss / Expedition / Delirium / Breach / Ritual / Verisium 分类交叉核对",
+    "poe.ninja PoE2 经济标签页：" + Object.keys(NINJA_TABS).join(" / ") + "（主口径）",
+    "poe2wiki.net：Category（Abyss / Breach / Delirium / Expedition / Ritual / Fate of the Vaal）、tags、drop_text（商店未收录时兜底）",
+    "神庙从 poe.ninja 的 Currency 中单独拆出：阿兹里神庙专属通货",
   ],
-  mechanics: MECHANICS,
-  kinds: KINDS,
-  items: byName,
+  order: GROUP_ORDER,
+  groups: GROUPS,
+  items: Object.fromEntries(Object.entries(items).sort(([a], [b]) => a.localeCompare(b))),
 };
 
 fs.writeFileSync(OUTPUT, JSON.stringify(payload, null, 2) + "\n");
-if (missing.length) {
-  console.warn("wiki 无条目、按人工校正或名称规则归类：" + missing.join(", "));
-}
-console.log("已写入 " + path.relative(process.cwd(), OUTPUT) + "：" + Object.keys(items).length + " 条，" +
-  Object.entries(counts).map(([key, value]) => key + " " + value).join(" / "));
-console.log("判定依据：" + Object.entries(evidenceKinds).map(([key, value]) => key + " " + value).join(" / "));
+if (missing.length) console.warn("wiki 无条目，按 poe.ninja / 名称规则归类：" + missing.join(", "));
+console.log("已写入 " + path.relative(process.cwd(), OUTPUT) + "（标签页取自 " + league + "）：" + Object.keys(items).length + " 条");
+console.log("分组：" + Object.entries(counts).map(([key, value]) => key + " " + value).join(" / "));
+console.log("依据：" + Object.entries(evidenceFamilies).map(([key, value]) => key + " " + value).join(" / "));

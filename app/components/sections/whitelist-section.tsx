@@ -25,7 +25,7 @@ export function WhitelistSection({
   onRemoveEntry: (entryId: string) => void;
 }) {
   return (
-    <Panel step="02" title="白名单与低价值隐藏" description="按玩法与种类选择白名单：整类或单件都可以勾选，并可设置可选的价格隐藏阈值。">
+    <Panel step="02" title="白名单与低价值隐藏" description="按商店分类选择白名单（基础通货、深渊骨骸、神庙等）：整类或单件都可以勾选，并可设置可选的价格隐藏阈值。">
       <div className="mb-6 rounded-sm border border-line bg-surface-2 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-ink">可选低价值隐藏</h3>

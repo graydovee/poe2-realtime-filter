@@ -43,10 +43,10 @@ export const CATEGORY_LABELS: Record<string, Record<Locale, string>> = {
   gem: { cn: "宝石", tw: "寶石", us: "Gems" },
 };
 
-/** 通货与材料的来源玩法词条，由 scripts/build-item-mechanics.mjs 生成。 */
+/** 通货与材料的分组词条与展示顺序，由 scripts/build-item-mechanics.mjs 生成（跟随 poe.ninja 标签页）。 */
 export const TAXONOMY = mechanicsData as {
-  mechanics: Record<string, Record<Locale, string>>;
-  kinds: Record<string, Record<Locale, string>>;
+  order: string[];
+  groups: Record<string, Record<Locale, string>>;
   items: Record<string, { mechanic: string; evidence: string }>;
 };
 

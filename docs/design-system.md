@@ -51,7 +51,7 @@
 
 白名单选择器（`item-picker`）的交互约定：
 
-- 分类菜单按「玩法 → 材料种类 → 物品」排序，玩法顺序来自 `data/item-mechanics.json`（基础通货、深渊、探险、裂痕、仪式、迷雾、神庙、试炼），其余分组保持原有插入顺序，整类匹配排在最后。
+- 分类菜单按 poe.ninja 经济侧栏的顺序排列（基础通货、碎片、深渊骨骸、精华、预兆、探险、液化情绪、催化剂、维金，然后是自定义的神庙与试炼钥匙），顺序写在 `data/item-mechanics.json` 的 `order` 字段；其余分支保持原有插入顺序，整类匹配排在最后。
 - 每张分类卡片右侧是独立的整类勾选按钮（`role="checkbox"`，支持 `aria-checked="mixed"` 的半选态）；点卡片主体进入下一级，点勾选框整选/取消该分类下的全部物品。
 - 当前分类顶部有一条汇总条（本类 N 项 / 已选 M）与「选择本类 / 取消本类」，适合一次性把整套装备槽位或整个玩法拉进白名单。
 - 已选区按条目展示：整类条目显示为「深渊 · 19 项」，单件显示物品名，都可以整条移除。
@@ -70,6 +70,6 @@
 - `docs/screenshots/builder-1024.png`：配置页（1024）
 - `docs/screenshots/builder-430.png`：配置页（移动端）
 - `docs/screenshots/preview-1440.png`：预览与导出页
-- `docs/screenshots/whitelist-mechanics-1440.png`：白名单的玩法分类（通货与材料）
+- `docs/screenshots/whitelist-mechanics-1440.png`：白名单的商店分类（通货与材料）
 - `docs/screenshots/whitelist-mechanics-selected-1440.png`：整类勾选深渊后的已选条目
-- `docs/screenshots/whitelist-mechanics-430.png`：玩法分类（移动端）
+- `docs/screenshots/whitelist-mechanics-430.png`：商店分类（移动端）

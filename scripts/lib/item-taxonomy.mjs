@@ -1,64 +1,79 @@
 /**
- * 通货与材料（crafting）分支的来源玩法分类。
+ * 通货与材料（crafting）分支的分组。
  *
- * 玩法归属来自 poe2wiki 条目的 tags / drop_text 与 poe.ninja PoE2 经济分类，
- * 由 scripts/build-item-mechanics.mjs 生成 data/item-mechanics.json，
- * scripts/apply-catalog-mechanics.mjs 再把结果写回 data/item-catalog.json 的 categoryPath。
+ * 分组口径直接跟随 poe.ninja 的 PoE2 经济标签页（Currency / Fragments / Abyssal Bones /
+ * Essences / Omens / Expedition / Liquid Emotions / Catalysts / Verisium），
+ * 唯一新增的分组是从 Currency 里拆出来的「神庙」（阿兹里神庙专属通货）。
  *
- * 这里只放「规则」和「词条」，不放具体物品，具体物品一律由离线数据文件决定。
+ * 归属由 scripts/build-item-mechanics.mjs 生成：先取 poe.ninja 标签页，
+ * 商店未收录的条目回落到 poe2wiki 的分类 / tags / drop_text 与名称族。
  */
 
-export const MECHANICS = {
-  basic: { cn: "基础通货", tw: "基礎通貨", us: "Basic Currency" },
-  abyss: { cn: "深渊", tw: "深淵", us: "Abyss" },
-  expedition: { cn: "探险", tw: "探險", us: "Expedition" },
-  breach: { cn: "裂痕", tw: "裂痕", us: "Breach" },
-  ritual: { cn: "仪式", tw: "儀式", us: "Ritual" },
-  delirium: { cn: "迷雾", tw: "迷霧", us: "Delirium" },
-  temple: { cn: "神庙", tw: "神廟", us: "Temple" },
-  trial: { cn: "试炼", tw: "試煉", us: "Trials" },
-};
-
-export const KINDS = {
-  bones: { cn: "亵渎骨骸", tw: "褻瀆骨骸", us: "Desecration Bones" },
+export const GROUPS = {
+  currency: { cn: "基础通货", tw: "基礎通貨", us: "Currency" },
+  shards: { cn: "碎片", tw: "碎片", us: "Fragments" },
+  bones: { cn: "深渊骨骸", tw: "深淵骨骸", us: "Abyssal Bones" },
   omens: { cn: "预兆", tw: "預兆", us: "Omens" },
-  alloys: { cn: "合金", tw: "合金", us: "Alloys" },
-  flux: { cn: "溶剂", tw: "溶劑", us: "Flux" },
-  verisium: { cn: "维金与矿石", tw: "維金與礦石", us: "Verisium & Ore" },
-  crests: { cn: "徽记", tw: "徽記", us: "Crests" },
-  sagas: { cn: "远征传说", tw: "遠征傳說", us: "Sagas" },
-  splinters: { cn: "碎片", tw: "碎片", us: "Splinters" },
-  catalysts: { cn: "催化剂", tw: "催化劑", us: "Catalysts" },
+  expedition: { cn: "探险", tw: "探險", us: "Expedition" },
   emotions: { cn: "液化情绪", tw: "液化情緒", us: "Liquid Emotions" },
-  infusers: { cn: "注能装置", tw: "注能裝置", us: "Infusers" },
-  orbs: { cn: "宝珠", tw: "寶珠", us: "Orbs" },
-  keys: { cn: "钥匙", tw: "鑰匙", us: "Keys" },
-  misc: { cn: "其他产出", tw: "其他產出", us: "Misc" },
+  catalysts: { cn: "催化剂", tw: "催化劑", us: "Catalysts" },
+  verisium: { cn: "维金", tw: "維金", us: "Verisium" },
+  temple: { cn: "神庙", tw: "神廟", us: "Temple" },
+  trial: { cn: "试炼钥匙", tw: "試煉鑰匙", us: "Trial Keys" },
 };
 
-/** 本模块负责的旧分类路径：这些组里的物品会按玩法重新归类。 */
-export const CLASSIFIED_GROUPS = new Set(["crafting/currency", "crafting/catalysts", "crafting/emotions", "crafting/omens", "crafting/shards"]);
+/** 侧栏展示顺序：跟随 poe.ninja，精华与插槽物品保持在原位置。 */
+export const GROUP_ORDER = [
+  "currency",
+  "shards",
+  "bones",
+  "essences",
+  "omens",
+  "expedition",
+  "emotions",
+  "catalysts",
+  "verisium",
+  "temple",
+  "trial",
+  "socketables",
+];
 
-/** wiki 条目分类 → 玩法。分类是 wiki 编辑者的显式标注，优先于掉落文本推断。 */
-export const CATEGORY_MECHANICS = {
-  Abyss: "abyss",
-  Breach: "breach",
-  Delirium: "delirium",
+/** poe.ninja 经济标签页 → 分组。未列出的标签页不参与本分支归类。 */
+export const NINJA_TABS = {
+  Currency: "currency",
+  Fragments: "shards",
+  Abyss: "bones",
+  Ritual: "omens",
   Expedition: "expedition",
-  Ritual: "ritual",
+  Delirium: "emotions",
+  Breach: "catalysts",
+  Verisium: "verisium",
+};
+
+/** wiki 分类 → 分组，仅在 poe.ninja 未收录时兜底。 */
+export const CATEGORY_GROUPS = {
+  Abyss: "bones",
+  Breach: "catalysts",
+  Delirium: "emotions",
+  Expedition: "expedition",
+  Ritual: "omens",
   "Fate of the Vaal": "temple",
   Incursion: "temple",
 };
 
+/** 通货与材料分支里不参与归类的分组：精华、插槽物品与整类匹配标记各自独立。 */
+export const UNMANAGED_GROUPS = new Set(["essences", "socketables", "class-selection"]);
+
 const BONES = /(?:Jawbone|Rib|Collarbone|Cranium)$/;
+const SPLINTER = /(?:Splinter|Shard)$/;
 const ORE = /(?:Verisium|Starlit Ore)/;
 
 /**
- * 判定来源玩法，返回玩法键与判定依据（依据会写进 data/item-mechanics.json，便于复核）。
- * 顺序：人工校正 → 骨骸族名（颚骨/肋骨/锁骨/头骨只在深渊产出）→ wiki 分类 →
- * wiki tags → drop_text → 名称族 → 基础通货。
- * @param {{name: string, tags?: string|null, drop?: string|null, categories?: string[]}} item
- * @returns {{mechanic: keyof typeof MECHANICS, evidence: string}}
+ * 判定分组，返回分组键与判定依据（依据写进 data/item-mechanics.json，便于复核）。
+ * 顺序：人工校正 → 碎片（碎片类不随标签页漂移）→ 神庙（从 Currency 拆出）→
+ * poe.ninja 标签页 → wiki 分类 → wiki tags → drop_text → 名称族 → 基础通货。
+ * @param {{name: string, tags?: string|null, drop?: string|null, categories?: string[], ninjaTab?: string|null, override?: string, reason?: string}} item
+ * @returns {{mechanic: keyof typeof GROUPS, evidence: string}}
  */
 export function classifyItem(item) {
   const name = item.name;
@@ -68,96 +83,50 @@ export function classifyItem(item) {
 
   if (item.override) return { mechanic: item.override, evidence: "manual: " + (item.reason ?? "人工校正") };
 
-  // 骨骸是深渊专属材料：wiki 上 Altered Collarbone 误标为 Breach，这里以族名和掉落文本为准。
-  if (BONES.test(name)) return { mechanic: "abyss", evidence: "name: abyssal bones" };
+  // 碎片（通货碎片 / 裂痕与幻影碎片）统一进「碎片」，不让 Breach 标签页把它们带去催化剂。
+  if (SPLINTER.test(name)) return { mechanic: "shards", evidence: "name: splinter or shard" };
 
-  for (const category of categories) {
-    const mechanic = CATEGORY_MECHANICS[category];
-    if (mechanic) return { mechanic, evidence: "wiki-category: " + category };
-  }
-
-  // 神庙：incursion 标签与神庙掉落文本。
+  // 神庙：poe.ninja 把神庙通货放在 Currency 里，按需求单独拆出。
   if (/incursion_currency/.test(tags)) return { mechanic: "temple", evidence: "wiki-tag: incursion_currency" };
   if (/Atziri's Temple|Royal Trove/.test(drop)) return { mechanic: "temple", evidence: "wiki-drop: Atziri's Temple" };
 
-  // 探险：维金残迹、远征日志、合金 / 溶剂 / 星辉矿 / 徽记 / 传说。
-  if (/verisium_/.test(tags)) return { mechanic: "expedition", evidence: "wiki-tag: verisium" };
-  if (/Verisium Remnant/.test(drop)) return { mechanic: "expedition", evidence: "wiki-drop: Verisium Remnant" };
+  // poe.ninja 把同一族材料分在两个标签页（部分溶剂在 Verisium、部分星辉矿在 Expedition），
+  // 这里按材料族归一，避免同一类东西被拆到两个分组。
+  if (/Flux(?: \(Level \d+\))?$/.test(name)) return { mechanic: "expedition", evidence: "name: flux" };
+  if (ORE.test(name)) return { mechanic: "verisium", evidence: "name: verisium ore" };
+
+  const tab = item.ninjaTab ? NINJA_TABS[item.ninjaTab] : undefined;
+  if (tab) return { mechanic: tab, evidence: "poe.ninja: " + item.ninjaTab };
+
+  for (const category of categories) {
+    const group = CATEGORY_GROUPS[category];
+    if (group) return { mechanic: group, evidence: "wiki-category: " + category };
+  }
+
+  if (/verisium_/.test(tags)) return { mechanic: "verisium", evidence: "wiki-tag: verisium" };
+  if (/catalyst/.test(tags)) return { mechanic: "catalysts", evidence: "wiki-tag: catalyst" };
+  if (/mushrune/.test(tags)) return { mechanic: "emotions", evidence: "wiki-tag: mushrune" };
+
+  if (/Verisium Remnant/.test(drop)) return { mechanic: "verisium", evidence: "wiki-drop: Verisium Remnant" };
   if (/Expedition|Logbook/.test(drop)) return { mechanic: "expedition", evidence: "wiki-drop: Expedition" };
-
-  if (/catalyst/.test(tags)) return { mechanic: "breach", evidence: "wiki-tag: catalyst" };
-  if (/breachstone_splinter/.test(tags)) return { mechanic: "breach", evidence: "wiki-tag: breachstone_splinter" };
-
-  if (/mushrune/.test(tags)) return { mechanic: "delirium", evidence: "wiki-tag: mushrune" };
-  if (/affliction_orb/.test(tags)) return { mechanic: "delirium", evidence: "wiki-tag: affliction_orb" };
-  if (/Delirium/.test(drop)) return { mechanic: "delirium", evidence: "wiki-drop: Delirium" };
-
-  if (/Abyssal|Lichborn/.test(drop)) return { mechanic: "abyss", evidence: "wiki-drop: Abyssal/Lichborn" };
-  if (/\bRitual\b/.test(drop)) return { mechanic: "ritual", evidence: "wiki-drop: Ritual" };
-  if (/\bBreach\b/.test(drop)) return { mechanic: "breach", evidence: "wiki-drop: Breach" };
-  if (/Abyss|Abyssal Depths/.test(drop)) return { mechanic: "abyss", evidence: "wiki-drop: Abyss" };
+  if (/Abyssal|Lichborn|\bAbyss\b/.test(drop)) return { mechanic: "bones", evidence: "wiki-drop: Abyss" };
+  if (/\bRitual\b/.test(drop)) return { mechanic: "omens", evidence: "wiki-drop: Ritual" };
+  if (/Delirium/.test(drop)) return { mechanic: "emotions", evidence: "wiki-drop: Delirium" };
   if (/Sekhemas/.test(drop)) return { mechanic: "trial", evidence: "wiki-drop: Trial of the Sekhemas" };
 
-  // 名称回落：这些词条只在对应玩法里产出。
-  if (ORE.test(name)) return { mechanic: "expedition", evidence: "name: verisium ore" };
-  if (/Alloy$/.test(name)) return { mechanic: "expedition", evidence: "name: alloy" };
-  if (/Flux(?: \(Level \d+\))?$/.test(name)) return { mechanic: "expedition", evidence: "name: flux" };
-  if (/Crest of the/.test(name)) return { mechanic: "expedition", evidence: "name: crest" };
+  // 名称族：poe.ninja 未收录的低价 / 不可交易条目。
+  if (BONES.test(name)) return { mechanic: "bones", evidence: "name: abyssal bones" };
+  if (/Alloy$|Crest of the/.test(name)) return { mechanic: "verisium", evidence: "name: verisium family" };
   if (/Saga$/.test(name)) return { mechanic: "expedition", evidence: "name: saga" };
-  if (/^Omen of/.test(name)) return { mechanic: "ritual", evidence: "name: omen" };
-  if (/Catalyst$/.test(name)) return { mechanic: "breach", evidence: "name: catalyst" };
-  if (/^Simulacrum Splinter$/.test(name)) return { mechanic: "delirium", evidence: "name: simulacrum splinter" };
-  if (/^Petition Splinter$/.test(name)) return { mechanic: "ritual", evidence: "name: petition splinter" };
-  if (/^Breach Splinter$/.test(name)) return { mechanic: "breach", evidence: "name: breach splinter" };
-  if (/^Liquid /.test(name)) return { mechanic: "delirium", evidence: "name: liquid emotion" };
+  if (/^Liquid /.test(name)) return { mechanic: "emotions", evidence: "name: liquid emotion" };
+  if (/Catalyst$/.test(name)) return { mechanic: "catalysts", evidence: "name: catalyst" };
+  if (/^Omen of/.test(name)) return { mechanic: "omens", evidence: "name: omen" };
+  if (/^[A-Z][a-z]+ Key$/.test(name)) return { mechanic: "trial", evidence: "name: trial key" };
 
-  return { mechanic: "basic", evidence: "default: 通用通货" };
-}
-
-/**
- * 依据物品名给出玩法内的细分小组；基础通货保持单层，避免常用通货多点一次。
- * @param {{name: string}} item
- * @param {keyof typeof MECHANICS} mechanic
- * @returns {keyof typeof KINDS | null}
- */
-export function classifyKind(item, mechanic) {
-  const name = item.name;
-  switch (mechanic) {
-    case "abyss":
-      return BONES.test(name) ? "bones" : "omens";
-    case "expedition":
-      if (ORE.test(name)) return "verisium";
-      if (/Alloy$/.test(name)) return "alloys";
-      if (/Flux/.test(name)) return "flux";
-      if (/Crest of the/.test(name)) return "crests";
-      if (/Saga$/.test(name)) return "sagas";
-      if (/Splinter/.test(name)) return "splinters";
-      return "misc";
-    case "breach":
-      return /Catalyst$/.test(name) ? "catalysts" : "splinters";
-    case "ritual":
-      return /^Omen of/.test(name) ? "omens" : "splinters";
-    case "delirium":
-      return /Splinter$/.test(name) ? "splinters" : "emotions";
-    case "temple":
-      return /Infuser$/.test(name) ? "infusers" : "orbs";
-    case "trial":
-      return "keys";
-    default:
-      return null;
-  }
+  return { mechanic: "currency", evidence: "default: Currency" };
 }
 
 /** 生成 catalog 中的 categoryPath。 */
-export function categoryPathFor(item, mechanic) {
-  const kind = classifyKind(item, mechanic);
-  return kind ? ["crafting", mechanic, kind] : ["crafting", mechanic];
-}
-
-export function mechanicLabels() {
-  return MECHANICS;
-}
-
-export function kindLabels() {
-  return KINDS;
+export function categoryPathFor(mechanic) {
+  return ["crafting", mechanic];
 }
