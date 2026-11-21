@@ -34,6 +34,31 @@ for (const item of catalog.items || []) {
   if (!item.localeNames?.cn || !item.localeNames?.tw || !item.localeNames?.us) problems.push("catalog: missing locale name " + item.id);
 }
 
+const mechanics = JSON.parse(fs.readFileSync(path.join(root, "data", "item-mechanics.json"), "utf8"));
+const mechanicKeys = Object.keys(mechanics.mechanics || {});
+const kindKeys = Object.keys(mechanics.kinds || {});
+if (!mechanicKeys.length) problems.push("item mechanics: missing mechanic vocabulary");
+for (const [key, labels] of Object.entries(mechanics.mechanics || {})) {
+  if (!labels?.cn || !labels?.tw || !labels?.us) problems.push("item mechanics: missing labels for " + key);
+}
+for (const [key, labels] of Object.entries(mechanics.kinds || {})) {
+  if (!labels?.cn || !labels?.tw || !labels?.us) problems.push("item mechanics: missing kind labels for " + key);
+}
+const mapping = mechanics.items || {};
+const mapped = new Set(Object.keys(mapping));
+const unmapped = [];
+for (const item of catalog.items || []) {
+  if (item.categoryPath?.[0] !== "crafting") continue;
+  const mechanic = item.categoryPath[1];
+  const known = mechanicKeys.includes(mechanic) || ["essences", "socketables", "class-selection"].includes(mechanic);
+  if (!known) problems.push("catalog: unknown crafting group '" + mechanic + "' on " + item.id);
+  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2 && !kindKeys.includes(item.categoryPath[2])) problems.push("catalog: unknown crafting kind '" + item.categoryPath[2] + "' on " + item.id);
+  if (mechanicKeys.includes(mechanic) && !mapped.has(item.name)) unmapped.push(item.name);
+}
+for (const [name, mechanic] of Object.entries(mapping)) {
+  if (!mechanicKeys.includes(mechanic)) problems.push("item mechanics: unknown mechanic " + mechanic + " for " + name);
+}
+
 const visuals = JSON.parse(fs.readFileSync(path.join(root, "data", "visual-presets.json"), "utf8"));
 if (!Array.isArray(visuals.presets) || visuals.presets.length < 10) problems.push("visual presets: expected NeverSink effect union");
 const visualIds = new Set();
@@ -43,8 +68,13 @@ for (const preset of visuals.presets || []) {
   if (!preset.effect || (!preset.sound || (preset.sound.type === "builtin" ? !Number.isInteger(preset.sound.id) : !preset.sound.fileName))) problems.push("visual presets: incomplete " + preset.id);
 }
 
+if (unmapped.length) {
+  for (const name of unmapped.slice(0, 10)) console.warn("WARN: 未登记来源玩法，先运行 node scripts/build-item-mechanics.mjs：" + name);
+  problems.push(unmapped.length + " 件通货与材料物品缺少来源玩法归属（见上方 WARN）");
+}
+
 if (problems.length) {
   for (const problem of problems) console.error("FAIL: " + problem);
   process.exit(1);
 }
-console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + visuals.presets.length + " visual presets)");
+console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + visuals.presets.length + " visual presets)");

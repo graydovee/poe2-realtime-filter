@@ -66,3 +66,9 @@ const catalog = JSON.parse(fs.readFileSync(catalogFile, "utf8"));
 for (const item of catalog.items) item.categoryPath = categoryPath(item);
 fs.writeFileSync(catalogFile, JSON.stringify(catalog, null, 2) + "\n");
 console.log("Grouped " + catalog.items.length + " items using client ItemClass metadata");
+// 分组之后按来源玩法细分通货与材料：先跑 scripts/build-item-mechanics.mjs 更新映射，
+// 这里负责把映射写回 categoryPath（离线、可重复执行）。
+if (!process.argv.includes("--skip-mechanics")) {
+  const { execFileSync } = await import("node:child_process");
+  execFileSync(process.execPath, ["scripts/apply-catalog-mechanics.mjs"], { stdio: "inherit" });
+}

@@ -17,7 +17,13 @@ export function validateProfile(input:unknown):FilterProfile {
  if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new ApiError(400,'无效的基础过滤器');
  if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new ApiError(400,'无效赛季');
  if(!number(p.itemLevelMin,1,100)||!number(p.areaLevelMin,1,100)||!number(p.hideBelowAmount,0,1e12)||!['divine','chaos','exalted'].includes(p.hideBelowCurrency)||typeof p.hideBelowEnabled!=='boolean')throw new ApiError(400,'无效的等级或隐藏阈值');
- if(!Array.isArray(p.whitelist)||p.whitelist.length>3000||p.whitelist.some(e=>!Array.isArray(e.itemIds)||e.itemIds.some(id=>!ITEM_CATALOG.some(i=>i.id===id))))throw new ApiError(400,'无效白名单');
+ if(!Array.isArray(p.whitelist)||p.whitelist.length>3000)throw new ApiError(400,'无效白名单');
+ const catalogIds=new Set(ITEM_CATALOG.map(i=>i.id));
+ for(const entry of p.whitelist){
+  if(!entry||typeof entry.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(entry.id))throw new ApiError(400,'无效白名单');
+  if(typeof entry.label!=='string'||!entry.label.trim()||entry.label.length>120||/[\r\n]/.test(entry.label))throw new ApiError(400,'无效白名单');
+  if(!Array.isArray(entry.itemIds)||entry.itemIds.length===0||entry.itemIds.length>2000||entry.itemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new ApiError(400,'无效白名单');
+ }
  if(!Array.isArray(p.visualPresets)||p.visualPresets.length>100)throw new ApiError(400,'光效规则过多');
  const ids=new Set<string>();
  for(const v of p.visualPresets){

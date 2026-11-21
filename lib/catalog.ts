@@ -1,3 +1,4 @@
+import { TAXONOMY } from "./data";
 import type { ItemDefinition, Locale } from "./types";
 
 const GROUP_NAMES: Record<string, [string, string, string]> = {
@@ -26,8 +27,29 @@ const GROUP_NAMES: Record<string, [string, string, string]> = {
   "class-selection": ["整类匹配", "整類匹配", "Class Matches"], "other-items": ["其他物品", "其他物品", "Other Items"],
 };
 
+const LOCALE_INDEX: Record<Locale, number> = { cn: 0, tw: 1, us: 2 };
+
+const MECHANIC_ORDER = Object.keys(TAXONOMY.mechanics);
+const KIND_ORDER = Object.keys(TAXONOMY.kinds);
+
+/**
+ * 分类菜单的展示顺序：先按玩法（基础通货、深渊、探险…），再按材料小组，
+ * 未登记的分组保持原本的插入顺序，整类匹配固定放最后。
+ */
+export function groupOrder(key: string): number {
+  const mechanic = MECHANIC_ORDER.indexOf(key);
+  if (mechanic >= 0) return mechanic;
+  const kind = KIND_ORDER.indexOf(key);
+  if (kind >= 0) return 100 + kind;
+  if (key === "class-selection") return 1000;
+  return 500;
+}
+
+/** 分组名优先取数据文件里的玩法词条（通货与材料），其余回落到内置装备词条。 */
 export function groupName(key: string, locale: Locale): string {
-  return GROUP_NAMES[key]?.[{ cn: 0, tw: 1, us: 2 }[locale]] ?? key;
+  const taxonomy = TAXONOMY.mechanics[key] ?? TAXONOMY.kinds[key];
+  if (taxonomy) return taxonomy[locale] ?? taxonomy.us ?? key;
+  return GROUP_NAMES[key]?.[LOCALE_INDEX[locale]] ?? key;
 }
 export type CatalogNode = { key: string; path: string[]; items: ItemDefinition[]; children: CatalogNode[] };
 

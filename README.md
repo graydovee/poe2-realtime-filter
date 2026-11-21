@@ -9,7 +9,7 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 
 - 七个 NeverSink PoE2 基础档位和多种官方视觉风格。
 - 从 NeverSink 基础规则解析的完整物品目录（当前包含 1417 个 BaseType/Class 条目）。
-- 白名单按物品种类逐级选择（例如装备 → 武器 → 弓），支持三语搜索、已选汇总和移除。
+- 白名单按「玩法 → 材料种类 → 物品」逐级选择；每个分类都可以整类勾选（例如深渊、探险、裂痕、神庙），也可以只勾分类下的单件物品，支持三语搜索、已选汇总和移除。
 - 白名单和低价值隐藏在同一板块；隐藏默认关闭，预填阈值为 0.1 E。
 - 每个 NeverSink 光效可以单独设置价格范围、启用状态、优先级和音效。
 - 默认启用崇高石、混沌石、剥离石、神圣石四档原始视觉与音效（从所选 NeverSink 档位与风格读取），先按 poe.ninja 汇率统一换算成 E，再从低到高排列价格区间。每档使用下限通货的效果，最高档无上限，低于最小通货价格沿用原始规则。
@@ -64,6 +64,31 @@ Gitea Actions 只在 `v*` tag 上构建 amd64/arm64 镜像，推送到 Harbor �
 NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2 游戏数据属于 Grinding Gear Games。
 
 物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。
+
+### 通货与材料的玩法分组
+
+`crafting`（通货与材料）分支不再是一个大杂烩，而是按掉落来源玩法分组：
+
+| 分类 | 内容 | 数量 |
+|---|---|---|
+| 基础通货 | 宝珠、品质通货、通货碎片、金币等通用产出 | 41 |
+| 深渊 | 亵渎骨骸（颚骨 / 肋骨 / 锁骨 / 头骨）与深渊预兆 | 19 |
+| 探险 | 合金、溶剂（Flux）、维金与星辉矿、徽记、远征传说与碎片 | 57 |
+| 裂痕 | 催化剂与裂痕碎片 | 27 |
+| 仪式 | 仪式预兆与请愿碎片 | 30 |
+| 迷雾 | 液化情绪与幻影碎片 | 26 + 1 |
+| 神庙 | 阿兹里神庙专属宝珠与注能装置 | 14 |
+| 试炼 | 赛克玛试炼钥匙 | 3 |
+
+归属来自 <https://www.poe2wiki.net> 条目的 `tags` 与 `drop_text`（例如 `incursion_currency` → 神庙、`verisium_*` → 探险、深渊稀有怪的预兆 → 深渊），并用 poe.ninja PoE2 经济分类交叉核对。映射写在 `data/item-mechanics.json`，由脚本生成、可人工校正：
+
+```bash
+node scripts/build-item-mechanics.mjs   # 抓取 wiki 元数据并重写映射（需要网络）
+node scripts/apply-catalog-mechanics.mjs # 把映射写回 data/item-catalog.json（离线、确定）
+node scripts/validate-data.mjs          # 校验玩法词条、分类路径和未归类条目
+```
+
+更新 NeverSink 或客户端数据后，如果新物品没有玩法归属，`validate:data` 和 `tests/item-taxonomy.test.mjs` 会直接失败并点名，避免新通货又静默堆回「基础通货」。整类白名单在过滤器里展开成合并的 `BaseType ==` 列表块（每 24 个一组），单件物品仍是独立规则。
 
 通货样式从全部 56 个 NeverSink 模板提取，预览和生成器共用 `data/neversink-currency-appearances.json`。运行 `node scripts/extract-neversink-appearances.mjs --check` 验证源文件及样式数据一致；更新模板后可去掉 `--check` 重建。
 

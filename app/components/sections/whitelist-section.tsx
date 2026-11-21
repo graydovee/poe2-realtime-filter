@@ -3,25 +3,29 @@
 import type { Currency, FilterProfile, Locale } from "../../../lib/types";
 import { Select, Switch, TextInput } from "../ui/controls";
 import { Field, Panel } from "../ui/primitives";
-import { ItemPicker } from "../item-picker";
+import { ItemPicker, type ItemPickerEntry, type ItemPickerToggle } from "../item-picker";
 
 const currencyLabels: Record<Currency, string> = { divine: "D · 神圣石", chaos: "C · 混沌石", exalted: "E · 崇高石" };
 
 export function WhitelistSection({
   profile,
+  whitelistEntries,
   onHideEnabled,
   onHideAmount,
   onHideCurrency,
   onToggleItem,
+  onRemoveEntry,
 }: {
   profile: FilterProfile;
+  whitelistEntries: ItemPickerEntry[];
   onHideEnabled: (enabled: boolean) => void;
   onHideAmount: (amount: number) => void;
   onHideCurrency: (currency: Currency) => void;
-  onToggleItem: (id: string, checked: boolean) => void;
+  onToggleItem: (toggle: ItemPickerToggle) => void;
+  onRemoveEntry: (entryId: string) => void;
 }) {
   return (
-    <Panel step="02" title="白名单与低价值隐藏" description="按物品种类选择白名单，并设置可选的价格隐藏阈值。">
+    <Panel step="02" title="白名单与低价值隐藏" description="按玩法与种类选择白名单：整类或单件都可以勾选，并可设置可选的价格隐藏阈值。">
       <div className="mb-6 rounded-sm border border-line bg-surface-2 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-ink">可选低价值隐藏</h3>
@@ -56,8 +60,9 @@ export function WhitelistSection({
 
       <ItemPicker
         locale={profile.locale as Locale}
-        selectedIds={profile.whitelist.flatMap((entry) => entry.itemIds)}
+        entries={whitelistEntries}
         onToggle={onToggleItem}
+        onRemoveEntry={onRemoveEntry}
       />
     </Panel>
   );

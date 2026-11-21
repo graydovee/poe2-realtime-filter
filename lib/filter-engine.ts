@@ -66,16 +66,50 @@ function presetRule(item: ItemDefinition, preset: VisualPreset): string {
   return "Show # poe2-filter preset: " + preset.name + " / " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + actions;
 }
 
+const WHITELIST_ACTIONS = "\tSetFontSize 42\n\tSetTextColor 255 255 255 255\n\tSetBorderColor 255 255 255 255\n\tMinimapIcon 0 White Star\n\tPlayEffect White\n\tPlayAlertSound 6 300";
+/** 单个 BaseType 行的上限：整类白名单会展开成较长的列表，按块拆开保持可读。 */
+const WHITELIST_CHUNK = 24;
+
 function whitelistRule(item: ItemDefinition): string {
-  return "Show # poe2-filter whitelist: " + item.name + "\n" + matcherLines(item).join("\n") + "\n\tSetFontSize 42\n\tSetTextColor 255 255 255 255\n\tSetBorderColor 255 255 255 255\n\tMinimapIcon 0 White Star\n\tPlayEffect White\n\tPlayAlertSound 6 300";
+  return "Show # poe2-filter whitelist: " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + WHITELIST_ACTIONS;
+}
+
+/**
+ * 整类白名单：同名匹配条件（Class / Rarity）合并成一条规则，BaseType 列表按块拆分。
+ * 单件白名单走 whitelistRule，两者的动作完全一致。
+ */
+function whitelistEntryRules(label: string, items: ItemDefinition[]): string[] {
+  if (items.length === 1) return [whitelistRule(items[0])];
+  const groups = new Map<string, { matcher: ItemDefinition["matcher"]; baseTypes: string[] }>();
+  for (const item of items) {
+    const matcher = { class: item.matcher.class, rarity: item.matcher.rarity };
+    const key = JSON.stringify(matcher);
+    const group = groups.get(key);
+    if (group) group.baseTypes.push(item.matcher.baseType ?? item.name);
+    else groups.set(key, { matcher, baseTypes: [item.matcher.baseType ?? item.name] });
+  }
+  const rules: string[] = [];
+  const total = items.length;
+  for (const { matcher, baseTypes } of groups.values()) {
+    for (let offset = 0; offset < baseTypes.length; offset += WHITELIST_CHUNK) {
+      const chunk = baseTypes.slice(offset, offset + WHITELIST_CHUNK);
+      const head: string[] = [];
+      if (matcher.class) head.push("\tClass == " + quote(matcher.class));
+      if (matcher.rarity) head.push("\tRarity " + matcher.rarity);
+      head.push("\tBaseType == " + chunk.map(quote).join(" "));
+      const range = baseTypes.length > WHITELIST_CHUNK ? " (" + (offset + 1) + "-" + Math.min(offset + WHITELIST_CHUNK, baseTypes.length) + "/" + baseTypes.length + ")" : "";
+      rules.push("Show # poe2-filter whitelist: " + label + range + " [" + total + "]\n" + head.join("\n") + "\n" + WHITELIST_ACTIONS);
+    }
+  }
+  return rules;
 }
 
 function hideRule(item: ItemDefinition, profile: FilterProfile): string {
   return "Hide # poe2-filter optional low-value rule: " + item.name + "\n" + matcherLines(item).join("\n") + "\n\tItemLevel < " + Math.max(1, profile.itemLevelMin) + "\n\tSetFontSize 18";
 }
 
-function isWhitelisted(itemId: string, profile: FilterProfile): boolean {
-  return profile.whitelist.some((entry) => entry.itemIds.includes(itemId));
+function whitelistedIds(profile: FilterProfile): Set<string> {
+  return new Set((profile.whitelist ?? []).flatMap((entry) => entry.itemIds));
 }
 
 function resolvedPresets(profile: FilterProfile): VisualPreset[] {
@@ -132,6 +166,19 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   const presets = currencyDefaultRanges(applyTemplateAppearances(resolvedPresets(profile), profile), snapshot).filter((preset) => preset.enabled);
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
+  const catalogById = new Map(ITEM_CATALOG.map((item) => [item.id, item]));
+  const whitelist = whitelistedIds(profile);
+
+  // 白名单规则统一排在价格光效与隐藏规则之前：整类条目会展开成 BaseType 列表块。
+  for (const entry of profile.whitelist ?? []) {
+    const items: ItemDefinition[] = [];
+    for (const itemId of new Set(entry.itemIds)) {
+      const item = catalogById.get(itemId);
+      if (item && !item.ambiguous) items.push(item);
+    }
+    if (!items.length) continue;
+    overrides.push(...whitelistEntryRules(entry.label || items[0].name, items));
+  }
   const warnings: string[] = [];
   const soundFiles = new Set<string>();
   const applied = new Map<string, { preset: VisualPreset; count: number }>();
@@ -141,14 +188,11 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
   for (const item of ITEM_CATALOG) {
     const price = item.priceable ? snapshot.prices[item.id] : undefined;
     const exaltedValue = price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
-    const whitelisted = isWhitelisted(item.id, profile);
+    const whitelisted = whitelist.has(item.id);
     if (item.ambiguous) ambiguous += 1;
     if (item.priceable && exaltedValue === undefined) unpriced += 1;
 
-    if (whitelisted && !item.ambiguous) {
-      overrides.push(whitelistRule(item));
-      continue;
-    }
+    if (whitelisted && !item.ambiguous) continue;
 
     if (exaltedValue !== undefined) {
       const preset = presets.find((candidate) => rangeMatches(exaltedValue, candidate, snapshot));

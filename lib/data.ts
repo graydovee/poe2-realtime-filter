@@ -1,4 +1,5 @@
 import catalogData from "../data/item-catalog.json";
+import mechanicsData from "../data/item-mechanics.json";
 import visualData from "../data/visual-presets.json";
 import type { ItemDefinition, Locale, MarketSnapshot, Strictness, VisualPreset } from "./types";
 
@@ -40,6 +41,13 @@ export const CATEGORY_LABELS: Record<string, Record<Locale, string>> = {
   fragment: { cn: "碎片", tw: "碎片", us: "Fragments" },
   flask: { cn: "药剂", tw: "藥劑", us: "Flasks" },
   gem: { cn: "宝石", tw: "寶石", us: "Gems" },
+};
+
+/** 通货与材料的来源玩法词条，由 scripts/build-item-mechanics.mjs 生成。 */
+export const TAXONOMY = mechanicsData as {
+  mechanics: Record<string, Record<Locale, string>>;
+  kinds: Record<string, Record<Locale, string>>;
+  items: Record<string, string>;
 };
 
 export const ITEM_CATALOG = catalogData.items as ItemDefinition[];

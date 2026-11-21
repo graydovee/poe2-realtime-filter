@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
+import { FALLBACK_SNAPSHOT } from "../lib/data";
 import type { Currency, FilterProfile, FilterStyle, LeagueCatalog, Locale, MarketSnapshot, Strictness, VisualPreset } from "../lib/types";
 
 import { applyTemplateAppearances } from "../lib/neversink-appearance";
@@ -18,6 +18,7 @@ import { SeasonSection } from "./components/sections/season-section";
 import { SummarySidebar } from "./components/sections/summary-sidebar";
 import { VisualsSection } from "./components/sections/visuals-section";
 import { WhitelistSection } from "./components/sections/whitelist-section";
+import type { ItemPickerToggle } from "./components/item-picker";
 import { TabBar } from "./components/ui/nav";
 
 const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -93,13 +94,29 @@ export default function HomePage() {
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleWhitelist(itemId: string, checked: boolean) {
-    const existing = profile.whitelist.flatMap((entry) => entry.itemIds);
-    const ids = checked ? [...new Set([...existing, itemId])] : existing.filter((id) => id !== itemId);
-    update("whitelist", ids.map((id) => {
-      const item = ITEM_CATALOG.find((candidate) => candidate.id === id);
-      return { id: "wl-" + id, label: item?.name || id, itemIds: [id] };
-    }));
+  function toggleWhitelist({ ids, checked, label, key }: ItemPickerToggle) {
+    setProfile((profile) => {
+      const entries = profile.whitelist ?? [];
+      if (checked) {
+        const existing = new Set(entries.flatMap((entry) => entry.itemIds));
+        const added = ids.filter((id) => !existing.has(id));
+        if (!added.length) return profile;
+        const base = "wl-" + key.replace(/[^a-zA-Z0-9_-]+/g, "-");
+        const used = new Set(entries.map((entry) => entry.id));
+        let id = base;
+        for (let index = 2; used.has(id); index += 1) id = base + "-" + index;
+        return { ...profile, whitelist: [...entries, { id, label, itemIds: added }] };
+      }
+      const removed = new Set(ids);
+      const next = entries
+        .map((entry) => ({ ...entry, itemIds: entry.itemIds.filter((itemId) => !removed.has(itemId)) }))
+        .filter((entry) => entry.itemIds.length > 0);
+      return next.length === entries.length ? profile : { ...profile, whitelist: next };
+    });
+  }
+
+  function removeWhitelistEntry(entryId: string) {
+    setProfile((profile) => ({ ...profile, whitelist: (profile.whitelist ?? []).filter((entry) => entry.id !== entryId) }));
   }
 
   function updatePreset(id: string, patch: Partial<VisualPreset>) {
@@ -205,7 +222,9 @@ export default function HomePage() {
                 onHideEnabled={(enabled) => update("hideBelowEnabled", enabled)}
                 onHideAmount={(amount) => update("hideBelowAmount", amount)}
                 onHideCurrency={(currency: Currency) => update("hideBelowCurrency", currency)}
+                whitelistEntries={profile.whitelist.map((entry) => ({ id: entry.id, label: entry.label, itemIds: entry.itemIds }))}
                 onToggleItem={toggleWhitelist}
+                onRemoveEntry={removeWhitelistEntry}
               />
               <PresetsSection
                 profile={profile}
