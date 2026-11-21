@@ -383,7 +383,8 @@ export function RuleEditor({
         <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} />
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="mt-3 border-t border-line/60 pt-3">
+      <div className="grid gap-3 pt-3 sm:grid-cols-2">
         <Field label="光柱">
           <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
         </Field>
@@ -451,6 +452,7 @@ export function RuleEditor({
           </div>
         </Field>
       </div>
+      </Disclosure>
     </div>
   );
 }
