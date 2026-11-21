@@ -18,6 +18,7 @@ import type {
 } from "../../lib/types";
 import { cn } from "../../lib/cn";
 import { ItemPicker, type ItemPickerToggle } from "./item-picker";
+import { SoundPreviewButton } from "./sound-preview";
 import { Checkbox, FileInput, SearchInput, Select, Switch, TextInput } from "./ui/controls";
 import { Disclosure } from "./ui/nav";
 import { Button, Field } from "./ui/primitives";
@@ -100,7 +101,7 @@ function pickEffects(preset: EffectPreset): RuleEffects {
   };
 }
 
-function AppearancePreview({ effects, name }: { effects: RuleEffects; name: string }) {
+function AppearancePreview({ effects, name, file }: { effects: RuleEffects; name: string; file?: File }) {
   const { color: iconColor, shape } = iconParts(effects.icon);
   const [beamColor] = (effects.beam ?? "").split(" ");
   const beam = colorValues[beamColor] ?? "transparent";
@@ -108,11 +109,15 @@ function AppearancePreview({ effects, name }: { effects: RuleEffects; name: stri
   return (
     <div className="grid gap-4 rounded-sm border border-line bg-surface-2/50 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.85fr)]">
       <div>
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold">实时预览</span>
-          <span className="text-[10px] text-ink-muted">改任意字段都会立刻更新</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-ink-muted">改任意字段都会立刻更新</span>
+            <SoundPreviewButton sound={effects.sound} file={file} />
+          </div>
         </div>
         <div className="loot-scene border border-line/70">
+        <div className="loot-beam-wrap">
         <span aria-hidden="true" className="loot-glow" style={{ background: "radial-gradient(ellipse at center, " + rgbaFromHex(beam === "transparent" ? "#8a7a5c" : beam, 0.45) + ", transparent 70%)" }} />
         <span
           aria-hidden="true"
@@ -129,6 +134,7 @@ function AppearancePreview({ effects, name }: { effects: RuleEffects; name: stri
         >
           {name}
         </span>
+        </div>
         {shape && (
           <svg viewBox="0 0 24 24" className="loot-icon" style={{ color: colorValues[iconColor] ?? "#9a9a9a" }} aria-label={iconColor + shape}>
             {shape === "Star" ? (
@@ -176,6 +182,7 @@ function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active
       )}
     >
       <span className="loot-scene" style={{ minHeight: "4.25rem" }}>
+        <span className="loot-beam-wrap">
         <span aria-hidden="true" className="loot-glow" style={{ background: "radial-gradient(ellipse at center, " + rgbaFromHex(colorValues[beamColor] ?? "#8a7a5c", 0.4) + ", transparent 70%)" }} />
         <span
           aria-hidden="true"
@@ -195,6 +202,7 @@ function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active
           }}
         >
           示例
+        </span>
         </span>
         {shape && (
           <svg viewBox="0 0 24 24" className="loot-icon" style={{ color: colorValues[iconColor] ?? "#9a9a9a" }}>
@@ -380,7 +388,7 @@ export function RuleEditor({
       </div>
 
       <div className="mt-3">
-        <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} />
+        <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} file={customFile} />
       </div>
 
       <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="mt-3 border-t border-line/60 pt-3">

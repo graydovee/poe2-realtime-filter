@@ -119,6 +119,7 @@ node scripts/extract-neversink-effects.mjs
 - 产物一 `data/neversink-effects.json`：按视觉风格分组的外观预设，一个预设 = 光柱 + 地图图标 + 字体（字号 + 三色）+ 音效，default / aura / cobalt / customsounds / darkmode / mythic / vaal / zen 分别是 104 / 99 / 96 / 104 / 101 / 61 / 99 / 87 种。
 - 产物二 `data/default-rules.json`：4 条默认价格规则，`effectPresetId` 指向前者里的一个预设，`effects` 与预设完全一致（取自 default 风格 2-SEMI-STRICT 里对应通货的原始规则）。
 - 选择预设后四项一起填好，仍可逐项改；改完规则会标记为「自定义」，生成器只读具体值，不依赖预设数据。
+- 规则卡片上有「播放音效」按钮：模板音效直接播放 `vendor/neversink` 里的同一个 mp3；内置音效（`PlayAlertSound 1–16`）播放 `public/sounds/alert-sound-N.ogg`（从游戏 `FMOD/Desktop/Four_ItemFilter.bank` 导出，见 [public/sounds/README.md](public/sounds/README.md)），缺失时按钮置灰。
 
 wiki 侧的分类与三语对照方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill。
 
