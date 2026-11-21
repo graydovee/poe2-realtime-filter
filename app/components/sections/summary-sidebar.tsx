@@ -32,14 +32,14 @@ export function SummarySidebar({
   ];
 
   return (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
+    <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
       <Panel>
         <h2 className="text-sm font-semibold tracking-tight text-ink">当前配置</h2>
-        <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-[11px] leading-relaxed">
+        <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-xs leading-relaxed">
           {rows.map(([label, value]) => (
             <Fragment key={label}>
               <dt className="text-ink-muted">{label}</dt>
-              <dd className="break-words text-right text-ink/90">{value}</dd>
+              <dd className="m-0 break-words text-right text-ink">{value}</dd>
             </Fragment>
           ))}
         </dl>

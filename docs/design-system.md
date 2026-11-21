@@ -1,6 +1,6 @@
 # 设计系统
 
-网页端使用一套深色奇幻 token，风格参考「流放之路 2」：暖黑底、古铜金描边、羊皮纸文字、克制的血焰强调色。少色、少阴影、强对比、足够留白。
+网页和 Windows 客户端使用同一套深色调色板。炭灰底区分页面、卡片与输入框，暖白用于文字，暖金标记选中状态和主要操作。
 
 ## Token
 
@@ -8,37 +8,37 @@
 
 | 语义 | Token | 值 |
 |---|---|---|
-| 背景 | `--color-bg` | 10 8 6 |
-| 面板 | `--color-surface` | 19 16 12 |
-| 面板 2 | `--color-surface-2` | 25 21 16 |
-| 面板 3 | `--color-surface-3` | 34 28 21 |
-| 描边 | `--color-line` | 43 36 26 |
-| 描边-强 | `--color-line-strong` | 61 50 35 |
-| 文字 | `--color-ink` | 232 220 196 |
-| 次要文字 | `--color-ink-muted` | 154 139 114 |
-| 金色 | `--color-gold` | 200 164 92 |
-| 金色-亮 / 按下 | `--color-gold-bright` / `--color-gold-press` | 228 197 127 / 168 133 63 |
-| 血焰 | `--color-ember` | 180 67 42 |
-| 暖绿 | `--color-sage` | 127 168 107 |
+| 背景 | `--color-bg` | 18 18 20 |
+| 面板 | `--color-surface` | 25 25 28 |
+| 面板 2 | `--color-surface-2` | 33 33 37 |
+| 面板 3 | `--color-surface-3` | 41 41 46 |
+| 描边 | `--color-line` | 61 60 66 |
+| 描边-强 | `--color-line-strong` | 119 116 124 |
+| 文字 | `--color-ink` | 247 242 233 |
+| 次要文字 | `--color-ink-muted` | 196 190 181 |
+| 金色 | `--color-gold` | 231 194 120 |
+| 金色-亮 / 按下 | `--color-gold-bright` / `--color-gold-press` | 250 216 150 / 209 168 93 |
+| 血焰 | `--color-ember` | 255 158 148 |
+| 暖绿 | `--color-sage` | 161 210 149 |
 | 稀有度（普通/魔法/稀有/传奇） | `--color-rarity-*` | 200 200 200 / 136 136 255 / 255 255 119 / 175 96 37 |
 
 稀有度使用游戏官方配色，让白名单与掉落预览和游戏内观感一致。
 
 ## 排版
 
-- 展示体 `Cinzel`（OFL）：品牌、页面主标题、步骤号、指标数字。
+- 展示体 `Cinzel`（OFL）：品牌标识。
 - 正文 `Inter`（OFL）+ 中文系统栈：`PingFang SC` / `Microsoft YaHei UI` / `Noto Sans SC`。
 - 等宽 `JetBrains Mono`（OFL）：价格、汇率、修订号、过滤器代码。
 - 三种字体都由 `@fontsource/*` 自托管并在 `app/layout.tsx` 引入，不请求任何外部字体 CDN。
-- 字号阶梯 11 / 12 / 13 / 15 / 18 / 24（大标题 `clamp(1.5rem, 3vw, 2rem)`）。
+- 界面字号以 12 至 16px 为主（大标题 `clamp(1.5rem, 3vw, 2rem)`）。
 
 ## 形状、层级与动效
 
-- 圆角：控件 4px、卡片 6px、空态容器 10px。
-- 卡片 = 1px `line` 描边 + `inset 0 1px 0 rgba(255,255,255,.04)` 顶部高光 + `0 10px 26px rgba(0,0,0,.45)` 投影。
-- 背景仅两层极淡径向暗角（`.app-vignette`），不使用彩色光斑。
+- 圆角：控件 6px、卡片 10px。
+- 卡片 = 1px `line` 描边 + `0 10px 26px rgba(0,0,0,.22)` 投影。
+- 网页背景在标题区保留一层淡暖色渐变（`.app-vignette`）。
 - 动效 120–180ms `ease-out`，只动 transform / opacity / border-color；`prefers-reduced-motion` 全部关闭。
-- 焦点环 2px 金色 45% 透明；所有可点击元素保留可见焦点。
+- 键盘焦点使用 2px 亮金描边。复选框统一为 18px，开关圆点在轨道中垂直居中。禁用开关用虚线边框区分，状态说明保持正常对比度。
 
 ## 组件层
 
@@ -71,7 +71,7 @@
 
 > Tailwind 的 preflight 被关闭（`corePlugins.preflight = false`），以免重置影响这些复合组件；`app/globals.css` 的 `@layer base` 里只保留必要的底色、按钮归零与滚动条样式。
 
-## 截图
+## 旧版截图
 
 - `docs/screenshots/builder-1440.png`：配置页（1440）
 - `docs/screenshots/builder-1024.png`：配置页（1024）

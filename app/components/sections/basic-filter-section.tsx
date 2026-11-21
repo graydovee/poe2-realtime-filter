@@ -26,7 +26,7 @@ export function BasicFilterSection({
   onLocaleChange: (locale: Locale) => void;
 }) {
   return (
-    <Panel step="01" title="基础过滤器" description="选择 NeverSink 档位和视觉风格。严格度越高，显示的物品越少。">
+    <Panel title="基础过滤器" description="选择 NeverSink 档位和视觉风格。严格度越高，显示的物品越少。">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" role="group" aria-label="NeverSink 严格度">
         {STRICTNESS_LEVELS.map((level) => {
           const selected = profile.strictness === level;
@@ -45,8 +45,8 @@ export function BasicFilterSection({
                 {level}
               </span>
               <span className="block">
-                <b className="block text-[11px] font-semibold leading-tight text-ink">{STRICTNESS_LABELS[level]}</b>
-                <small className="mt-1 block text-[10px] leading-tight text-ink-muted">{strictnessHint(level)}</small>
+                <b className="block text-xs font-semibold leading-tight text-ink">{STRICTNESS_LABELS[level]}</b>
+                <small className="mt-1 block text-xs leading-tight text-ink-muted">{strictnessHint(level)}</small>
               </span>
               {selected && <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-gold" />}
             </button>

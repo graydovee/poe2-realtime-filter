@@ -22,13 +22,13 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ["Cinzel", "Songti SC", "SimSun", "serif"],
+        display: ["Cinzel", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", "serif"],
         sans: ["Inter", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "sans-serif"],
         mono: ["JetBrains Mono", "Cascadia Mono", "Consolas", "monospace"],
       },
-      borderRadius: { sm: "4px", DEFAULT: "6px", lg: "10px" },
+      borderRadius: { sm: "6px", DEFAULT: "10px", lg: "14px" },
       boxShadow: {
-        panel: "0 10px 26px rgba(0, 0, 0, 0.45)",
+        panel: "0 10px 26px rgba(0, 0, 0, 0.22)",
         hairline: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
         gold: "0 0 0 1px rgba(200, 164, 92, 0.35), 0 8px 24px rgba(0, 0, 0, 0.4)",
       },

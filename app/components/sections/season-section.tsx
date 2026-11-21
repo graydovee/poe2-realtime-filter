@@ -41,9 +41,8 @@ export function SeasonSection({
     <Panel className="p-4 sm:p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)] lg:items-center">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold">当前行情范围</p>
-          <h2 className="mt-1.5 text-[15px] font-semibold tracking-tight text-ink">选择赛季</h2>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-ink-muted">
+          <h2 className="text-base font-semibold text-ink">选择赛季</h2>
+          <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
             赛季决定行情、价格区间和生成版本。赛季结束后，已保存方案会保留原始赛季并自动归入对应永久区。
           </p>
         </div>
@@ -61,13 +60,13 @@ export function SeasonSection({
             {loading && !marketError ? (
               <Skeleton className="h-3 w-40" />
             ) : (
-              <p className="truncate text-[11px] leading-relaxed text-ink-muted" role="status">
+              <p className="truncate text-xs leading-relaxed text-ink-muted" role="status">
                 {statusText}
               </p>
             )}
           </div>
           {profile.originalLeague && profile.originalLeague !== profile.league && (
-            <p className="mt-1.5 text-[11px] text-gold/80">原始赛季：{profile.originalLeague}</p>
+            <p className="mt-1.5 text-xs text-gold">原始赛季：{profile.originalLeague}</p>
           )}
         </div>
       </div>

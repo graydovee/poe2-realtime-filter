@@ -4,27 +4,25 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../../lib/cn";
 
 type PanelProps = Omit<ComponentPropsWithoutRef<"section">, "title"> & {
-  step?: string;
   title?: string;
   description?: string;
   action?: ReactNode;
   children?: ReactNode;
 };
 
-export function Panel({ step, title, description, action, children, className, ...rest }: PanelProps) {
-  const hasHeading = Boolean(step || title || description);
+export function Panel({ title, description, action, children, className, ...rest }: PanelProps) {
+  const hasHeading = Boolean(title || description);
   return (
     <section
-      className={cn("rounded border border-line bg-surface p-5 shadow-panel shadow-hairline sm:p-6", className)}
+      className={cn("rounded border border-line bg-surface p-5 shadow-panel sm:p-6", className)}
       {...rest}
     >
       {hasHeading && (
-        <header className="mb-5 flex items-start justify-between gap-4">
+        <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 gap-3">
-            {step && <span className="pt-0.5 font-display text-[11px] tracking-[0.2em] text-gold">{step}</span>}
             <div className="min-w-0">
-              {title && <h2 className="text-[15px] font-semibold leading-tight tracking-tight text-ink">{title}</h2>}
-              {description && <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">{description}</p>}
+              {title && <h2 className="text-base font-semibold leading-snug text-ink">{title}</h2>}
+              {description && <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{description}</p>}
             </div>
           </div>
           {action}
@@ -36,20 +34,20 @@ export function Panel({ step, title, description, action, children, className, .
 }
 
 const buttonStyles = cva(
-  "inline-flex select-none items-center justify-center gap-2 rounded-sm font-semibold transition duration-150 ease-out focus-visible:outline-none disabled:pointer-events-none disabled:opacity-45",
+  "inline-flex select-none items-center justify-center gap-2 rounded-sm font-semibold transition duration-150 ease-out disabled:pointer-events-none disabled:opacity-60",
   {
     variants: {
       variant: {
         primary: "bg-gold text-[#0b0805] shadow-[0_6px_20px_rgba(200,164,92,0.18)] hover:bg-gold-bright active:bg-gold-press",
-        secondary: "border border-line bg-surface-3 text-ink hover:border-line-strong hover:bg-surface-2",
+        secondary: "border border-line-strong bg-surface-3 text-ink hover:border-gold hover:bg-surface-2",
         ghost: "text-ink-muted hover:bg-surface-3 hover:text-ink",
         danger: "border border-ember/45 bg-ember/5 text-ember hover:border-ember/80 hover:bg-ember/10",
       },
       size: {
-        sm: "h-8 px-3 text-xs",
+        sm: "min-h-9 px-3 text-[13px]",
         md: "h-10 px-4 text-sm",
         lg: "h-12 px-5 text-sm",
-        icon: "size-8 p-0",
+        icon: "size-9 shrink-0 p-0",
       },
     },
     defaultVariants: { variant: "secondary", size: "md" },
@@ -63,7 +61,7 @@ export function Button({ className, variant, size, type = "button", ...rest }: B
 }
 
 const badgeStyles = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-[10px] uppercase leading-tight tracking-[0.12em]",
+  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-medium text-xs leading-tight",
   {
     variants: {
       tone: {
@@ -91,7 +89,7 @@ export function Chip({ children, onRemove, removeLabel }: { children: ReactNode;
         type="button"
         aria-label={removeLabel}
         onClick={onRemove}
-        className="grid size-5 place-items-center rounded-sm text-ink-muted transition hover:bg-ember/15 hover:text-ember focus-visible:outline-none"
+        className="grid size-5 place-items-center rounded-sm text-ink-muted transition hover:bg-ember/15 hover:text-ember"
       >
         <span aria-hidden="true" className="text-sm leading-none">×</span>
       </button>
@@ -116,8 +114,8 @@ export function Field({
     <div className={cn("flex min-w-0 flex-col", className)}>
       <span className="mb-2 block text-xs font-medium text-ink-muted">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-[11px] leading-relaxed text-ink-muted/85">{hint}</span>}
-      {error && <span className="mt-1.5 block text-[11px] leading-relaxed text-ember">{error}</span>}
+      {hint && <span className="mt-1.5 block text-xs leading-relaxed text-ink-muted">{hint}</span>}
+      {error && <span className="mt-1.5 block text-xs leading-relaxed text-ember">{error}</span>}
     </div>
   );
 }
@@ -153,7 +151,7 @@ export function Alert({
   return (
     <div className={cn(alertStyles({ tone }), className)} role={role}>
       {title && <strong className="block text-[13px] font-semibold">{title}</strong>}
-      {children && <div className={cn(title && "mt-1", "text-[11px] leading-relaxed")}>{children}</div>}
+      {children && <div className={cn(title && "mt-1", "text-xs leading-relaxed")}>{children}</div>}
     </div>
   );
 }
@@ -188,7 +186,7 @@ export function EmptyState({
 }
 
 export function Mono({ children, className }: { children: ReactNode; className?: string }) {
-  return <span className={cn("font-mono text-[11px] tracking-tight text-ink/90", className)}>{children}</span>;
+  return <span className={cn("font-mono text-xs tracking-tight text-ink/90", className)}>{children}</span>;
 }
 
 export function StatusDot({ tone = "muted", className }: { tone?: "gold" | "sage" | "ember" | "muted"; className?: string }) {

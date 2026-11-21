@@ -1,19 +1,19 @@
 /* PoE2 dark design tokens — mirrored in desktop/src/theme.rs (see docs/design-system.md). */
 :root {
   color-scheme: dark;
-  --color-bg: 10 8 6;
-  --color-surface: 19 16 12;
-  --color-surface-2: 25 21 16;
-  --color-surface-3: 34 28 21;
-  --color-line: 43 36 26;
-  --color-line-strong: 61 50 35;
-  --color-ink: 232 220 196;
-  --color-ink-muted: 154 139 114;
-  --color-gold: 200 164 92;
-  --color-gold-bright: 228 197 127;
-  --color-gold-press: 168 133 63;
-  --color-ember: 180 67 42;
-  --color-sage: 127 168 107;
+  --color-bg: 18 18 20;
+  --color-surface: 25 25 28;
+  --color-surface-2: 33 33 37;
+  --color-surface-3: 41 41 46;
+  --color-line: 61 60 66;
+  --color-line-strong: 119 116 124;
+  --color-ink: 247 242 233;
+  --color-ink-muted: 196 190 181;
+  --color-gold: 231 194 120;
+  --color-gold-bright: 250 216 150;
+  --color-gold-press: 209 168 93;
+  --color-ember: 255 158 148;
+  --color-sage: 161 210 149;
   --color-rarity-normal: 200 200 200;
   --color-rarity-magic: 136 136 255;
   --color-rarity-rare: 255 255 119;
@@ -30,7 +30,8 @@
   }
 
   body {
-    @apply bg-bg font-sans text-ink antialiased;
+    @apply m-0 min-h-screen bg-bg font-sans text-ink antialiased;
+    line-height: 1.5;
     text-rendering: optimizeLegibility;
   }
 
@@ -39,13 +40,31 @@
     color: rgb(var(--color-ink));
   }
 
-  button {
-    border: 0;
-    background-color: transparent;
+  *, *::before, *::after {
+    box-sizing: border-box;
+    border: 0 solid currentColor;
   }
 
+  h1, h2, h3, p { margin: 0; }
+
+  button, input, select {
+    margin: 0;
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+  }
+
+  button:disabled { cursor: not-allowed; }
+
+  .lucide { display: block; }
+
   :focus-visible {
-    outline: 2px solid rgb(var(--color-gold) / 0.45);
+    outline: 2px solid rgb(var(--color-gold-bright));
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -89,14 +108,70 @@
 
 @layer components {
   .app-vignette {
-    background-image:
-      radial-gradient(120% 70% at 50% -12%, rgb(42 31 20 / 0.6), transparent 62%),
-      radial-gradient(90% 60% at 108% 104%, rgb(30 23 16 / 0.5), transparent 64%);
-    background-color: rgb(var(--color-bg));
+    background: radial-gradient(ellipse at 50% 0, rgb(55 43 30 / 0.38), transparent 34rem), rgb(var(--color-bg));
   }
 
-  .hairline-top {
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  .ui-checkbox {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid rgb(var(--color-line-strong));
+    border-radius: 4px;
+    background: rgb(var(--color-surface-3));
+    color: rgb(var(--color-bg));
+  }
+
+  .ui-checkbox[data-state="checked"],
+  .ui-checkbox[data-state="mixed"] {
+    border-color: rgb(var(--color-gold));
+    background: rgb(var(--color-gold));
+  }
+
+  .ui-switch {
+    --track-width: 40px;
+    --thumb-size: 14px;
+    --track-inset: 4px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    width: var(--track-width);
+    height: 22px;
+    padding: 0 calc(var(--track-inset) - 1px);
+    border: 1px solid rgb(var(--color-line-strong));
+    border-radius: 999px;
+    background: rgb(var(--color-surface-3));
+  }
+
+  .ui-switch-thumb {
+    width: var(--thumb-size);
+    height: var(--thumb-size);
+    border-radius: 50%;
+    background: rgb(var(--color-ink-muted));
+    transition: transform 150ms ease-out;
+  }
+
+  .ui-switch[data-state="checked"] {
+    border-color: rgb(var(--color-gold));
+    background: rgb(var(--color-gold));
+  }
+
+  .ui-switch[data-state="checked"] .ui-switch-thumb {
+    transform: translateX(calc(var(--track-width) - var(--thumb-size) - 2 * var(--track-inset)));
+    background: rgb(var(--color-bg));
+  }
+
+  .ui-switch:disabled { border-style: dashed; }
+
+  .ui-switch:disabled[data-state="checked"] {
+    border-color: rgb(var(--color-gold));
+    background: rgb(var(--color-surface-3));
+  }
+
+  .ui-switch:disabled[data-state="checked"] .ui-switch-thumb {
+    background: rgb(var(--color-gold));
   }
 
   .loot-scene {
@@ -117,6 +192,7 @@
   .loot-beam-wrap {
     position: relative;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     place-items: center;
     max-width: 76%;
   }
@@ -166,7 +242,7 @@
   .loot-label {
     position: relative;
     z-index: 1;
-    max-width: 20rem;
+    max-width: min(20rem, 100%);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -190,7 +266,7 @@
   }
 
   .filter-code {
-    @apply font-mono text-[11px] leading-relaxed;
+    @apply font-mono text-xs leading-relaxed;
     max-height: 34rem;
     margin: 0;
     padding: 1.1rem 1.25rem;
@@ -198,7 +274,7 @@
     border: 1px solid rgb(var(--color-line));
     border-radius: 6px;
     background: #070504;
-    color: #b7a88e;
+    color: rgb(var(--color-ink-muted));
     white-space: pre-wrap;
     tab-size: 2;
   }
@@ -218,31 +294,25 @@
 
 /* Legacy aliases for composite widgets (scheme manager, season panel, preview) — mapped to the PoE2 palette. */
 :root {
-  --bg: #0a0806;
-  --surface: #13100c;
-  --surface-2: #191510;
-  --surface-3: #221c15;
-  --border: #2b241a;
-  --text: #e8dcc4;
-  --muted: #9a8b72;
-  --blue: #8f7a52;
-  --cyan: #c8a45c;
-  --amber: #e4c57f;
-  --pink: #b4432a;
-  --green: #7fa86b;
+  --bg: rgb(var(--color-bg));
+  --surface: rgb(var(--color-surface));
+  --surface-2: rgb(var(--color-surface-2));
+  --surface-3: rgb(var(--color-surface-3));
+  --border: rgb(var(--color-line));
+  --text: rgb(var(--color-ink));
+  --muted: rgb(var(--color-ink-muted));
+  --blue: rgb(var(--color-ink-muted));
+  --cyan: rgb(var(--color-gold));
+  --amber: rgb(var(--color-gold-bright));
+  --pink: rgb(var(--color-ember));
+  --green: rgb(var(--color-sage));
 }
 
 /* ---- composite widgets inherited from the v0.2.x UI (restyled through the aliases above) ---- */
 
-* { box-sizing: border-box; }
-html, body { min-height: 100%; }
-body { margin: 0; background: radial-gradient(circle at 88% 4%, #1a3046 0, transparent 28%), radial-gradient(circle at 20% 0, #1a1f2d 0, transparent 25%), var(--bg); color: var(--text); font-family: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-button, input, select { font: inherit; }
-button { color: inherit; cursor: pointer; }
 .shell { max-width: 1440px; margin: 0 auto; padding: 0 42px 26px; }
 .topbar { height: 82px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(154,139,114,.16); }
 .brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: var(--bg); background: var(--cyan); border-radius: 10px; font-size: 20px; box-shadow: 0 0 28px rgba(200,164,92,.22); }
 .brand div { display: flex; flex-direction: column; gap: 2px; }
 .brand strong { font-size: 16px; letter-spacing: -.02em; }
 .brand span { color: var(--muted); font-size: 11px; }
@@ -274,9 +344,8 @@ button { color: inherit; cursor: pointer; }
 .strictness b { display: block; font-size: 10px; }
 .strictness small { color: var(--muted); display: block; margin-top: 4px; font-size: 9px; }
 .inline-fields, .range-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 17px; }
-label { color: #aebccc; font-size: 11px; }
-select, input[type="number"], .catalog-toolbar input, .preset-name { width: 100%; margin-top: 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-3); color: var(--text); padding: 10px 11px; outline: none; }
-select:focus, input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(200,164,92,.1); }
+.schemes-panel select, .hide-price-fields input[type="number"], .catalog-toolbar input, .preset-name { width: 100%; margin-top: 7px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-3); color: var(--text); padding: 10px 11px; outline: none; }
+.schemes-panel :is(select, input):focus-visible { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(200,164,92,.1); }
 .price-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center; }
 .price-hero { padding: 15px 16px; border: 1px solid rgba(255,201,103,.2); border-radius: 11px; background: linear-gradient(135deg, rgba(97,72,29,.18), rgba(29,26,22,.24)); }
 .price-label { color: var(--amber); font: 10px "DM Mono", monospace; text-transform: uppercase; letter-spacing: .12em; }
@@ -437,7 +506,6 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid rg
 .selected-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; max-height: 180px; overflow: auto; }
 .selected-chips button { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-3); font-size: 12px; }
 .selected-chips button span { color: var(--muted); }
-button:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 @media (max-width: 680px) { .hide-price-fields { grid-template-columns: 1fr; } .category-grid { grid-template-columns: 1fr; } }
 
 .appearance-select { display: block; margin: 14px 0; font-size: 12px; }
@@ -466,7 +534,7 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); ou
 .original-league { margin: 0; color: var(--amber); font-size: 11px; }
 
 .schemes-panel { margin-bottom: 20px; }
-.scheme-heading { display:flex;justify-content:space-between;gap:16px;align-items:center; }
+.scheme-heading { display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center; }
 .scheme-heading h2 {font-size:16px;margin:0;} .scheme-heading p {color:var(--muted);font-size:12px;margin-bottom:0;}
 .schemes-panel button,.scheme-heading a {border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text);padding:8px 12px;text-decoration:none;font-size:12px;transition:border-color .15s,color .15s;} .schemes-panel button:hover,.scheme-heading a:hover {border-color:var(--cyan);color:var(--cyan);}
 .scheme-import-row { display:flex; gap:10px; align-items:end; margin-top:18px; }
@@ -505,24 +573,8 @@ button:focus-visible, summary:focus-visible { outline: 2px solid var(--cyan); ou
 /* scheme manager alignment with the new card grid */
 .schemes-panel { margin-bottom: 0; }
 .scheme-heading h2 { font-size: 15px; letter-spacing: -0.01em; }
-.scheme-heading p { font-size: 11px; line-height: 1.6; }
+.scheme-heading p { font-size: 13px; line-height: 1.6; }
 .scheme-row { border-color: var(--border); }
 .scheme-row + .scheme-row { margin-top: 6px; }
 .more-menu-popover { border-radius: 4px; }
 .sync-link input { border-radius: 4px; }
-
-/* Legacy aliases (last word: they must override any inherited :root block). */
-:root {
-  --bg: #0a0806;
-  --surface: #13100c;
-  --surface-2: #191510;
-  --surface-3: #221c15;
-  --border: #2b241a;
-  --text: #e8dcc4;
-  --muted: #9a8b72;
-  --blue: #8f7a52;
-  --cyan: #c8a45c;
-  --amber: #e4c57f;
-  --pink: #b4432a;
-  --green: #7fa86b;
-}

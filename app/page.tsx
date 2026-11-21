@@ -230,7 +230,7 @@ export default function HomePage() {
             { value: "builder", label: "配置过滤器" },
             { value: "preview", label: "预览与导出" },
           ]}
-          trailing={<span className="font-mono text-[10px] uppercase tracking-[0.14em]">价格单位 D / C / E</span>}
+          trailing={<span className="text-xs">价格单位 D / C / E</span>}
         />
 
         {activeTab === "builder" ? (

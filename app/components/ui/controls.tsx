@@ -17,11 +17,11 @@ function SelectItem({ option }: { option: SelectOption }) {
     <SelectPrimitive.Item
       value={option.value}
       disabled={option.disabled}
-      className="relative flex cursor-default select-none items-center gap-2 rounded-sm py-2 pl-2.5 pr-8 text-sm text-ink outline-none data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[state=checked]:text-gold"
+      className="relative flex cursor-default select-none items-center gap-2 rounded-sm py-2 pl-2.5 pr-8 text-sm text-ink outline-none data-[disabled]:text-ink-muted data-[disabled]:line-through data-[highlighted]:bg-surface-3 data-[state=checked]:text-gold"
     >
       <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator className="absolute right-2 grid place-items-center">
-        <Check className="size-3.5" strokeWidth={2.5} />
+      <SelectPrimitive.ItemIndicator className="absolute right-2 top-1/2 -translate-y-1/2">
+        <Check aria-hidden="true" className="size-3.5" strokeWidth={2.5} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   );
@@ -51,13 +51,15 @@ export function Select({
       <SelectPrimitive.Trigger
         aria-label={ariaLabel}
         className={cn(
-          "flex h-10 w-full items-center justify-between gap-2 rounded-sm border border-line bg-surface-3 px-3 text-left text-sm text-ink transition hover:border-line-strong focus-visible:border-gold/60 focus-visible:outline-none disabled:opacity-45 data-[placeholder]:text-ink-muted",
+          "flex h-10 w-full items-center justify-between gap-2 rounded-sm border border-line-strong bg-surface-3 px-3 text-left text-sm text-ink transition enabled:hover:border-gold/60 disabled:border-dashed disabled:border-line disabled:text-ink-muted data-[placeholder]:text-ink-muted",
           className,
         )}
       >
-        <SelectPrimitive.Value placeholder={placeholder} className="truncate" />
+        <span className="min-w-0 truncate">
+          <SelectPrimitive.Value placeholder={placeholder} />
+        </span>
         <SelectPrimitive.Icon asChild>
-          <ChevronDown className="size-4 shrink-0 text-ink-muted" />
+          <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
@@ -98,14 +100,14 @@ export function Checkbox({
   className?: string;
 }) {
   return (
-    <label className={cn("flex cursor-pointer items-center gap-2.5 text-xs text-ink-muted transition hover:text-ink", className)}>
+    <label className={cn("inline-flex min-h-8 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-ink", className)}>
       <CheckboxPrimitive.Root
         checked={checked}
         onCheckedChange={(value) => onCheckedChange(value === true)}
-        className="grid size-4 shrink-0 place-items-center rounded-sm border border-line-strong bg-surface-3 text-transparent transition focus-visible:outline-none data-[state=checked]:border-gold data-[state=checked]:bg-gold data-[state=checked]:text-[#0b0805]"
+        className="ui-checkbox"
       >
-        <CheckboxPrimitive.Indicator>
-          <Check className="size-3" strokeWidth={3} />
+        <CheckboxPrimitive.Indicator className="grid place-items-center">
+          <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
       <span>{label}</span>
@@ -119,31 +121,31 @@ export function Switch({
   label,
   className,
   disabled,
-  title,
+  describedBy,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   label: string;
   className?: string;
   disabled?: boolean;
-  title?: string;
+  describedBy?: string;
 }) {
   return (
     <label
-      title={title}
       className={cn(
-        "flex items-center gap-2.5 text-xs text-ink-muted transition hover:text-ink",
-        disabled ? "cursor-not-allowed opacity-45 hover:text-ink-muted" : "cursor-pointer",
+        "inline-flex min-h-8 items-center gap-2.5 text-[13px] font-medium",
+        disabled ? "cursor-not-allowed text-ink-muted" : "cursor-pointer text-ink",
         className,
       )}
     >
       <SwitchPrimitive.Root
+        aria-describedby={describedBy}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
-        className="relative h-5 w-9 shrink-0 rounded-full border border-line bg-surface-3 transition focus-visible:outline-none data-[state=checked]:border-gold data-[state=checked]:bg-gold disabled:cursor-not-allowed"
+        className="ui-switch"
       >
-        <SwitchPrimitive.Thumb className="block size-3.5 translate-x-[3px] rounded-full bg-ink-muted transition-transform duration-150 data-[state=checked]:translate-x-[18px] data-[state=checked]:bg-[#0b0805]" />
+        <SwitchPrimitive.Thumb className="ui-switch-thumb" />
       </SwitchPrimitive.Root>
       <span>{label}</span>
     </label>
@@ -186,10 +188,10 @@ export function Slider({
         onValueChange={(next) => onValueChange(next[0])}
         aria-label={ariaLabel ?? label}
       >
-        <SliderPrimitive.Track className="relative h-1 w-full grow rounded-full bg-surface-3">
+        <SliderPrimitive.Track className="relative h-1 w-full grow rounded-full bg-line-strong">
           <SliderPrimitive.Range className="absolute h-full rounded-full bg-gold/70" />
         </SliderPrimitive.Track>
-        <SliderPrimitive.Thumb className="block size-4 rounded-full border border-gold bg-bg shadow-[0_0_0_2px_rgba(200,164,92,0.16)] transition hover:bg-surface-3 focus-visible:outline-none" />
+        <SliderPrimitive.Thumb className="block size-4 rounded-full border-2 border-bg bg-gold transition hover:bg-gold-bright" />
       </SliderPrimitive.Root>
     </div>
   );
@@ -199,7 +201,7 @@ export function TextInput({ className, ...rest }: ComponentPropsWithoutRef<"inpu
   return (
     <input
       className={cn(
-        "h-10 w-full min-w-0 rounded-sm border border-line bg-surface-3 px-3 text-sm text-ink transition placeholder:text-ink-muted/60 hover:border-line-strong focus-visible:border-gold/60 focus-visible:outline-none disabled:opacity-45",
+        "h-10 w-full min-w-0 rounded-sm border border-line-strong bg-surface-3 px-3 text-sm text-ink transition placeholder:text-ink-muted enabled:hover:border-gold/60 disabled:border-dashed disabled:border-line disabled:text-ink-muted",
         className,
       )}
       {...rest}
@@ -230,8 +232,8 @@ export function FileInput({
   className?: string;
 }) {
   return (
-    <label className={cn("flex cursor-pointer items-center gap-2 text-[11px] text-ink-muted transition hover:text-ink", className)}>
-      <span className="rounded-sm border border-line bg-surface-3 px-2.5 py-1.5 text-ink">上传音效</span>
+    <label className={cn("flex cursor-pointer flex-wrap items-center gap-2 rounded-sm text-xs text-ink-muted transition hover:text-ink focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-gold", className)}>
+      <span className="rounded-sm border border-line-strong bg-surface-3 px-2.5 py-1.5 text-ink">上传音效</span>
       <span className="max-w-[10rem] truncate font-mono text-[10px]">{fileName ?? "未选择文件"}</span>
       <input
         type="file"

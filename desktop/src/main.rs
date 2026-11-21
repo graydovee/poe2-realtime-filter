@@ -2,6 +2,7 @@
 #[cfg(not(windows))]
 compile_error!("This client supports Windows amd64 only");
 mod app;
+mod brand;
 mod platform;
 mod sync;
 mod theme;

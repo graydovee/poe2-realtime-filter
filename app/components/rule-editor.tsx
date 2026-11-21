@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
 
 import { EFFECT_PRESETS, effectPresetsFor } from "../../lib/data";
@@ -110,9 +110,9 @@ function AppearancePreview({ effects, name, file }: { effects: RuleEffects; name
     <div className="grid gap-4 rounded-sm border border-line bg-surface-2/50 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(11rem,0.85fr)]">
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold">实时预览</span>
+          <span className="font-mono text-xs uppercase tracking-[0.16em] text-gold">实时预览</span>
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-ink-muted">改任意字段都会立刻更新</span>
+            <span className="text-xs text-ink-muted">改任意字段都会立刻更新</span>
             <SoundPreviewButton sound={effects.sound} file={file} />
           </div>
         </div>
@@ -148,7 +148,7 @@ function AppearancePreview({ effects, name, file }: { effects: RuleEffects; name
         )}
         </div>
       </div>
-      <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] content-center gap-x-3 gap-y-2 text-[11px] leading-relaxed">
+      <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] content-center gap-x-3 gap-y-2 text-xs leading-relaxed">
         <dt className="text-ink-muted">光柱</dt>
         <dd className="text-ink/90">{effects.beam ? (colorNames[effects.beam.split(" ")[0]] ?? effects.beam) + (effects.beam.endsWith("Temp") ? "（临时）" : "") : "沿用基础"}</dd>
         <dt className="text-ink-muted">地图图标</dt>
@@ -216,7 +216,7 @@ function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active
           </svg>
         )}
       </span>
-      <span className="flex items-start gap-1 text-[10px] leading-tight text-ink-muted group-hover:text-ink/90">
+      <span className="flex items-start gap-1 text-xs leading-tight text-ink-muted group-hover:text-ink/90">
         {active && <Check aria-hidden="true" className="mt-0.5 size-3 shrink-0 text-gold" />}
         <span className="line-clamp-2">{describeEffects(pickEffects(preset))}</span>
       </span>
@@ -257,6 +257,9 @@ export function RuleEditor({
   const hasPrice = Boolean(rule.target.range);
   const itemConditionOn = rule.target.itemEnabled !== false && hasItems;
   const priceConditionOn = rule.target.priceEnabled !== false && hasPrice;
+  const conditionId = useId();
+  const itemConditionLocked = itemConditionOn && !priceConditionOn;
+  const priceConditionLocked = priceConditionOn && !itemConditionOn;
   const selected = presets.find((preset) => preset.id === rule.effectPresetId);
   const filtered = query.trim() ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(query.trim())) : presets;
   const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "neversink" ? "neversink:" + rule.effects.sound.fileName : "builtin:" + rule.effects.sound.id;
@@ -287,15 +290,15 @@ export function RuleEditor({
   }
 
   return (
-    <div className={cn("rounded-sm border p-4 transition", rule.enabled ? "border-gold/40 bg-gold/[0.04]" : "border-line bg-surface-2/40")}>
-      <div className="flex flex-wrap items-center gap-3">
-        <Checkbox checked={rule.enabled} onCheckedChange={(enabled) => onChange({ enabled })} label="启用" className="min-w-[4.5rem]" />
+    <div className={cn("rounded border transition", rule.enabled ? "border-gold/55 bg-surface" : "border-line bg-surface")}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-t-[9px] border-b border-line bg-surface-2 px-3 py-3 sm:px-4">
         <TextInput
           aria-label={"规则 " + (index + 1) + " 名称"}
-          className="h-8 min-w-0 flex-1 py-1 text-xs"
+          className="h-9 min-w-0 basis-full py-1 sm:flex-1"
           value={rule.name}
           onChange={(event) => onChange({ name: event.target.value })}
         />
+        <Checkbox checked={rule.enabled} onCheckedChange={(enabled) => onChange({ enabled })} label="启用规则" />
         <Switch checked={rule.hidden} onCheckedChange={(hidden) => onChange({ hidden })} label="隐藏物品" />
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" aria-label="上移规则" disabled={index === 0} onClick={() => onMove(-1)}>
@@ -311,69 +314,65 @@ export function RuleEditor({
       </div>
 
       {rule.hidden && (
-        <p className="mt-2 text-[11px] leading-relaxed text-ember/90">
+        <p className="mx-3 mt-3 text-xs leading-relaxed text-ember sm:mx-4">
           这条规则会隐藏命中的物品；隐藏物品在游戏内按住 Alt 仍可见，所以下面的特效照样会生效。
         </p>
       )}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3 rounded-sm border border-line/70 bg-surface-2/40 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] font-medium text-ink">适用物品</span>
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-[10px] text-ink-muted">{rule.target.itemIds.length ? rule.target.itemIds.length + " 项" : "未选择"}</span>
-              <Switch
-                checked={itemConditionOn}
-                disabled={!hasItems || (itemConditionOn && !priceConditionOn)}
-                onCheckedChange={(next) => editTarget({ itemEnabled: next })}
-                label="启用物品条件"
-                title={!hasItems ? "先选择物品（当前只按价格匹配）" : itemConditionOn && !priceConditionOn ? "价格条件已关闭，至少要保留一个条件" : undefined}
-              />
-            </div>
+      <div className="grid gap-3 p-3 sm:p-4 xl:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-3 rounded-sm border border-line bg-surface-2 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <h3 className="text-sm font-semibold text-ink">物品条件</h3>
+            <Switch
+              checked={itemConditionOn}
+              disabled={!hasItems || itemConditionLocked}
+              onCheckedChange={(next) => editTarget({ itemEnabled: next })}
+              label="启用物品条件"
+              describedBy={conditionId + "-items"}
+            />
           </div>
-          <div className={cn("flex flex-col gap-3", !itemConditionOn && "opacity-55")}>
-          <Disclosure summary={rule.target.itemIds.length ? "修改物品选择（" + rule.target.itemIds.length + " 项）" : "选择物品（可选）"} className="rounded-sm border border-line/60 px-3 py-2">
-            <div className="pt-3">
-              <ItemPicker
-                locale={locale}
-                entries={rule.target.itemIds.length ? [{ id: "rule-items", label: "规则物品", itemIds: rule.target.itemIds }] : []}
-                onToggle={(toggle: ItemPickerToggle) => {
-                  const current = new Set(rule.target.itemIds);
-                  for (const id of toggle.ids) {
-                    if (toggle.checked) current.add(id);
-                    else current.delete(id);
-                  }
-                  editTarget({ itemIds: [...current] });
-                }}
-                onRemoveEntry={() => editTarget({ itemIds: [] })}
-              />
-            </div>
-          </Disclosure>
-          <p className="text-[10px] leading-relaxed text-ink-muted/85">
-            {!hasItems
-              ? "未选择物品：规则只按价格条件匹配。"
-              : itemConditionOn
-                ? "不选物品 = 规则对所有物品生效（配合价格区间使用）。"
-                : "物品条件已关闭，已选内容保留但不参与匹配。"}
-          </p>
+          <div className="flex flex-col gap-2">
+            <Disclosure summary={rule.target.itemIds.length ? "修改物品选择（" + rule.target.itemIds.length + " 项）" : "选择物品（可选）"} className="rounded-sm border border-line/60 px-3 py-2">
+              <div className="pt-3">
+                <ItemPicker
+                  locale={locale}
+                  entries={rule.target.itemIds.length ? [{ id: "rule-items", label: "规则物品", itemIds: rule.target.itemIds }] : []}
+                  onToggle={(toggle: ItemPickerToggle) => {
+                    const current = new Set(rule.target.itemIds);
+                    for (const id of toggle.ids) {
+                      if (toggle.checked) current.add(id);
+                      else current.delete(id);
+                    }
+                    editTarget({ itemIds: [...current] });
+                  }}
+                  onRemoveEntry={() => editTarget({ itemIds: [] })}
+                />
+              </div>
+            </Disclosure>
+            <p id={conditionId + "-items"} className="text-xs leading-relaxed text-ink-muted">
+              {!hasItems
+                ? "先选择物品，再启用此条件。"
+                : itemConditionLocked
+                  ? "当前唯一启用的条件。启用价格条件后可关闭。"
+                  : itemConditionOn
+                    ? "只匹配所选物品与价格区间的交集。"
+                    : "已关闭。所选物品已保留。"}
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-sm border border-line/70 bg-surface-2/40 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] font-medium text-ink">价格区间</span>
-            <div className="flex items-center gap-3">
-              {rule.autoRange ? <span className="font-mono text-[10px] text-gold">跟随市价</span> : <span className="font-mono text-[10px] text-ink-muted">固定价格</span>}
-              <Switch
-                checked={priceConditionOn}
-                disabled={!hasPrice || (priceConditionOn && !itemConditionOn)}
-                onCheckedChange={(next) => editTarget({ priceEnabled: next })}
-                label="启用价格条件"
-                title={!hasPrice ? "先填写价格区间" : priceConditionOn && !itemConditionOn ? "物品条件已关闭，至少要保留一个条件" : undefined}
-              />
-            </div>
+        <div className="flex min-w-0 flex-col gap-3 rounded-sm border border-line bg-surface-2 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <h3 className="text-sm font-semibold text-ink">价格条件</h3>
+            <Switch
+              checked={priceConditionOn}
+              disabled={!hasPrice || priceConditionLocked}
+              onCheckedChange={(next) => editTarget({ priceEnabled: next })}
+              label="启用价格条件"
+              describedBy={conditionId + "-price"}
+            />
           </div>
-          <div className={cn("flex flex-col gap-3", !priceConditionOn && "opacity-55")}>
+          {rule.autoRange && <span className="text-xs font-medium text-gold">跟随市价</span>}
           <div className="grid gap-2 sm:grid-cols-2">
             <PriceBoundEditor label="下限（含）" point={rule.target.range?.min} market={market} autoRange={rule.autoRange} onChange={(point) => onChange({ autoRange: false, target: { ...rule.target, range: { ...rule.target.range, min: point } } })} />
             <PriceBoundEditor label="上限（不含）" point={rule.target.range?.max} market={market} autoRange={rule.autoRange} onChange={(point) => onChange({ autoRange: false, target: { ...rule.target, range: { ...rule.target.range, max: point } } })} />
@@ -382,122 +381,127 @@ export function RuleEditor({
             <Button variant="secondary" size="sm" disabled={!rule.target.range?.min} onClick={() => onChange({ autoRange: false })}>
               改为固定价格
             </Button>
-          ) : (
-            <p className="text-[10px] leading-relaxed text-ink-muted/85">留空上限表示不封顶；两条规则区间重叠时，列表靠前的那条先生效。</p>
-          )}
-          {!priceConditionOn && (
-            <p className="text-[10px] leading-relaxed text-ink-muted/85">
-              {hasPrice ? "价格条件已关闭，区间保留但不参与匹配。" : "未填写价格区间：规则只按物品条件匹配。"}
-            </p>
-          )}
-          </div>
+          ) : null}
+          <p id={conditionId + "-price"} className="text-xs leading-relaxed text-ink-muted">
+            {!hasPrice
+              ? "先填写价格区间，再启用此条件。"
+              : priceConditionLocked
+                ? "当前唯一启用的条件。启用物品条件后可关闭。"
+                : !priceConditionOn
+                  ? "已关闭。填写的价格区间已保留。"
+                  : rule.autoRange
+                    ? "根据市价更新区间。"
+                    : "留空上限表示不封顶。"}
+          </p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-sm border border-line/70 bg-surface-2/40 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <span className="text-[11px] font-medium text-ink">完整特效预设</span>
-            <p className="mt-1 truncate text-[10px] text-ink-muted" title={selected ? describeEffects(pickEffects(selected)) : describeEffects(rule.effects)}>
-              {selected ? describeEffects(pickEffects(selected)) : "自定义（逐项填写）"}
-            </p>
+      <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
+        <div className="rounded-sm border border-line bg-surface-2 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="text-xs font-medium text-ink">完整特效预设</span>
+              <p className="mt-1 truncate text-xs text-ink-muted" title={selected ? describeEffects(pickEffects(selected)) : describeEffects(rule.effects)}>
+                {selected ? describeEffects(pickEffects(selected)) : "自定义（逐项填写）"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-ink-muted">{presets.length} 种可用</span>
+              <Button variant="secondary" size="sm" onClick={() => setGalleryOpen((open) => !open)} aria-expanded={galleryOpen}>
+                {galleryOpen ? "收起预设" : "选择预设"}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-ink-muted">{presets.length} 种可用</span>
-            <Button variant="secondary" size="sm" onClick={() => setGalleryOpen((open) => !open)} aria-expanded={galleryOpen}>
-              {galleryOpen ? "收起预设" : "选择预设"}
-            </Button>
-          </div>
+
+          {galleryOpen && (
+            <div className="mt-3 flex flex-col gap-2">
+              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} aria-label="筛选特效预设" placeholder="筛选预设，例如 星形 / 40号 / 白边" />
+              <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+                {filtered.map((preset) => (
+                  <PresetCard key={preset.id} preset={preset} active={preset.id === rule.effectPresetId} onSelect={() => applyPreset(preset)} />
+                ))}
+                {filtered.length === 0 && <p className="col-span-full py-4 text-center text-xs text-ink-muted">没有匹配的预设。</p>}
+              </div>
+              <p className="text-xs leading-relaxed text-ink-muted">预设是一次性填入光柱、地图图标、字体和音效；填好之后下面的字段仍可继续修改（改完会变成「自定义」）。</p>
+            </div>
+          )}
         </div>
 
-        {galleryOpen && (
-          <div className="mt-3 flex flex-col gap-2">
-            <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} aria-label="筛选特效预设" placeholder="筛选预设，例如 星形 / 40号 / 白边" />
-            <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
-              {filtered.map((preset) => (
-                <PresetCard key={preset.id} preset={preset} active={preset.id === rule.effectPresetId} onSelect={() => applyPreset(preset)} />
-              ))}
-              {filtered.length === 0 && <p className="col-span-full py-4 text-center text-[11px] text-ink-muted">没有匹配的预设。</p>}
-            </div>
-            <p className="text-[10px] leading-relaxed text-ink-muted/85">预设是一次性填入光柱、地图图标、字体和音效；填好之后下面的字段仍可继续修改（改完会变成「自定义」）。</p>
-          </div>
-        )}
-      </div>
+        <div>
+          <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} file={customFile} />
+        </div>
 
-      <div className="mt-3">
-        <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} file={customFile} />
-      </div>
-
-      <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="mt-3 border-t border-line/60 pt-3">
-      <div className="grid gap-3 pt-3 sm:grid-cols-2">
-        <Field label="光柱">
-          <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
-        </Field>
-        <Field label="地图图标">
-          <TextInput aria-label={rule.name + " 地图图标"} placeholder="MinimapIcon，留空沿用基础" value={rule.effects.icon ?? ""} onChange={(event) => editEffects({ icon: event.target.value })} />
-        </Field>
-        <Field label="字号" hint="18–45">
-          <div className="flex gap-2">
-            <TextInput
-              type="number"
-              min={18}
-              max={45}
-              aria-label={rule.name + " 字号"}
-              placeholder="沿用基础"
-              value={font.fontSize ?? ""}
-              onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
-            />
-            <ColorSwatch color={font.textColor} />
+        <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="border-t border-line pt-1">
+          <div className="grid gap-3 pt-3 sm:grid-cols-2">
+            <Field label="光柱">
+              <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
+            </Field>
+            <Field label="地图图标">
+              <TextInput aria-label={rule.name + " 地图图标"} placeholder="MinimapIcon，留空沿用基础" value={rule.effects.icon ?? ""} onChange={(event) => editEffects({ icon: event.target.value })} />
+            </Field>
+            <Field label="字号" hint="18–45">
+              <div className="flex gap-2">
+                <TextInput
+                  type="number"
+                  min={18}
+                  max={45}
+                  aria-label={rule.name + " 字号"}
+                  placeholder="沿用基础"
+                  value={font.fontSize ?? ""}
+                  onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
+                />
+                <ColorSwatch color={font.textColor} />
+              </div>
+            </Field>
+            {(
+              [
+                ["textColor", "文字颜色"],
+                ["borderColor", "边框颜色"],
+                ["backgroundColor", "背景颜色"],
+              ] as const
+            ).map(([key, label]) => (
+              <Field key={key} label={label}>
+                <div className="flex gap-2">
+                  <TextInput aria-label={rule.name + " " + label} placeholder="R G B (A)，留空沿用基础" value={font[key] ?? ""} onChange={(event) => editFont({ [key]: event.target.value })} />
+                  <ColorSwatch color={font[key]} />
+                </div>
+              </Field>
+            ))}
+            <Field label="音效">
+              <div className="flex flex-col gap-2">
+                <Select
+                  ariaLabel={rule.name + " 音效"}
+                  value={soundValue}
+                  onValueChange={(value) => {
+                    if (value === NONE) editEffects({ sound: undefined });
+                    else if (value === CUSTOM_SOUND) editEffects({ sound: { type: "custom", fileName: rule.effects.sound?.type === "custom" ? rule.effects.sound.fileName : "" } });
+                    else if (value.startsWith("builtin:")) {
+                      const id = Number(value.slice(8));
+                      editEffects({ sound: { type: "builtin", id, volume: rule.effects.sound?.type === "builtin" && rule.effects.sound.id === id ? rule.effects.sound.volume : 300 } });
+                    } else editEffects({ sound: { type: "neversink", fileName: value.slice(10) } });
+                  }}
+                  options={[
+                    { value: NONE, label: "沿用基础" },
+                    ...EFFECT_PRESETS.sounds.map((sound) => ({
+                      value: sound.type === "builtin" ? "builtin:" + sound.id : "neversink:" + sound.fileName,
+                      label: sound.type === "builtin" ? "内置音效 " + sound.id + " · 音量 " + sound.volume : "模板音效 · " + sound.fileName,
+                    })),
+                    { value: CUSTOM_SOUND, label: "自定义上传…" },
+                  ]}
+                />
+                {rule.effects.sound?.type === "custom" && (
+                  <FileInput
+                    label={rule.name + " 自定义音效"}
+                    accept="audio/mpeg,audio/wav,audio/ogg"
+                    fileName={customFile?.name || rule.effects.sound.fileName || "选择 mp3 / wav / ogg"}
+                    onFile={onSound}
+                  />
+                )}
+              </div>
+            </Field>
           </div>
-        </Field>
-        {(
-          [
-            ["textColor", "文字颜色"],
-            ["borderColor", "边框颜色"],
-            ["backgroundColor", "背景颜色"],
-          ] as const
-        ).map(([key, label]) => (
-          <Field key={key} label={label}>
-            <div className="flex gap-2">
-              <TextInput aria-label={rule.name + " " + label} placeholder="R G B (A)，留空沿用基础" value={font[key] ?? ""} onChange={(event) => editFont({ [key]: event.target.value })} />
-              <ColorSwatch color={font[key]} />
-            </div>
-          </Field>
-        ))}
-        <Field label="音效">
-          <div className="flex flex-col gap-2">
-            <Select
-              ariaLabel={rule.name + " 音效"}
-              value={soundValue}
-              onValueChange={(value) => {
-                if (value === NONE) editEffects({ sound: undefined });
-                else if (value === CUSTOM_SOUND) editEffects({ sound: { type: "custom", fileName: rule.effects.sound?.type === "custom" ? rule.effects.sound.fileName : "" } });
-                else if (value.startsWith("builtin:")) {
-                  const id = Number(value.slice(8));
-                  editEffects({ sound: { type: "builtin", id, volume: rule.effects.sound?.type === "builtin" && rule.effects.sound.id === id ? rule.effects.sound.volume : 300 } });
-                } else editEffects({ sound: { type: "neversink", fileName: value.slice(10) } });
-              }}
-              options={[
-                { value: NONE, label: "沿用基础" },
-                ...EFFECT_PRESETS.sounds.map((sound) => ({
-                  value: sound.type === "builtin" ? "builtin:" + sound.id : "neversink:" + sound.fileName,
-                  label: sound.type === "builtin" ? "内置音效 " + sound.id + " · 音量 " + sound.volume : "模板音效 · " + sound.fileName,
-                })),
-                { value: CUSTOM_SOUND, label: "自定义上传…" },
-              ]}
-            />
-            {rule.effects.sound?.type === "custom" && (
-              <FileInput
-                label={rule.name + " 自定义音效"}
-                accept="audio/mpeg,audio/wav,audio/ogg"
-                fileName={customFile?.name || rule.effects.sound.fileName || "选择 mp3 / wav / ogg"}
-                onFile={onSound}
-              />
-            )}
-          </div>
-        </Field>
+        </Disclosure>
       </div>
-      </Disclosure>
     </div>
   );
 }
@@ -517,7 +521,7 @@ function PriceBoundEditor({ label, point, market, autoRange, onChange }: { label
     const value = toExalted(point, market.rates, market.prices);
     return (
       <div className="flex flex-col gap-1.5 rounded-sm border border-line bg-surface-2/60 px-3 py-2.5">
-        <span className="text-[11px] text-ink-muted">{label}</span>
+        <span className="text-xs text-ink-muted">{label}</span>
         <strong className="font-mono text-xs font-medium text-ink">{formatPrice(point, market)}</strong>
         {!autoRange && (
           <Button variant="secondary" size="sm" disabled={value === undefined} onClick={() => onChange({ amount: value!, currency: "exalted" })}>
@@ -529,15 +533,15 @@ function PriceBoundEditor({ label, point, market, autoRange, onChange }: { label
   }
   return (
     <div className="flex flex-col gap-1.5 rounded-sm border border-line bg-surface-2/60 px-3 py-2.5">
-      <span className="text-[11px] text-ink-muted">{label}</span>
-      <div className="flex gap-2">
+      <span className="text-xs text-ink-muted">{label}</span>
+      <div className="grid grid-cols-[minmax(4.5rem,1fr)_minmax(0,1.3fr)] gap-2">
         <TextInput
           type="number"
           min={0}
           step={0.01}
           placeholder="不限"
           aria-label={label + "数值"}
-          className="h-9 min-w-0 py-1 text-xs"
+          className="h-9 px-2 py-1 text-xs"
           value={point?.amount ?? ""}
           onChange={(event) => onChange(event.target.value === "" ? undefined : { amount: Number(event.target.value), currency: point?.currency ?? "divine" })}
         />
@@ -545,7 +549,7 @@ function PriceBoundEditor({ label, point, market, autoRange, onChange }: { label
           value={point?.currency ?? "divine"}
           onValueChange={(currency) => onChange({ amount: point?.amount ?? 0, currency: currency as Currency })}
           ariaLabel={label + "单位"}
-          className="h-9 w-[8.5rem] shrink-0 py-1 text-xs"
+          className="h-9 px-2 py-1 text-xs"
           options={Object.entries(currencyLabels).map(([value, name]) => ({ value, label: name }))}
         />
       </div>

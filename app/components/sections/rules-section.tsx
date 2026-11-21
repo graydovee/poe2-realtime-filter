@@ -32,7 +32,6 @@ export function RulesSection({
 
   return (
     <Panel
-      step="03"
       title="自定义过滤规则"
       description="从上到下依次匹配，第一个命中的规则生效。适用物品与价格区间可以只填一个，也可以同时填（取交集）。没有填写的特效交给基础过滤器，隐藏也是规则里的一个选项。"
     >
@@ -40,28 +39,27 @@ export function RulesSection({
         {tiers.length ? (
           tiers.map((tier) => (
             <div key={tier.itemId} className="flex flex-col gap-1.5 rounded-sm border border-line bg-surface-2 px-3 py-2.5">
-              <span className="truncate text-[11px] text-ink-muted">{tier.name}</span>
+              <span className="truncate text-xs text-ink-muted">{tier.name}</span>
               <strong className="font-mono text-[13px] font-medium text-gold">{formatPrice({ amount: tier.exaltedValue, currency: "exalted" })}</strong>
             </div>
           ))
         ) : (
-          <p className="col-span-2 text-[11px] leading-relaxed text-ink-muted sm:col-span-4">
+          <p className="col-span-2 text-xs leading-relaxed text-ink-muted sm:col-span-4">
             当前赛季没有可用的锚点行情，跟随市价的价格档会被禁用；仍可以用「选择物品」或固定价格写规则。
           </p>
         )}
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-muted">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
         <span>
           共 <b className="font-mono font-normal text-ink">{profile.rules.length}</b> 条规则，启用 <b className="font-mono font-normal text-ink">{enabled}</b> 条
           {hidden > 0 ? <>，其中隐藏规则 <b className="font-mono font-normal text-ember">{hidden}</b> 条</> : null}
         </span>
-        <span className="font-mono text-[10px]">顺序 = 优先级</span>
       </div>
 
       <div className="flex flex-col gap-3">
         {profile.rules.length === 0 && (
-          <p className="rounded-sm border border-dashed border-line bg-surface-2/40 px-4 py-6 text-center text-[11px] text-ink-muted">
+          <p className="rounded-sm border border-dashed border-line bg-surface-2/40 px-4 py-6 text-center text-xs text-ink-muted">
             还没有规则，输出等于基础过滤器。可以先「新增规则」。
           </p>
         )}

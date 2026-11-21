@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use eframe::egui::{self, Align, Color32, Frame, Layout, RichText, Vec2};
+use eframe::egui::{self, Align, Color32, Frame, Layout, Margin, RichText, Stroke, Vec2};
 use windows_sys::Win32::{
     Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS},
     System::Threading::CreateMutexW,
@@ -17,10 +17,10 @@ use windows_sys::Win32::{
 };
 
 use crate::{
-    platform,
+    brand, platform,
     sync::{self, Entry, Settings},
     theme,
-    tray::{self, Tray, TrayCommand},
+    tray::{Tray, TrayCommand},
     widgets,
 };
 
@@ -52,6 +52,7 @@ enum Message {
 
 pub struct App {
     root: PathBuf,
+    logo: egui::TextureHandle,
     settings: Settings,
     link: String,
     directory: String,
@@ -87,6 +88,7 @@ impl App {
         let (sender, receiver) = channel();
         Self {
             root,
+            logo: brand::load_texture(&cc.egui_ctx),
             settings,
             link: String::new(),
             directory,
@@ -366,19 +368,16 @@ impl App {
 
     fn header(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.add_space(18.0);
-            ui.label(RichText::new("◈").font(theme::heading(22.0)).color(theme::GOLD));
+            ui.image((self.logo.id(), Vec2::splat(36.0)));
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 0.0;
-                ui.label(RichText::new("poe2-filter").font(theme::heading(15.0)).color(theme::INK));
-                ui.label(RichText::new("PATH OF EXILE 2 · 自动更新").size(9.5).color(theme::INK_MUTED));
+                ui.label(RichText::new("poe2-filter").font(theme::heading(17.0)).color(theme::INK));
+                ui.label(RichText::new("过滤器自动更新").size(13.0).color(theme::INK_MUTED));
             });
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.add_space(18.0);
-                widgets::pill(ui, &format!("{} 个方案", self.settings.entries.len()), theme::INK_MUTED);
                 widgets::pill(ui, &self.next_check_label(), theme::GOLD);
                 if self.busy {
-                    widgets::spinner(ui);
+                    ui.add(egui::Spinner::new().size(16.0).color(theme::GOLD));
                 }
             });
         });
@@ -386,14 +385,14 @@ impl App {
 
     fn link_card(&mut self, ui: &mut egui::Ui) {
         widgets::card(ui, |ui| {
-            widgets::section_title(ui, "01", "添加订阅", "从网站复制订阅链接，粘贴后立即同步。");
+            widgets::section_title(ui, "添加订阅", "从网站复制订阅链接，粘贴后立即同步。");
             widgets::field_label(ui, "方案订阅链接");
             ui.add(
                 egui::TextEdit::singleline(&mut self.link)
                     .hint_text("https://…/sync/…")
                     .desired_width(f32::INFINITY),
             );
-            ui.add_space(10.0);
+            ui.add_space(3.0);
             let width = ui.available_width();
             if widgets::primary_button(ui, "添加方案", !self.busy, width).clicked() {
                 self.add_entry();
@@ -403,14 +402,14 @@ impl App {
 
     fn directory_card(&mut self, ui: &mut egui::Ui) {
         widgets::card(ui, |ui| {
-            widgets::section_title(ui, "02", "过滤器目录", "游戏读取过滤器的目录，必须是绝对路径。");
+            widgets::section_title(ui, "过滤器目录", "游戏读取过滤器的目录，必须是绝对路径。");
             widgets::field_label(ui, "本地目录");
             ui.add(
                 egui::TextEdit::singleline(&mut self.directory)
                     .desired_width(f32::INFINITY),
             );
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
+            ui.add_space(2.0);
+            ui.horizontal_wrapped(|ui| {
                 if widgets::secondary_button(ui, "浏览…", true, 74.0).clicked() {
                     if let Some(path) = platform::pick_directory() {
                         self.directory = path.to_string_lossy().to_string();
@@ -430,19 +429,13 @@ impl App {
 
     fn schedule_card(&mut self, ui: &mut egui::Ui) {
         widgets::card(ui, |ui| {
-            widgets::section_title(ui, "03", "定时与启动", "关闭窗口后仍会留在托盘继续检查。");
+            widgets::section_title(ui, "定时与启动", "关闭窗口后仍会留在托盘继续检查。");
             ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    widgets::field_label(ui, "检查间隔（分钟）");
-                    ui.add(egui::TextEdit::singleline(&mut self.minutes).desired_width(72.0));
-                });
-                ui.add_space(10.0);
-                ui.vertical(|ui| {
-                    ui.add_space(15.0);
-                    ui.checkbox(&mut self.autostart, "开机启动");
-                });
+                widgets::field_label(ui, "检查间隔（分钟）");
+                ui.add(egui::TextEdit::singleline(&mut self.minutes).desired_width(56.0));
             });
-            ui.add_space(10.0);
+            ui.checkbox(&mut self.autostart, "开机启动");
+            ui.add_space(3.0);
             let width = ui.available_width();
             if widgets::secondary_button(ui, "保存设置 / 目录", true, width).clicked() {
                 self.save_settings();
@@ -452,33 +445,26 @@ impl App {
 
     fn entries_card(&mut self, ui: &mut egui::Ui) {
         widgets::card(ui, |ui| {
+            let count = self.settings.entries.len();
             ui.horizontal(|ui| {
-                ui.label(RichText::new("订阅方案").size(13.5).strong().color(theme::INK));
-                ui.label(
-                    RichText::new(format!("{} 个", self.settings.entries.len()))
-                        .size(10.0)
-                        .color(theme::INK_MUTED),
-                );
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if widgets::secondary_button(ui, "全部暂停 / 恢复", !self.busy, 0.0).clicked() {
-                        self.toggle_all();
-                    }
-                    if widgets::secondary_button(ui, "全部更新", !self.busy, 0.0).clicked() {
-                        self.start_update(None);
-                    }
-                });
+                ui.label(RichText::new("订阅方案").size(17.0).strong().color(theme::INK));
+                widgets::pill(ui, &format!("{count} 个"), theme::INK_MUTED);
             });
-            ui.add_space(8.0);
-            if self.settings.entries.is_empty() {
-                widgets::empty_state(ui, "◈", "还没有订阅方案", "先在左侧粘贴网站生成的订阅链接。");
+            if count == 0 {
+                widgets::empty_state(ui, "还没有订阅方案", "在「添加订阅」中粘贴网站生成的订阅链接。");
                 return;
             }
-            let count = self.settings.entries.len();
-            let content_height = count as f32 * 96.0 + 12.0;
-            let height = content_height.min((ui.available_height() - 6.0).max(180.0));
+            ui.horizontal_wrapped(|ui| {
+                if widgets::primary_button(ui, "全部更新", !self.busy, 0.0).clicked() {
+                    self.start_update(None);
+                }
+                if widgets::secondary_button(ui, "全部暂停 / 恢复", !self.busy, 0.0).clicked() {
+                    self.toggle_all();
+                }
+            });
+            ui.add_space(5.0);
             egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .max_height(height)
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
                     for index in 0..count {
                         self.entry_row(ui, index);
@@ -494,8 +480,8 @@ impl App {
         let clicked = widgets::sub_card(ui, index, selected, |ui| {
             ui.vertical(|ui| {
                 ui.spacing_mut().item_spacing.y = 4.0;
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new(&title).size(13.0).strong().color(theme::INK));
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(&title).size(15.0).strong().color(theme::INK));
                     if !entry.league.is_empty() {
                         widgets::pill(ui, &entry.league, theme::GOLD);
                     }
@@ -507,7 +493,7 @@ impl App {
                 });
                 ui.horizontal(|ui| {
                     widgets::dot(ui, entry_tone(&entry));
-                    ui.label(RichText::new(entry_status(&entry)).size(10.5).color(theme::INK_MUTED));
+                    ui.label(RichText::new(entry_status(&entry)).size(12.0).color(theme::INK_MUTED));
                 });
             });
         });
@@ -518,7 +504,7 @@ impl App {
         }
         if selected {
             ui.add_space(4.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if widgets::secondary_button(ui, "更新", !self.busy, 0.0).clicked() {
                     self.start_update(Some(vec![index]));
                 }
@@ -539,21 +525,21 @@ impl App {
 
     fn status_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.add_space(18.0);
-            widgets::dot(ui, self.notice_tone.color());
-            ui.label(RichText::new(&self.notice).size(10.5).color(self.notice_tone.color()));
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.add_space(18.0);
-                ui.label(
-                    RichText::new(format!(
-                        "v{} · {}",
-                        env!("CARGO_PKG_VERSION"),
-                        if self.busy { "同步中" } else { "空闲" }
-                    ))
-                    .size(9.5)
+            let state = if self.busy { "同步中" } else { "空闲" };
+            ui.label(
+                RichText::new(format!("{state} · v{}", env!("CARGO_PKG_VERSION")))
+                    .size(12.0)
                     .color(theme::INK_MUTED),
-                );
-            });
+            );
+            ui.separator();
+            widgets::dot(ui, self.notice_tone.color());
+            ui.add(
+                egui::Label::new(
+                    RichText::new(&self.notice).size(13.0).color(self.notice_tone.color()),
+                )
+                .truncate(),
+            )
+            .on_hover_text(&self.notice);
         });
     }
 }
@@ -608,37 +594,43 @@ impl eframe::App for App {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let bar = Frame::NONE
+            .fill(theme::SURFACE)
+            .stroke(Stroke::new(1.0, theme::LINE))
+            .inner_margin(Margin::symmetric(20, 10));
+        egui::Panel::top("header")
+            .frame(bar)
+            .show(ui, |ui| self.header(ui));
+        egui::Panel::bottom("status")
+            .frame(bar)
+            .show(ui, |ui| self.status_bar(ui));
         egui::CentralPanel::default()
-            .frame(Frame::NONE.fill(theme::BG))
+            .frame(Frame::NONE.fill(theme::BG).inner_margin(Margin::same(20)))
             .show(ui, |ui| {
-                ui.add_space(14.0);
-                self.header(ui);
-                widgets::separator(ui, 10.0);
-                let body_height = (ui.available_height() - 32.0).max(300.0);
+                let height = ui.available_height();
+                let settings_width = 340.0;
+                ui.spacing_mut().item_spacing = egui::vec2(16.0, 12.0);
                 ui.horizontal_top(|ui| {
-                    ui.add_space(18.0);
                     ui.allocate_ui_with_layout(
-                        Vec2::new(318.0, body_height),
+                        Vec2::new(settings_width, height),
                         Layout::top_down(Align::Min),
                         |ui| {
-                            ui.spacing_mut().item_spacing.y = 10.0;
-                            self.link_card(ui);
-                            self.directory_card(ui);
-                            self.schedule_card(ui);
+                            egui::ScrollArea::vertical()
+                                .id_salt("settings")
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    self.link_card(ui);
+                                    self.directory_card(ui);
+                                    self.schedule_card(ui);
+                                });
                         },
                     );
-                    ui.add_space(14.0);
-                    let width = (ui.available_width() - 18.0).max(300.0);
                     ui.allocate_ui_with_layout(
-                        Vec2::new(width, body_height),
+                        ui.available_size(),
                         Layout::top_down(Align::Min),
-                        |ui| {
-                            self.entries_card(ui);
-                        },
+                        |ui| self.entries_card(ui),
                     );
                 });
-                widgets::separator(ui, 6.0);
-                self.status_bar(ui);
             });
     }
 }
@@ -683,7 +675,7 @@ pub fn run(tray_only: bool) -> eframe::Result<()> {
                 .with_inner_size([1040.0, 780.0])
                 .with_min_inner_size([880.0, 640.0])
                 .with_visible(!tray_only)
-                .with_icon(egui::IconData { rgba: tray::icon_rgba(), width: 32, height: 32 }),
+                .with_icon(brand::window_icon()),
             centered: true,
             ..Default::default()
         };

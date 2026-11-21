@@ -22,7 +22,7 @@ export function TabBar<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="tablist" aria-label="视图切换" className={cn("flex h-14 min-w-0 items-center gap-5 overflow-x-auto border-y border-line sm:gap-7", className)}>
+    <div role="tablist" aria-label="视图切换" className={cn("flex min-w-0 flex-wrap items-center gap-1 rounded border border-line bg-surface p-1.5", className)}>
       {items.map((item) => {
         const active = value === item.value;
         return (
@@ -33,22 +33,15 @@ export function TabBar<T extends string>({
             aria-selected={active}
             onClick={() => onChange(item.value)}
             className={cn(
-              "relative h-full text-[13px] transition-colors duration-150 focus-visible:outline-none",
-              active ? "font-semibold text-ink" : "text-ink-muted hover:text-ink",
+              "min-h-10 rounded-sm px-3 text-sm transition-colors duration-150 sm:px-4",
+              active ? "bg-gold/15 font-semibold text-gold-bright" : "text-ink-muted hover:bg-surface-3 hover:text-ink",
             )}
           >
             {item.label}
-            <span
-              aria-hidden="true"
-              className={cn(
-                "absolute inset-x-0 -bottom-px h-0.5 transition-colors duration-150",
-                active ? "bg-gold" : "bg-transparent",
-              )}
-            />
           </button>
         );
       })}
-      {trailing && <div className="ml-auto hidden shrink-0 items-center gap-2 pl-4 text-[11px] text-ink-muted sm:flex">{trailing}</div>}
+      {trailing && <div className="ml-auto hidden shrink-0 items-center gap-2 pl-4 pr-2 text-xs text-ink-muted sm:flex">{trailing}</div>}
     </div>
   );
 }
@@ -68,7 +61,7 @@ export function Disclosure({
 }) {
   return (
     <CollapsiblePrimitive.Root defaultOpen={defaultOpen} className={className}>
-      <CollapsiblePrimitive.Trigger className="group flex w-full items-center justify-between gap-3 py-3 text-left text-xs font-medium text-ink-muted transition hover:text-ink focus-visible:outline-none">
+      <CollapsiblePrimitive.Trigger className="group flex w-full items-center justify-between gap-3 min-h-9 py-2 text-left text-[13px] font-medium text-ink transition hover:text-gold-bright">
         <span>{summary}</span>
         <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />
       </CollapsiblePrimitive.Trigger>

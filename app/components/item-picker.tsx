@@ -27,14 +27,9 @@ function selectionOf(items: ItemDefinition[], selected: Set<string>) {
 
 function SelectionMark({ state }: { state: "off" | "on" | "mixed" }) {
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "grid size-4 shrink-0 place-items-center rounded-sm border transition",
-        state === "off" ? "border-line-strong bg-surface-3 text-transparent" : "border-gold bg-gold text-[#0b0805]",
-      )}
-    >
-      {state === "mixed" ? <Minus className="size-3" strokeWidth={3} /> : <Check className="size-3" strokeWidth={3} />}
+    <span aria-hidden="true" className="ui-checkbox" data-state={state === "on" ? "checked" : state}>
+      {state === "mixed" && <Minus className="size-3.5" strokeWidth={3} />}
+      {state === "on" && <Check className="size-3.5" strokeWidth={3} />}
     </span>
   );
 }
@@ -87,7 +82,7 @@ export function ItemPicker({
           全部种类
         </button>
         {path.map((key, index) => (
-          <span key={path.slice(0, index + 1).join("/")} className="flex items-center gap-1 text-ink-muted/70">
+          <span key={path.slice(0, index + 1).join("/")} className="flex items-center gap-1 text-ink-muted">
             <span aria-hidden="true">/</span>
             <button
               type="button"
@@ -130,7 +125,7 @@ export function ItemPicker({
           )}
 
           {current.children.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3" role="group" aria-label="物品种类">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2" role="group" aria-label="物品种类">
               {childNodes.map((child) => {
                 const items = catalogItems(child);
                 const state = selectionOf(items, selected);
@@ -138,20 +133,20 @@ export function ItemPicker({
                 return (
                   <div
                     key={child.key}
-                    className="flex min-h-[3.75rem] items-stretch overflow-hidden rounded-sm border border-line bg-surface-2/60 transition duration-150 ease-out hover:border-gold/50"
+                    className="flex min-h-[3.75rem] min-w-0 items-stretch overflow-hidden rounded-sm border border-line bg-surface-2/60 transition duration-150 ease-out hover:border-gold/50"
                   >
                     <button
                       type="button"
                       onClick={() => setPath(child.path)}
-                      className="group flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3 text-left focus-visible:outline-none"
+                      className="group flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-3 text-left focus-visible:-outline-offset-2"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] text-ink">{name}</span>
-                        <small className="mt-1 block text-[10px] text-ink-muted">
+                        <small className="mt-1 block text-xs text-ink-muted">
                           {items.length} 项{state.count > 0 ? " · 已选 " + state.count : ""}
                         </small>
                       </span>
-                      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-ink-muted transition group-hover:text-gold" />
+                      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-ink-muted transition group-hover:text-gold" />
                     </button>
                     <button
                       type="button"
@@ -159,7 +154,7 @@ export function ItemPicker({
                       aria-checked={state.all ? true : state.partial ? "mixed" : false}
                       aria-label={(state.all ? "取消本类：" : "选择本类：") + name}
                       onClick={() => toggle(items, !state.all, name, child.path.join("/"))}
-                      className="grid w-10 shrink-0 place-items-center border-l border-line/70 transition hover:bg-gold/10 focus-visible:outline-none"
+                      className="grid w-9 shrink-0 place-items-center border-l border-line/70 transition hover:bg-gold/10 focus-visible:-outline-offset-2"
                     >
                       <SelectionMark state={state.all ? "on" : state.partial ? "mixed" : "off"} />
                     </button>
@@ -193,9 +188,9 @@ export function ItemPicker({
                       <SelectionMark state={checked ? "on" : "off"} />
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <b className="truncate text-[11px] font-medium leading-tight text-ink">{item.localeNames[locale]}</b>
-                        <small className="truncate text-[10px] leading-tight text-ink-muted">{item.name}</small>
+                        <small className="truncate text-xs leading-tight text-ink-muted">{item.name}</small>
                       </span>
-                      <em className="shrink-0 text-[10px] not-italic text-ink-muted">
+                      <em className="shrink-0 text-xs not-italic text-ink-muted">
                         {item.ambiguous ? "沿用原始规则" : checked ? "已选中" : ""}
                       </em>
                     </label>
@@ -225,7 +220,7 @@ export function ItemPicker({
         />
       )}
 
-      <p className="font-mono text-[10px] tracking-tight text-ink-muted">
+      <p className="font-mono text-xs tracking-tight text-ink-muted">
         {query.trim()
           ? "搜索匹配 " + matchingItems.length + " 项，可按分类整类勾选。"
           : "按 poe.ninja 的分组逐级选择，整类或单件都可以直接勾选，共 " + ITEM_CATALOG.length + " 项。"}
@@ -248,7 +243,7 @@ export function ItemPicker({
             ))}
           </div>
         )}
-        <p className="mt-3 text-[10px] leading-relaxed text-ink-muted/80">
+        <p className="mt-3 text-xs leading-relaxed text-ink-muted">
           整类条目会展开成对应的 BaseType 列表写进过滤器；单件物品按单条规则写入，两者可以混用。
         </p>
       </div>
