@@ -81,6 +81,17 @@ test("Most Popular uses the reciprocal quote and converts D, C and E before matc
   assert.match(blocks[0], /^Hide .*Greater Jeweller/);
 });
 
+test("subscription filter bytes stay stable when only the market timestamp changes", () => {
+  const nextMarket = { ...snapshot, capturedAt: new Date(Date.parse(snapshot.capturedAt) + 60_000).toISOString() };
+  const config = profile({ skippedItemIds: [] });
+  const options = { includeMarketTimestamp: false };
+  const first = generateFilter(config, snapshot, options);
+  const second = generateFilter(config, nextMarket, options);
+  assert.equal(first.filterFile, second.filterFile);
+  assert.deepEqual(first.soundFiles, second.soundFiles);
+  assert.notEqual(generateFilter(config, snapshot).filterFile, generateFilter(config, nextMarket).filterFile);
+});
+
 test("规则按列表顺序首个命中，后面的规则不再覆盖", () => {
   const generated = generateFilter(
     profile({

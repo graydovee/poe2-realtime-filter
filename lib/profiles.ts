@@ -154,7 +154,7 @@ async function renderManifest(row:any){
  try{
  const config=await resolveProfileLeague(validateProfile(JSON.parse(row.config)));const market=await loadMarketSnapshot(config.league);
   if(!market.rates||Date.parse(market.expiresAt)<=Date.now())throw new Error('所选赛季行情暂不可用');
-  const generated=generateFilter(config,market);if(!generated.safetyReport.passed)throw new Error('生成检查未通过');
+  const generated=generateFilter(config, market, { includeMarketTimestamp: false });if(!generated.safetyReport.passed)throw new Error('生成检查未通过');
   const assets=new Map<string,Buffer>();
   for(const name of generated.soundFiles){
    if(safeName(name)!==name)throw new Error('音效路径无效');

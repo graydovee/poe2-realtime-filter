@@ -21,6 +21,7 @@ use crate::{
     sync::{self, Entry, Settings},
     theme,
     tray::{Tray, TrayCommand},
+    updater,
     widgets,
 };
 
@@ -45,13 +46,30 @@ impl Tone {
     }
 }
 
+enum ClientUpdate {
+    Checking,
+    Current,
+    CheckFailed(String),
+    Available(updater::Release, Option<String>),
+    Downloading(String),
+    Ready(updater::Staged, Option<String>),
+}
+
+fn check_client_update(sender: Sender<Message>) {
+    thread::spawn(move || { let _ = sender.send(Message::ClientChecked(updater::check())); });
+}
+
 enum Message {
+    ClientChecked(sync::Result<Option<updater::Release>>),
+    ClientDownloaded(updater::Release, sync::Result<updater::Staged>),
     Updated { entries: Vec<Entry>, changed: bool, failed: bool },
     Rolled { index: usize, outcome: Result<Entry, (Entry, String)> },
 }
 
 pub struct App {
     root: PathBuf,
+    device: Option<String>,
+    client_update: ClientUpdate,
     logo: egui::TextureHandle,
     settings: Settings,
     link: String,
@@ -87,7 +105,10 @@ impl App {
         let minutes = settings.interval_minutes.to_string();
         let autostart = settings.autostart;
         let (sender, receiver) = channel();
+        check_client_update(sender.clone());
         Self {
+            client_update: ClientUpdate::Checking,
+            device: sync::device_id(&root).ok(),
             root,
             logo: brand::load_texture(&cc.egui_ctx),
             settings,
@@ -150,6 +171,7 @@ impl App {
         let root = self.root.clone();
         let sender = self.sender.clone();
         let subscriptions = self.settings.entries.clone();
+        let device = self.device.clone();
         thread::spawn(move || {
             let mut list = entries;
             let mut changed = false;
@@ -158,7 +180,7 @@ impl App {
                 if entry.paused || entry.revoked {
                     continue;
                 }
-                match sync::update(&root, entry, &subscriptions) {
+                match sync::update(&root, entry, &subscriptions, device.as_deref()) {
                     Ok(updated) => changed |= updated,
                     Err(message) => {
                         entry.status = message;
@@ -195,6 +217,19 @@ impl App {
     fn poll_worker(&mut self) {
         while let Ok(message) = self.receiver.try_recv() {
             match message {
+                Message::ClientChecked(result) => {
+                    self.client_update = match result {
+                        Ok(Some(release)) => ClientUpdate::Available(release, None),
+                        Ok(None) => ClientUpdate::Current,
+                        Err(error) => ClientUpdate::CheckFailed(error),
+                    };
+                }
+                Message::ClientDownloaded(release, result) => {
+                    self.client_update = match result {
+                        Ok(staged) => ClientUpdate::Ready(staged, None),
+                        Err(error) => ClientUpdate::Available(release, Some(error)),
+                    };
+                }
                 Message::Updated { entries, changed, failed } => {
                     for entry in entries {
                         if let Some(target) = self
@@ -319,6 +354,7 @@ impl App {
                 if entry.directory != directory {
                     entry.directory = directory;
                     entry.current = None;
+                    entry.manifest_etag = None;
                     entry.filter_filename = None;
                 }
             }
@@ -589,6 +625,47 @@ impl App {
         ui.add_space(6.0);
     }
 
+    fn client_update_button(&mut self, ui: &mut egui::Ui) {
+        match &mut self.client_update {
+            ClientUpdate::Checking | ClientUpdate::Current => {},
+            ClientUpdate::CheckFailed(error) => {
+                if widgets::secondary_button(ui, "重试检查", true, 80.0).on_hover_text(error.as_str()).clicked() {
+                    self.client_update = ClientUpdate::Checking;
+                    check_client_update(self.sender.clone());
+                }
+            }
+            ClientUpdate::Available(release, error) => {
+                let label = if error.is_some() { "重试更新" } else { "更新" };
+                let hint = error.clone().unwrap_or_else(|| format!("下载 {}", release.tag));
+                if widgets::secondary_button(ui, label, true, 80.0).on_hover_text(hint).clicked() {
+                    let release = release.clone();
+                    self.client_update = ClientUpdate::Downloading(release.tag.clone());
+                    let sender = self.sender.clone();
+                    thread::spawn(move || {
+                        let result = updater::download(&release);
+                        let _ = sender.send(Message::ClientDownloaded(release, result));
+                    });
+                }
+            }
+            ClientUpdate::Downloading(tag) => {
+                widgets::secondary_button(ui, "下载中…", false, 80.0).on_hover_text(tag.as_str());
+            }
+            ClientUpdate::Ready(staged, error) => {
+                let enabled = !self.busy && self.pending_removal.is_none();
+                let hint = error.clone().unwrap_or_else(|| format!("重启并安装 {}", staged.tag));
+                if widgets::primary_button(ui, "重启", enabled, 65.0).on_hover_text(hint).clicked() {
+                    match staged.restart(&self.root) {
+                        Ok(()) => {
+                            self.quit = true;
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                        Err(reason) => *error = Some(reason),
+                    }
+                }
+            }
+        }
+    }
+
     fn status_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let state = if self.busy { "同步中" } else { "空闲" };
@@ -597,6 +674,7 @@ impl App {
                     .size(12.0)
                     .color(theme::INK_MUTED),
             );
+            self.client_update_button(ui);
             ui.separator();
             widgets::dot(ui, self.notice_tone.color());
             ui.add(
@@ -728,7 +806,7 @@ impl Drop for Instance {
     }
 }
 
-pub fn run(tray_only: bool) -> eframe::Result<()> {
+pub fn run(tray_only: bool, ready: Option<String>) -> eframe::Result<()> {
     unsafe {
         let _instance = match Instance::acquire() {
             Ok(Some(instance)) => instance,
@@ -747,6 +825,7 @@ pub fn run(tray_only: bool) -> eframe::Result<()> {
         };
 
         let root = sync::state_root();
+        updater::clean_helpers(&root);
         let settings = match sync::read_settings(&root) {
             Ok(settings) => settings,
             Err(error) => {
@@ -775,13 +854,17 @@ pub fn run(tray_only: bool) -> eframe::Result<()> {
         let result = eframe::run_native(
             "poe2-filter",
             options,
-            Box::new(move |cc| Ok(Box::new(App::new(cc, root, settings, tray)))),
+            Box::new(move |cc| {
+                let app = App::new(cc, root, settings, tray);
+                if let Some(nonce) = ready { updater::signal_ready(&nonce); }
+                Ok(Box::new(app))
+            }),
         );
         result
     }
 }
 
-fn error_box(message: &str) {
+pub(crate) fn error_box(message: &str) {
     unsafe {
         MessageBoxW(
             std::ptr::null_mut(),

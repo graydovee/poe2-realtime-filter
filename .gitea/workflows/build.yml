@@ -38,7 +38,7 @@ jobs:
           mkdir -p "${HOME}/.docker"
           AUTH="$(printf '%s' "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" | base64 | tr -d '\n')"
           printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REGISTRY" "$AUTH" > "${HOME}/.docker/config.json"
-          docker build -t "${IMAGE}:${TAG}-${{ matrix.arch }}" .
+          docker build --build-arg "NEXT_PUBLIC_APP_VERSION=${TAG}" -t "${IMAGE}:${TAG}-${{ matrix.arch }}" .
           docker push "${IMAGE}:${TAG}-${{ matrix.arch }}"
 
   merge:

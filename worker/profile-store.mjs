@@ -19,6 +19,9 @@ export function db() {
  CREATE TABLE IF NOT EXISTS subscription_keys (profile_id TEXT PRIMARY KEY, encrypted TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS sounds (profile_id TEXT NOT NULL, name TEXT NOT NULL, hash TEXT NOT NULL, PRIMARY KEY(profile_id,name));
  CREATE TABLE IF NOT EXISTS revisions (profile_id TEXT NOT NULL, revision TEXT NOT NULL, config_version INTEGER NOT NULL, manifest TEXT NOT NULL, created TEXT NOT NULL, PRIMARY KEY(profile_id,revision));
+ CREATE TABLE IF NOT EXISTS subscription_devices (
+   profile_id TEXT NOT NULL, device_hash TEXT NOT NULL, PRIMARY KEY(profile_id, device_hash)
+ );
  CREATE TABLE IF NOT EXISTS sync_status (profile_id TEXT PRIMARY KEY, latest TEXT, error TEXT, checked TEXT);
  `);return database;
 }
@@ -29,7 +32,16 @@ export function sessionUser(token) {
 }
 export function createSession(owner,name) {const token=secret();db().prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(digest(token),owner,name,Date.now()+7*86400000);return token;}
 export function profileRow(id,owner) { return db().prepare('SELECT * FROM profiles WHERE id=? AND owner=? AND deleted=0').get(id,owner); }
-export function summary(row){return {id:row.id,name:row.name,profile:JSON.parse(row.config),version:row.version,subscriptionEnabled:Boolean(row.enabled),updatedAt:row.updated};}
+export function countSubscriptionDevice(profileId, tokenHash, deviceId) {
+ if (!deviceId || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) return;
+ const deviceHash = digest(profileId + '\0' + deviceId.toLowerCase());
+ db().prepare(`INSERT OR IGNORE INTO subscription_devices(profile_id, device_hash)
+   SELECT id, ? FROM profiles WHERE id=? AND deleted=0 AND enabled=1 AND token_hash=?`).run(deviceHash, profileId, tokenHash);
+}
+export function summary(row) {
+ const { count } = db().prepare('SELECT COUNT(*) AS count FROM subscription_devices WHERE profile_id=?').get(row.id);
+ return {id:row.id,name:row.name,profile:JSON.parse(row.config),version:row.version,subscriptionEnabled:Boolean(row.enabled),subscriberCount:count,updatedAt:row.updated};
+}
 export function authorizeSync(id,token) {
  if(!token)return null;
  const row=db().prepare('SELECT * FROM profiles WHERE id=? AND deleted=0 AND enabled=1 AND token_hash=?').get(id,digest(token));return row || null;

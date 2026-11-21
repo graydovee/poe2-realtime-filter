@@ -24,6 +24,8 @@ pub struct Entry {
     #[serde(default)]
     pub current: Option<String>,
     #[serde(default)]
+    pub manifest_etag: Option<String>,
+    #[serde(default)]
     pub filter_filename: Option<String>,
     #[serde(default)]
     pub previous: Option<String>,
@@ -40,6 +42,29 @@ pub struct Manifest{pub protocol_version:u32,pub profile_id:String,pub name:Stri
 pub struct File{pub id:String,pub path:String,pub kind:String,pub size:u64,pub sha256:String}
 pub fn hash(bytes:&[u8])->String{hex::encode(Sha256::digest(bytes))}
 pub fn state_root()->PathBuf{std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("poe2-filter")}
+pub fn device_id(root: &Path) -> Result<String> {
+    let path = root.join("device-id");
+    match fs::read_to_string(&path) {
+        Ok(value) if valid_uuid(value.trim()) => return Ok(value.trim().to_ascii_lowercase()),
+        Ok(_) => return Err("设备标识文件无效".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+        Err(error) => return Err(error.to_string()),
+    }
+    let id = platform::random_uuid()?;
+    fs::create_dir_all(root).map_err(|error| error.to_string())?;
+    write_installation(&path, id.as_bytes(), false)?;
+    Ok(id)
+}
+
+pub(crate) fn valid_uuid(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 36 && bytes[14] == b'4' && matches!(bytes[19].to_ascii_lowercase(), b'8' | b'9' | b'a' | b'b')
+        && bytes.iter().enumerate().all(|(i, byte)| match i {
+            8 | 13 | 18 | 23 => *byte == b'-',
+            _ => byte.is_ascii_hexdigit(),
+        })
+}
+
 pub fn read_settings(root:&Path)->Result<Settings>{let file=root.join("settings.json");if !file.exists(){return Ok(Settings::default());}serde_json::from_slice(&fs::read(file).map_err(|e|e.to_string())?).map_err(|_|"配置文件损坏，请从备份恢复".into())}
 pub fn save_settings(root:&Path,state:&Settings)->Result<()>{fs::create_dir_all(root).map_err(|e|e.to_string())?;let target=root.join("settings.json");let temporary=root.join("settings.tmp");fs::write(&temporary,serde_json::to_vec_pretty(state).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;platform::replace(&temporary,&target)}
 pub fn parse_link(link:&str,directory:PathBuf)->Result<Entry>{let url=Url::parse(link.trim()).map_err(|_|"请输入网站复制的完整订阅链接".to_string())?;if url.scheme()!="https"||!url.username().is_empty()||url.password().is_some()||url.query().is_some(){return Err("订阅链接必须是 HTTPS 地址".into());}
@@ -345,15 +370,52 @@ fn install(
     Ok(())
 }
 
-pub fn update(root: &Path, entry: &mut Entry, others: &[Entry]) -> Result<bool> {
+fn valid_manifest_etag(etag: &str) -> bool {
+    etag.strip_prefix("W/\"").and_then(|tag| tag.strip_suffix('"'))
+        .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn installation_complete(entry: &Entry, manifest: &Manifest, others: &[Entry]) -> Result<bool> {
+    let Some(path) = filter_path(entry)? else { return Ok(false); };
+    clean_parent(&path)?;
+    let Some(meta) = metadata(&path)? else { return Ok(false); };
+    if reserved(&path, entry, others) || !matches_filter(&path, &meta, filter_file(manifest))? {
+        return Ok(false);
+    }
+    for sound in manifest.files.iter().filter(|file| file.kind == "sound") {
+        let path = entry.directory.join(&sound.path);
+        clean_parent(&path)?;
+        let Some(meta) = metadata(&path)? else { return Ok(false); };
+        if !matches_filter(&path, &meta, sound)? { return Ok(false); }
+    }
+    Ok(true)
+}
+
+pub fn update(root: &Path, entry: &mut Entry, others: &[Entry], device: Option<&str>) -> Result<bool> {
     let key = platform::unprotect(&entry.protected_key)?;
-    // A rename can leave the content revision (the server's ETag) unchanged.
-    let response = platform::get(
-        &format!("{}/api/sync/{}/manifest", entry.origin, entry.id),
-        &key,
-        None,
-        1024 * 1024,
-    )?;
+    update_with(root, entry, others, device, |url, etag, limit| platform::get(url, &key, etag, limit))
+}
+
+fn update_with(
+    root: &Path, entry: &mut Entry, others: &[Entry], device: Option<&str>,
+    mut get: impl FnMut(&str, Option<&str>, usize) -> Result<platform::Response>,
+) -> Result<bool> {
+    let mut url = Url::parse(&format!("{}/api/sync/{}/manifest", entry.origin, entry.id))
+        .map_err(|_| "无效同步地址")?;
+    if let Some(device) = device { url.query_pairs_mut().append_pair("devices", device); }
+    let etag = entry.manifest_etag.as_deref().filter(|etag| valid_manifest_etag(etag));
+    let conditional = if let (Some(etag), Some(revision)) = (etag, entry.current.as_deref()) {
+        match cached_manifest(root, &entry.id, revision) {
+            Ok(manifest) if installation_complete(entry, &manifest, others)? => Some(etag),
+            _ => None,
+        }
+    } else { None };
+    let response = get(url.as_str(), conditional, 1024 * 1024)?;
+    if response.status == 304 && conditional.is_some() {
+        entry.revoked = false;
+        entry.status = "已是最新版本".into();
+        return Ok(false);
+    }
     if [401, 403, 404, 410].contains(&response.status) {
         entry.revoked = true;
         entry.status = "订阅已停用、删除或密钥失效，现有文件已保留".into();
@@ -375,17 +437,31 @@ pub fn update(root: &Path, entry: &mut Entry, others: &[Entry]) -> Result<bool> 
         "{}/api/sync/{}/revisions/{}/files",
         entry.origin, entry.id, manifest.revision
     );
-    apply_update(root, entry, &manifest, others, |file| {
-        let response = platform::get(
-            &format!("{files_url}/{}", file.id),
-            &key,
-            None,
-            8 * 1024 * 1024,
-        )?;
+    let updated = apply_update(root, entry, &manifest, others, |file| {
+        let response = get(&format!("{files_url}/{}", file.id), None, 8 * 1024 * 1024)?;
         if response.status != 200 {
             return Err(format!("下载失败：HTTP {}", response.status));
         }
         Ok(response.bytes)
+    })?;
+    entry.manifest_etag = response.etag.filter(|etag| valid_manifest_etag(etag));
+    Ok(updated)
+}
+
+fn reuse_file(entry: &Entry, caches: &[(PathBuf, Manifest)], file: &File) -> Option<Vec<u8>> {
+    let installed = if file.kind == "filter" {
+        filter_path(entry).ok().flatten()
+    } else {
+        Some(entry.directory.join(&file.path))
+    };
+    if let Some(path) = installed {
+        if clean_parent(&path).is_ok() && fs::symlink_metadata(&path).is_ok_and(|meta| regular_file(&meta)) {
+            if let Ok(bytes) = checked_file(&path, file) { return Some(bytes); }
+        }
+    }
+    caches.iter().find_map(|(directory, manifest)| {
+        let matching = manifest.files.iter().find(|existing| existing.size == file.size && existing.sha256 == file.sha256)?;
+        checked_file(&directory.join(&matching.id), file).ok()
     })
 }
 
@@ -397,22 +473,19 @@ fn apply_update(
     mut download: impl FnMut(&File) -> Result<Vec<u8>>,
 ) -> Result<bool> {
     let revision_changed = entry.current.as_deref() != Some(&manifest.revision);
-    if !revision_changed && entry.name == manifest.name && entry.filter_filename.is_some() {
-        if let Some(path) = filter_path(entry)? {
-            clean_parent(&path)?;
-            if let Some(meta) = metadata(&path)? {
-                if !reserved(&path, entry, others)
-                    && matches_filter(&path, &meta, filter_file(manifest))?
-                    && cached_manifest(root, &entry.id, &manifest.revision).is_ok()
-                {
-                    entry.league.clone_from(&manifest.league);
-                    entry.revoked = false;
-                    entry.status = "已是最新版本".into();
-                    return Ok(false);
-                }
-            }
-        }
+    if !revision_changed && entry.name == manifest.name
+        && cached_manifest(root, &entry.id, &manifest.revision).is_ok()
+        && installation_complete(entry, manifest, others)?
+    {
+        entry.league.clone_from(&manifest.league);
+        entry.revoked = false;
+        entry.status = "已是最新版本".into();
+        return Ok(false);
     }
+    let reusable_caches: Vec<_> = [entry.current.as_deref(), entry.previous.as_deref()]
+        .into_iter().flatten().filter_map(|revision| {
+            cached_manifest(root, &entry.id, revision).ok().map(|manifest| (cache(root, &entry.id, revision), manifest))
+        }).collect();
     let dir = cache(root, &entry.id, &manifest.revision);
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     for file in &manifest.files {
@@ -420,7 +493,10 @@ fn apply_update(
         if checked_file(&target, file).is_ok() {
             continue;
         }
-        let bytes = download(file)?;
+        let bytes = match reuse_file(entry, &reusable_caches, file) {
+            Some(bytes) => bytes,
+            None => download(file)?,
+        };
         if bytes.len() as u64 != file.size || hash(&bytes) != file.sha256 {
             return Err("下载中断或文件校验失败，现有过滤器已保留".into());
         }
@@ -455,6 +531,7 @@ pub fn rollback(root: &Path, entry: &mut Entry, others: &[Entry]) -> Result<()> 
     };
     install(root, entry, &manifest, &name, others)?;
     entry.previous = entry.current.replace(previous);
+    entry.manifest_etag = None;
     entry.name = name;
     entry.paused = true;
     entry.status = "已回滚并暂停同步，请在游戏内重新加载".into();
@@ -544,6 +621,37 @@ mod tests {
             stale: false,
             error: None,
         }
+    }
+
+    #[test]
+    fn conditional_sync_uses_one_request_and_repairs_from_cache() {
+        let temp = TestDirectory::new("conditional");
+        let mut entry = temp.entry("abc");
+        entry.origin = "https://example.test".into();
+        let device = device_id(&temp.0).unwrap();
+        assert!(valid_uuid(&device));
+        assert_eq!(device_id(&temp.0).unwrap(), device);
+        let bytes = b"Show";
+        let manifest = game_manifest("abc", "终极打宝", 'a', bytes);
+        apply_update(&temp.0, &mut entry, &manifest, &[], |_| Ok(bytes.to_vec())).unwrap();
+        let etag = format!("W/\"{}\"", "b".repeat(64));
+        entry.manifest_etag = Some(etag.clone());
+        let mut calls = 0;
+        assert!(!update_with(&temp.0, &mut entry, &[], Some(&device), |url, sent, _| {
+            calls += 1;
+            assert_eq!(url, format!("https://example.test/api/sync/abc/manifest?devices={device}"));
+            assert_eq!(sent, Some(etag.as_str()));
+            Ok(platform::Response { status: 304, bytes: vec![], etag: Some(etag.clone()) })
+        }).unwrap());
+        assert_eq!(calls, 1);
+        let installed = filter_path(&entry).unwrap().unwrap();
+        fs::remove_file(&installed).unwrap();
+        assert!(update_with(&temp.0, &mut entry, &[], None, |url, sent, _| {
+            assert!(url.ends_with("/manifest"), "repair needs no file download");
+            assert!(sent.is_none());
+            Ok(platform::Response { status: 200, bytes: serde_json::to_vec(&manifest).unwrap(), etag: Some(etag.clone()) })
+        }).unwrap());
+        assert_eq!(fs::read(installed).unwrap(), bytes);
     }
 
     #[test]

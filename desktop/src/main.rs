@@ -7,8 +7,14 @@ mod platform;
 mod sync;
 mod theme;
 mod tray;
+mod updater;
 mod widgets;
 fn main(){
+ let os_args: Vec<_> = std::env::args_os().collect();
+ if os_args.get(1).is_some_and(|arg| arg == updater::APPLY_FLAG) {
+  if let Err(error) = updater::apply(&os_args[2..]) { app::error_box(&error); }
+  return;
+ }
  let args:Vec<String>=std::env::args().collect();
  if args.iter().any(|a|a=="--diagnostics"){
   let info=serde_json::json!({"architecture":std::env::consts::ARCH,"filterDirectory":platform::documents().ok().map(|p|p.to_string_lossy().to_string()),"stateDirectory":sync::state_root(),"version":env!("CARGO_PKG_VERSION")});
@@ -29,7 +35,8 @@ fn main(){
       let parsed = sync::parse_link(link, directory)?;
       let index = settings.entries.iter().position(|entry| entry.id == parsed.id && entry.origin == parsed.origin);
       let mut entry = index.map(|index| settings.entries[index].clone()).unwrap_or(parsed);
-      let update = sync::update(&root, &mut entry, &settings.entries);
+      let device = sync::device_id(&root).ok();
+      let update = sync::update(&root, &mut entry, &settings.entries, device.as_deref());
       let data = serde_json::json!({"changed":update.as_ref().ok(),"id":entry.id,"name":entry.name,"league":entry.league,"revision":entry.current,"directory":entry.directory});
       // An existing filter may have been renamed before a later write failed.
       if let Some(index) = index {
@@ -45,5 +52,6 @@ fn main(){
   let (code,data)=match result{Ok(v)=>(0,v),Err(e)=>(1,serde_json::json!({"error":e}))};
   if let Some(i)=args.iter().position(|a|a=="--output"){if let Some(file)=args.get(i+1){let _=std::fs::write(file,data.to_string());}}else{println!("{data}");}std::process::exit(code);
  }
- let _=app::run(args.iter().any(|a|a=="--tray"));
+ let ready = args.windows(2).find(|pair| pair[0] == updater::READY_FLAG).map(|pair| pair[1].clone());
+ let _=app::run(args.iter().any(|a|a=="--tray"), ready);
 }

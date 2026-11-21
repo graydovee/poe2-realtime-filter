@@ -5,6 +5,7 @@ export function db(): any;
 export function sessionUser(token?: string): {owner:string;name:string}|null;
 export function createSession(owner:string,name:string): string;
 export function profileRow(id:string,owner:string): any;
+export function countSubscriptionDevice(profileId:string,tokenHash:string,deviceId:string|null): void;
 export function summary(row:any): any;
 export function authorizeSync(id:string,token:string): any;
 export function putSound(bytes:Uint8Array): string;

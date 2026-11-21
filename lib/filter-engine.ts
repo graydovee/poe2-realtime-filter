@@ -152,7 +152,7 @@ function validateSafety(
   };
 }
 
-export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
+export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean } = {}): GeneratedBundle {
   const { contents: baseline, file: baselineFile } = readBaseline(profile);
   const league = profile.league ?? "Standard";
   const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot)
@@ -210,7 +210,7 @@ export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSna
     "# League: " + league,
     "# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness],
     "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
-    "# Market: " + snapshot.source + " @ " + snapshot.capturedAt,
+    "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
     "# Safety: 未配置的动作交给 NeverSink 基线；隐藏规则会让安全检查失败。",
     "",
   ].join("\n");

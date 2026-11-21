@@ -20,23 +20,50 @@ pub fn unprotect(value:&str)->Result<String,String>{unsafe{
  let result=String::from_utf8_lossy(std::slice::from_raw_parts(output.pbData,output.cbData as usize)).to_string();LocalFree(output.pbData as *mut c_void);Ok(result)
 }}
 struct Internet(*mut c_void);impl Drop for Internet{fn drop(&mut self){if !self.0.is_null(){unsafe{WinHttpCloseHandle(self.0);}}}}
-pub struct Response{pub status:u32,pub bytes:Vec<u8>}
-pub fn get(url:&str,key:&str,etag:Option<&str>,limit:usize)->Result<Response,String>{unsafe{
+pub struct Response {
+ pub status: u32,
+ pub bytes: Vec<u8>,
+ pub etag: Option<String>,
+}
+pub fn get(url: &str, key: &str, etag: Option<&str>, limit: usize) -> Result<Response, String> {
+ request(url, Some(key), etag, limit)
+}
+pub fn get_public(url: &str, limit: usize) -> Result<Response, String> {
+ request(url, None, None, limit)
+}
+fn request(url:&str,key:Option<&str>,etag:Option<&str>,limit:usize)->Result<Response,String>{unsafe{
  let url=Url::parse(url).map_err(|_|"无效服务器地址".to_string())?;if url.scheme()!="https"{return Err("仅允许 HTTPS 同步地址".into());}
  let host=url.host_str().ok_or("无效服务器")?;
- let session=Internet(WinHttpOpen(wide("poe2-filter-client/0.2").as_ptr(),WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,ptr::null(),ptr::null(),0));if session.0.is_null(){return Err(err("无法初始化网络"));}
+ let session=Internet(WinHttpOpen(wide(concat!("poe2-filter-client/", env!("CARGO_PKG_VERSION"))).as_ptr(),WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,ptr::null(),ptr::null(),0));if session.0.is_null(){return Err(err("无法初始化网络"));}
  WinHttpSetTimeouts(session.0,10000,10000,15000,30000);
  let connection=Internet(WinHttpConnect(session.0,wide(host).as_ptr(),url.port_or_known_default().unwrap_or(443),0));if connection.0.is_null(){return Err(err("无法连接服务器"));}
  let route=format!("{}{}",url.path(),url.query().map(|q|format!("?{q}")).unwrap_or_default());
  let request=Internet(WinHttpOpenRequest(connection.0,wide("GET").as_ptr(),wide(&route).as_ptr(),ptr::null(),ptr::null(),ptr::null(),WINHTTP_FLAG_SECURE));if request.0.is_null(){return Err(err("无法创建请求"));}
  // A bearer token must never follow an HTTP redirect to a different destination.
  let policy:u32=WINHTTP_OPTION_REDIRECT_POLICY_NEVER;WinHttpSetOption(request.0,WINHTTP_OPTION_REDIRECT_POLICY,&policy as *const _ as *const c_void,4);
- let headers=wide(&format!("Authorization: Bearer {key}\r\n{}",etag.map(|e|format!("If-None-Match: {e}\r\n")).unwrap_or_default()));
- if WinHttpSendRequest(request.0,headers.as_ptr(),u32::MAX,ptr::null(),0,0,0)==0||WinHttpReceiveResponse(request.0,ptr::null_mut())==0{return Err(err("下载失败"));}
+ let mut headers = key.map(|key| format!("Authorization: Bearer {key}\r\n")).unwrap_or_default();
+ if let Some(etag) = etag { headers.push_str(&format!("If-None-Match: {etag}\r\n")); }
+ let headers = wide(&headers);
+ let (header_ptr, header_len) = if headers.len() == 1 { (ptr::null(), 0) } else { (headers.as_ptr(), u32::MAX) };
+ if WinHttpSendRequest(request.0,header_ptr,header_len,ptr::null(),0,0,0)==0||WinHttpReceiveResponse(request.0,ptr::null_mut())==0{return Err(err("下载失败"));}
  let mut status=0u32;let mut size=4u32;if WinHttpQueryHeaders(request.0,WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,ptr::null(),&mut status as *mut _ as *mut c_void,&mut size,ptr::null_mut())==0{return Err(err("读取状态失败"));}
  let mut bytes=Vec::new();loop{let mut buffer=[0u8;32768];let mut read=0;if WinHttpReadData(request.0,buffer.as_mut_ptr() as *mut c_void,buffer.len() as u32,&mut read)==0{return Err(err("下载中断"));}if read==0{break;}if bytes.len()+read as usize>limit{return Err("下载文件超过限制".into());}bytes.extend_from_slice(&buffer[..read as usize]);}
- Ok(Response{status,bytes})
+ let mut tag = [0u16; 128];
+ let mut tag_size = std::mem::size_of_val(&tag) as u32;
+ let etag = (WinHttpQueryHeaders(request.0, WINHTTP_QUERY_ETAG, ptr::null(), tag.as_mut_ptr().cast(), &mut tag_size, ptr::null_mut()) != 0)
+   .then(|| String::from_utf16_lossy(&tag[..tag_size as usize / 2]).trim_end_matches('\0').to_owned());
+ Ok(Response{status,bytes,etag})
 }}
+
+pub fn random_uuid() -> Result<String, String> {
+ let mut bytes = [0u8; 16];
+ let status = unsafe { BCryptGenRandom(ptr::null_mut(), bytes.as_mut_ptr(), bytes.len() as u32, BCRYPT_USE_SYSTEM_PREFERRED_RNG) };
+ if status != 0 { return Err(format!("无法生成设备标识 ({status:#x})")); }
+ bytes[6] = (bytes[6] & 0x0f) | 0x40;
+ bytes[8] = (bytes[8] & 0x3f) | 0x80;
+ let hex = hex::encode(bytes);
+ Ok(format!("{}-{}-{}-{}-{}", &hex[..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..]))
+}
 pub fn pick_directory()->Option<std::path::PathBuf>{unsafe{
  let mut info:BROWSEINFOW=std::mem::zeroed();let title=wide("选择 Path of Exile 2 本地过滤器目录");info.lpszTitle=title.as_ptr();info.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE;
  let pid=SHBrowseForFolderW(&info);if pid.is_null(){return None;}
