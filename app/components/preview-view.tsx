@@ -11,7 +11,7 @@ export type Generated = {
   filterFile: string;
   fileName: string;
   baselineFile: string;
-  appliedPresets: Array<{ presetId: string; presetName: string; itemCount: number }>;
+  appliedRules: Array<{ ruleId: string; ruleName: string; itemCount: number }>;
   safetyReport: {
     passed: boolean;
     warnings: string[];
@@ -82,7 +82,7 @@ export function PreviewView({
 
         {!generated.safetyReport.passed && (
           <Alert tone="ember" title="生成结果存在规则冲突" className="mb-4">
-            请检查白名单和隐藏规则后重新生成。
+            请检查自定义规则与隐藏规则后重新生成。
           </Alert>
         )}
 

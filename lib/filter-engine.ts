@@ -1,9 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_VISUAL_PRESETS, FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
-import { applyTemplateAppearances } from "./neversink-appearance";
-import { toExalted, currencyDefaultRanges } from "./pricing";
-import type { FilterProfile, GeneratedBundle, ItemDefinition, MarketSnapshot, SafetyReport, Strictness, VisualPreset } from "./types";
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
+import { resolveAutoRanges, toExalted } from "./pricing";
+import type {
+  FilterProfile,
+  FilterRule,
+  GeneratedBundle,
+  ItemDefinition,
+  MarketSnapshot,
+  PresetSound,
+  PriceRange,
+  SafetyReport,
+  Strictness,
+} from "./types";
 
 const BASELINE_NAMES: Record<Strictness, string> = {
   0: "0-SOFT",
@@ -53,74 +62,49 @@ export function matcherLines(item: ItemDefinition): string[] {
   return lines;
 }
 
-function presetRule(item: ItemDefinition, preset: VisualPreset): string {
-  const actions = [
-    preset.fontSize ? "\tSetFontSize " + preset.fontSize : "",
-    preset.textColor ? "\tSetTextColor " + preset.textColor : "",
-    preset.borderColor ? "\tSetBorderColor " + preset.borderColor : "",
-    preset.backgroundColor ? "\tSetBackgroundColor " + preset.backgroundColor : "",
-    preset.minimapIcon ? "\tMinimapIcon " + preset.minimapIcon : "",
-    preset.effect ? "\tPlayEffect " + preset.effect : "",
-    preset.sound.type === "builtin" ? "\tPlayAlertSound " + preset.sound.id + " " + preset.sound.volume : "\tCustomAlertSound " + quote(preset.sound.fileName) + " 300",
-  ].filter(Boolean).join("\n");
-  return "Show # poe2-filter preset: " + preset.name + " / " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + actions;
+function soundLine(sound: PresetSound): string {
+  return sound.type === "builtin" ? "\tPlayAlertSound " + sound.id + " " + sound.volume : "\tCustomAlertSound " + quote(sound.fileName) + " 300";
 }
 
-const WHITELIST_ACTIONS = "\tSetFontSize 42\n\tSetTextColor 255 255 255 255\n\tSetBorderColor 255 255 255 255\n\tMinimapIcon 0 White Star\n\tPlayEffect White\n\tPlayAlertSound 6 300";
-/** 单个 BaseType 行的上限：整类白名单会展开成较长的列表，按块拆开保持可读。 */
-const WHITELIST_CHUNK = 24;
-
-function whitelistRule(item: ItemDefinition): string {
-  return "Show # poe2-filter whitelist: " + item.name + "\n" + matcherLines(item).join("\n") + "\n" + WHITELIST_ACTIONS;
-}
-
-/**
- * 整类白名单：同名匹配条件（Class / Rarity）合并成一条规则，BaseType 列表按块拆分。
- * 单件白名单走 whitelistRule，两者的动作完全一致。
- */
-function whitelistEntryRules(label: string, items: ItemDefinition[]): string[] {
-  if (items.length === 1) return [whitelistRule(items[0])];
-  const groups = new Map<string, { matcher: ItemDefinition["matcher"]; baseTypes: string[] }>();
-  for (const item of items) {
-    const matcher = { class: item.matcher.class, rarity: item.matcher.rarity };
-    const key = JSON.stringify(matcher);
-    const group = groups.get(key);
-    if (group) group.baseTypes.push(item.matcher.baseType ?? item.name);
-    else groups.set(key, { matcher, baseTypes: [item.matcher.baseType ?? item.name] });
+/** 只输出规则里真正填写的动作；留空 = 交给基础过滤器。 */
+function effectLines(rule: FilterRule): string[] {
+  const lines: string[] = [];
+  const { beam, icon, font, sound } = rule.effects;
+  if (beam) lines.push("\tPlayEffect " + beam);
+  if (icon) lines.push("\tMinimapIcon " + icon);
+  if (font) {
+    if (Number.isFinite(font.fontSize)) lines.push("\tSetFontSize " + font.fontSize);
+    if (font.textColor) lines.push("\tSetTextColor " + font.textColor);
+    if (font.borderColor) lines.push("\tSetBorderColor " + font.borderColor);
+    if (font.backgroundColor) lines.push("\tSetBackgroundColor " + font.backgroundColor);
   }
-  const rules: string[] = [];
-  const total = items.length;
-  for (const { matcher, baseTypes } of groups.values()) {
-    for (let offset = 0; offset < baseTypes.length; offset += WHITELIST_CHUNK) {
-      const chunk = baseTypes.slice(offset, offset + WHITELIST_CHUNK);
-      const head: string[] = [];
-      if (matcher.class) head.push("\tClass == " + quote(matcher.class));
-      if (matcher.rarity) head.push("\tRarity " + matcher.rarity);
-      head.push("\tBaseType == " + chunk.map(quote).join(" "));
-      const range = baseTypes.length > WHITELIST_CHUNK ? " (" + (offset + 1) + "-" + Math.min(offset + WHITELIST_CHUNK, baseTypes.length) + "/" + baseTypes.length + ")" : "";
-      rules.push("Show # poe2-filter whitelist: " + label + range + " [" + total + "]\n" + head.join("\n") + "\n" + WHITELIST_ACTIONS);
-    }
-  }
-  return rules;
+  if (sound) lines.push(soundLine(sound));
+  return lines;
 }
 
-function hideRule(item: ItemDefinition, profile: FilterProfile): string {
-  return "Hide # poe2-filter optional low-value rule: " + item.name + "\n" + matcherLines(item).join("\n") + "\n\tItemLevel < " + Math.max(1, profile.itemLevelMin) + "\n\tSetFontSize 18";
+function ruleBlock(rule: FilterRule, item: ItemDefinition): string {
+  const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.name + " / " + item.name;
+  return [head, ...matcherLines(item), ...effectLines(rule)].join("\n");
 }
 
-function whitelistedIds(profile: FilterProfile): Set<string> {
-  return new Set((profile.whitelist ?? []).flatMap((entry) => entry.itemIds));
-}
-
-function resolvedPresets(profile: FilterProfile): VisualPreset[] {
-  return profile.visualPresets ?? DEFAULT_VISUAL_PRESETS;
-}
-
-function rangeMatches(exaltedValue: number, preset: VisualPreset, snapshot: MarketSnapshot): boolean {
-  const min = preset.range.min ? toExalted(preset.range.min, snapshot.rates, snapshot.prices) : 0;
-  const max = preset.range.max ? toExalted(preset.range.max, snapshot.rates, snapshot.prices) : Number.POSITIVE_INFINITY;
+function withinRange(exaltedValue: number | undefined, range: PriceRange | undefined, snapshot: MarketSnapshot): boolean {
+  if (!range) return true;
+  if (exaltedValue === undefined) return false;
+  const min = range.min ? toExalted(range.min, snapshot.rates, snapshot.prices) : 0;
+  const max = range.max ? toExalted(range.max, snapshot.rates, snapshot.prices) : Number.POSITIVE_INFINITY;
   if (min === undefined || max === undefined) return false;
   return exaltedValue >= min && exaltedValue < max;
+}
+
+function hasTarget(rule: FilterRule): boolean {
+  return (rule.target.itemIds?.length ?? 0) > 0 || Boolean(rule.target.range);
+}
+
+function matches(rule: FilterRule, item: ItemDefinition, exaltedValue: number | undefined, snapshot: MarketSnapshot): boolean {
+  if (!hasTarget(rule)) return false;
+  const itemIds = rule.target.itemIds ?? [];
+  if (itemIds.length && !itemIds.includes(item.id)) return false;
+  return withinRange(exaltedValue, rule.target.range, snapshot);
 }
 
 function snapshotUsable(snapshot: MarketSnapshot): boolean {
@@ -128,10 +112,10 @@ function snapshotUsable(snapshot: MarketSnapshot): boolean {
 }
 
 function validateSafety(
-  profile: FilterProfile,
   baselineFile: string,
   baseline: string,
   hidden: Array<{ item: ItemDefinition; exaltedValue?: number }>,
+  skipped: Set<string>,
   warnings: string[],
   divineToExalted?: number,
 ): SafetyReport {
@@ -142,8 +126,10 @@ function validateSafety(
       (line[1] === "BaseType" ? baseTypes : classes).add(value[1]);
     }
   }
-  const hiddenHighValueItems = hidden.filter((entry) => (entry.exaltedValue ?? 0) >= (divineToExalted ?? Number.POSITIVE_INFINITY)).map((entry) => entry.item.name);
-  const whitelistViolations = profile.whitelist.flatMap((entry) => entry.itemIds.filter((itemId) => hidden.some((hiddenItem) => hiddenItem.item.id === itemId)));
+  const hiddenHighValueItems = hidden
+    .filter((entry) => (entry.exaltedValue ?? 0) >= (divineToExalted ?? Number.POSITIVE_INFINITY))
+    .map((entry) => entry.item.name);
+  const exclusionViolations = hidden.filter((entry) => skipped.has(entry.item.id)).map((entry) => entry.item.name);
   return {
     sourceVersion: "NeverSink PoE2 vendored union + PoE2 client catalog",
     baselineFile,
@@ -153,92 +139,82 @@ function validateSafety(
     unpricedItems: 0,
     ambiguousItems: ITEM_CATALOG.filter((item) => item.ambiguous).length,
     hiddenHighValueItems,
-    whitelistViolations,
+    exclusionViolations,
     warnings,
-    passed: hiddenHighValueItems.length === 0 && whitelistViolations.length === 0,
+    passed: hiddenHighValueItems.length === 0 && exclusionViolations.length === 0,
   };
 }
 
 export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot): GeneratedBundle {
   const { contents: baseline, file: baselineFile } = readBaseline(profile);
   const league = profile.league ?? "Standard";
-  const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot) ? inputSnapshot : { ...FALLBACK_SNAPSHOT, league };
-  const presets = currencyDefaultRanges(applyTemplateAppearances(resolvedPresets(profile), profile), snapshot).filter((preset) => preset.enabled);
+  const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot)
+    ? inputSnapshot
+    : { ...FALLBACK_SNAPSHOT, league };
+  const skipped = new Set(profile.skippedItemIds ?? []);
+  const rawRules = profile.rules ?? [];
+  const rules = resolveAutoRanges(rawRules.filter((rule) => rule.enabled), snapshot);
+  const autoDisabled = rules.filter((rule) => !rule.enabled).map((rule) => rule.name);
+
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
-  const catalogById = new Map(ITEM_CATALOG.map((item) => [item.id, item]));
-  const whitelist = whitelistedIds(profile);
-
-  // 白名单规则统一排在价格光效与隐藏规则之前：整类条目会展开成 BaseType 列表块。
-  for (const entry of profile.whitelist ?? []) {
-    const items: ItemDefinition[] = [];
-    for (const itemId of new Set(entry.itemIds)) {
-      const item = catalogById.get(itemId);
-      if (item && !item.ambiguous) items.push(item);
-    }
-    if (!items.length) continue;
-    overrides.push(...whitelistEntryRules(entry.label || items[0].name, items));
-  }
+  const matched = new Set<string>();
+  const applied = new Map<string, { rule: FilterRule; count: number }>();
   const warnings: string[] = [];
   const soundFiles = new Set<string>();
-  const applied = new Map<string, { preset: VisualPreset; count: number }>();
   let unpriced = 0;
   let ambiguous = 0;
 
   for (const item of ITEM_CATALOG) {
     const price = item.priceable ? snapshot.prices[item.id] : undefined;
     const exaltedValue = price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
-    const whitelisted = whitelist.has(item.id);
     if (item.ambiguous) ambiguous += 1;
     if (item.priceable && exaltedValue === undefined) unpriced += 1;
+    if (item.ambiguous || skipped.has(item.id)) continue;
 
-    if (whitelisted && !item.ambiguous) continue;
-
-    if (exaltedValue !== undefined) {
-      const preset = presets.find((candidate) => rangeMatches(exaltedValue, candidate, snapshot));
-      if (preset) {
-        overrides.push(presetRule(item, preset));
-        if (preset.sound.type !== "builtin") soundFiles.add(preset.sound.fileName);
-        const current = applied.get(preset.id);
-        applied.set(preset.id, { preset, count: (current?.count ?? 0) + 1 });
-        continue;
-      }
-    }
-
-    if (profile.hideBelowEnabled && exaltedValue !== undefined && !whitelisted) {
-      const floor = toExalted({ amount: profile.hideBelowAmount, currency: profile.hideBelowCurrency }, snapshot.rates);
-      if (floor !== undefined && exaltedValue < floor && !item.ambiguous) {
-        hidden.push({ item, exaltedValue });
-        overrides.push(hideRule(item, profile));
-      }
+    for (const rule of rules) {
+      if (!rule.enabled) continue;
+      if (!matches(rule, item, exaltedValue, snapshot)) continue;
+      overrides.push(ruleBlock(rule, item));
+      matched.add(item.id);
+      if (rule.hidden) hidden.push({ item, exaltedValue });
+      if (rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
+      const current = applied.get(rule.id);
+      applied.set(rule.id, { rule, count: (current?.count ?? 0) + 1 });
+      break;
     }
   }
 
+  if (!rawRules.some((rule) => rule.enabled)) warnings.push("没有启用任何自定义规则，输出与基础过滤器完全一致。");
+  if (autoDisabled.length) warnings.push(autoDisabled.join("、") + " 跟随市价的价格档因缺少锚点行情被禁用。");
+  const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id)).map((rule) => rule.name);
+  if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
-    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，所有未定价物品继续使用 NeverSink 原始规则。");
+    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，其余物品沿用 NeverSink 原始规则。");
   }
-  if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，未新增价格光效或隐藏规则。");
+  if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用 NeverSink 原始规则，避免误覆盖其他物品。");
-  if (profile.hideBelowEnabled) warnings.push("已启用低于 " + profile.hideBelowAmount + " " + profile.hideBelowCurrency + " 的隐藏；白名单优先且高价值误藏会使安全检查失败。");
+  if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
 
-  const safetyReport = validateSafety(profile, baselineFile, baseline, hidden, warnings, snapshot.rates?.divineToExalted);
+  const safetyReport = validateSafety(baselineFile, baseline, hidden, skipped, warnings, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
     "# Base: " + baselineFile,
     "# League: " + league,
     "# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness],
+    "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
     "# Market: " + snapshot.source + " @ " + snapshot.capturedAt,
-    "# Safety: unpriced and ambiguous items remain under the NeverSink baseline.",
+    "# Safety: 未配置的动作交给 NeverSink 基线；隐藏规则会让安全检查失败。",
     "",
   ].join("\n");
-  const filterFile = header + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
+  const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
   for (const match of filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)) soundFiles.add(match[1]);
   return {
     filterFile,
     baselineFile,
     fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + BASELINE_NAMES[profile.strictness].toLowerCase() + ".filter",
     soundFiles: [...soundFiles],
-    appliedPresets: [...applied.values()].map(({ preset, count }) => ({ presetId: preset.id, presetName: preset.name, itemCount: count })),
+    appliedRules: [...applied.values()].map(({ rule, count }) => ({ ruleId: rule.id, ruleName: rule.name, itemCount: count })),
     safetyReport: { ...safetyReport, unpricedItems: unpriced, ambiguousItems: ambiguous },
   };
 }

@@ -7,34 +7,58 @@ import { DEFAULT_PROFILE } from './default-profile';
 import { ITEM_CATALOG,STYLE_LABELS } from './data';
 import { generateFilter } from './filter-engine';
 import { getLeagueCatalog, loadMarketSnapshot } from './market';
-import type { FilterProfile,VisualPreset } from './types';
+import { CURRENCY_ANCHORS } from './pricing';
+import { normalizeProfile } from './profile';
+import type { FilterProfile,FilterRule,PricePoint } from './types';
 const safeName=(value:string)=>value.replace(/[^a-zA-Z0-9._-]/g,'_');
-const effects=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
+const beamPattern=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
+const iconPattern=/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (Circle|Star|Diamond|Square|Pentagon|Hexagon|Triangle|Cross|Kite|UpsideDownHouse)$/;
+const colorPattern=/^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/;
 const number=(value:unknown,min:number,max:number)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max;
+const catalogIds=new Set(ITEM_CATALOG.map(i=>i.id));
+
+function validatePoint(point:PricePoint,label:string){
+ if(!point||typeof point!=='object')throw new ApiError(400,label+'无效');
+ if(!number(point.amount,0,1e12)||!['divine','chaos','exalted'].includes(point.currency))throw new ApiError(400,label+'无效');
+ if(point.referenceItemId&&!Object.prototype.hasOwnProperty.call(CURRENCY_ANCHORS,point.referenceItemId))throw new ApiError(400,label+'参考通货无效');
+}
+
+function validateRule(rule:FilterRule,ids:Set<string>){
+ if(!rule||typeof rule.id!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(rule.id)||ids.has(rule.id))throw new ApiError(400,'无效规则');
+ ids.add(rule.id);
+ if(typeof rule.name!=='string'||!rule.name.trim()||rule.name.length>100||/[\r\n]/.test(rule.name))throw new ApiError(400,'规则名称需要1–100个字符');
+ if(typeof rule.enabled!=='boolean'||typeof rule.hidden!=='boolean')throw new ApiError(400,'无效规则');
+ if(rule.autoRange!==undefined&&typeof rule.autoRange!=='boolean')throw new ApiError(400,'无效规则');
+ if(!rule.target||typeof rule.target!=='object')throw new ApiError(400,'规则缺少适用物品');
+ const itemIds=rule.target.itemIds;
+ if(!Array.isArray(itemIds)||itemIds.length>2000||itemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new ApiError(400,'规则物品无效');
+ const range=rule.target.range;
+ if(range){
+  if(typeof range!=='object')throw new ApiError(400,'无效价格区间');
+  if(range.min)validatePoint(range.min,'价格下限');
+  if(range.max)validatePoint(range.max,'价格上限');
+ }
+ if(!itemIds.length&&!range)throw new ApiError(400,'规则至少要选择物品或价格区间');
+ const effects=rule.effects??{};
+ if(effects.beam!==undefined&&!beamPattern.test(effects.beam))throw new ApiError(400,'无效光柱');
+ if(effects.icon!==undefined&&!iconPattern.test(effects.icon))throw new ApiError(400,'无效地图图标');
+ const font=effects.font;
+ if(font){
+  if(font.fontSize!==undefined&&(!Number.isInteger(font.fontSize)||!number(font.fontSize,18,45)))throw new ApiError(400,'字体范围为18–45');
+  for(const color of [font.textColor,font.borderColor,font.backgroundColor])if(color!==undefined&&(!colorPattern.test(color)||color.split(' ').some(n=>+n>255)))throw new ApiError(400,'无效颜色');
+ }
+ const sound=effects.sound;
+ if(sound&&(sound.type==='builtin'?!Number.isInteger(sound.id)||!number(sound.id,1,16)||!number(sound.volume,0,300):!['custom','neversink'].includes(sound.type)||typeof sound.fileName!=='string'||safeName(sound.fileName)!==sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(sound.fileName)))throw new ApiError(400,'无效音效');
+}
+
 export function validateProfile(input:unknown):FilterProfile {
- const p={...DEFAULT_PROFILE,...input as object} as FilterProfile;
- p.originalLeague = typeof p.originalLeague === 'string' && p.originalLeague.trim() ? p.originalLeague.trim() : p.league;
+ const p=normalizeProfile(input);
  if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new ApiError(400,'无效的基础过滤器');
  if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new ApiError(400,'无效赛季');
- if(!number(p.itemLevelMin,1,100)||!number(p.areaLevelMin,1,100)||!number(p.hideBelowAmount,0,1e12)||!['divine','chaos','exalted'].includes(p.hideBelowCurrency)||typeof p.hideBelowEnabled!=='boolean')throw new ApiError(400,'无效的等级或隐藏阈值');
- if(!Array.isArray(p.whitelist)||p.whitelist.length>3000)throw new ApiError(400,'无效白名单');
- const catalogIds=new Set(ITEM_CATALOG.map(i=>i.id));
- for(const entry of p.whitelist){
-  if(!entry||typeof entry.id!=='string'||!/^[a-zA-Z0-9_-]{1,140}$/.test(entry.id))throw new ApiError(400,'无效白名单');
-  if(typeof entry.label!=='string'||!entry.label.trim()||entry.label.length>120||/[\r\n]/.test(entry.label))throw new ApiError(400,'无效白名单');
-  if(!Array.isArray(entry.itemIds)||entry.itemIds.length===0||entry.itemIds.length>2000||entry.itemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new ApiError(400,'无效白名单');
- }
- if(!Array.isArray(p.visualPresets)||p.visualPresets.length>100)throw new ApiError(400,'光效规则过多');
+ if(!Array.isArray(p.rules)||p.rules.length>100)throw new ApiError(400,'自定义规则过多');
  const ids=new Set<string>();
- for(const v of p.visualPresets){
-  if(typeof v.id!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(v.id)||ids.has(v.id)||typeof v.name!=='string'||v.name.length>100||/[\r\n]/.test(v.name)||typeof v.enabled!=='boolean'||!effects.test(v.effect))throw new ApiError(400,'无效光效');ids.add(v.id);
-  for(const color of [v.textColor,v.borderColor,v.backgroundColor])if(color && (!/^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/.test(color)||color.split(' ').some(n=>+n>255)))throw new ApiError(400,'无效颜色');
-  if(v.fontSize!==undefined && v.fontSize!==null && !number(v.fontSize,18,45))throw new ApiError(400,'字体范围为18–45');
-  if(v.minimapIcon && !/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (Circle|Star|Diamond|Square|Pentagon|Hexagon|Triangle|Cross|Kite|UpsideDownHouse)$/.test(v.minimapIcon))throw new ApiError(400,'无效地图图标');
-  if(!v.range||typeof v.range!=='object')throw new ApiError(400,'无效价格范围');
-  for(const point of [v.range.min,v.range.max])if(point && (!number(point.amount,0,1e12)||!['divine','chaos','exalted'].includes(point.currency)||point.referenceItemId&&!['exalted-orb','chaos-orb','orb-of-annulment','divine-orb'].includes(point.referenceItemId)))throw new ApiError(400,'无效价格端点');
-  if(!v.sound || (v.sound.type==='builtin' ? !Number.isInteger(v.sound.id)||!number(v.sound.id,1,16)||!number(v.sound.volume,0,300) : !['custom','neversink'].includes(v.sound.type)||typeof v.sound.fileName!=='string'||safeName(v.sound.fileName)!==v.sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(v.sound.fileName)))throw new ApiError(400,'无效音效');
- }
+ for(const rule of p.rules)validateRule(rule,ids);
+ if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new ApiError(400,'跳过名单无效');
  return JSON.parse(JSON.stringify(p));
 }
 
@@ -65,10 +89,10 @@ export async function profileInput(request:Request){
  for(const [key,value] of form.entries()){
   if(!key.startsWith('sound:')||typeof value==='string'||value.size===0)continue;
   total+=value.size;if(value.size>8*1024*1024||total>32*1024*1024)throw new ApiError(413,'单个音效最多8MB，合计最多32MB');
-  const preset=profile.visualPresets.find(p=>p.id===key.slice(6));if(!preset||preset.sound.type!=='custom')throw new ApiError(400,'音效与规则不匹配');
-  if(safeName(value.name)!==preset.sound.fileName)throw new ApiError(400,'音效文件名不匹配');
+  const rule=profile.rules.find(r=>r.id===key.slice(6));if(!rule||rule.effects.sound?.type!=='custom')throw new ApiError(400,'音效与规则不匹配');
+  if(safeName(value.name)!==rule.effects.sound.fileName)throw new ApiError(400,'音效文件名不匹配');
   const hash=putSound(Buffer.from(await value.arrayBuffer()));
-  if(sounds.has(preset.sound.fileName)&&sounds.get(preset.sound.fileName)!==hash)throw new ApiError(400,'不同音效不能重名');sounds.set(preset.sound.fileName,hash);
+  if(sounds.has(rule.effects.sound.fileName)&&sounds.get(rule.effects.sound.fileName)!==hash)throw new ApiError(400,'不同音效不能重名');sounds.set(rule.effects.sound.fileName,hash);
  }
  return {name,profile,sounds,version:Number(form.get('version')||0)};
 }
@@ -77,7 +101,7 @@ export function saveProfile(owner:string,input:Awaited<ReturnType<typeof profile
  const profileId=id||crypto.randomUUID();
  const retained=new Map<string,string>((existing?store.prepare('SELECT name,hash FROM sounds WHERE profile_id=?').all(profileId):[]).map((r:any)=>[r.name,r.hash]));
  for(const [name,hash] of input.sounds)retained.set(name,hash);
- for(const preset of input.profile.visualPresets)if(preset.sound.type==='custom'&&!retained.has(preset.sound.fileName))throw new ApiError(400,'请上传音效：'+preset.sound.fileName);
+ for(const rule of input.profile.rules)if(rule.effects.sound?.type==='custom'&&!retained.has(rule.effects.sound.fileName))throw new ApiError(400,'请上传音效：'+rule.effects.sound.fileName);
  store.exec('BEGIN IMMEDIATE');
  try{
   if(existing){if(existing.version!==input.version)throw new ApiError(409,'方案已被其他页面修改，请重新打开');store.prepare('UPDATE profiles SET name=?,config=?,version=version+1,updated=? WHERE id=? AND owner=?').run(input.name,JSON.stringify(input.profile),new Date().toISOString(),profileId,owner);}

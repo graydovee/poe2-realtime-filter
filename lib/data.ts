@@ -1,7 +1,8 @@
 import catalogData from "../data/item-catalog.json";
+import effectsData from "../data/neversink-effects.json";
+import rulesData from "../data/default-rules.json";
 import mechanicsData from "../data/item-mechanics.json";
-import visualData from "../data/visual-presets.json";
-import type { ItemDefinition, Locale, MarketSnapshot, Strictness, VisualPreset } from "./types";
+import type { EffectPresets, FilterRule, ItemDefinition, Locale, MarketSnapshot, Strictness } from "./types";
 
 export const STRICTNESS_LABELS: Record<Strictness, string> = {
   0: "宽松",
@@ -50,8 +51,13 @@ export const TAXONOMY = mechanicsData as {
   items: Record<string, { mechanic: string; evidence: string }>;
 };
 
+/** 基础过滤器里出现过的光柱 / 图标 / 字体组合 / 音效，作为规则编辑器的预设。 */
+export const EFFECT_PRESETS = effectsData as EffectPresets;
+
+/** 默认 4 条价格规则（崇高石 / 混沌石 / 剥离石 / 神圣石），由 scripts/extract-neversink-effects.mjs 生成。 */
+export const DEFAULT_RULES = (rulesData as { rules: FilterRule[] }).rules;
+
 export const ITEM_CATALOG = catalogData.items as ItemDefinition[];
-export const DEFAULT_VISUAL_PRESETS = visualData.presets as VisualPreset[];
 
 export const FALLBACK_SNAPSHOT: MarketSnapshot = {
   league: "Standard",

@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/extract-neversink-effects.mjs",
+  "rules": [
+    {
+      "id": "default-exalted",
+      "name": "崇高石价格档",
+      "enabled": true,
+      "hidden": false,
+      "autoRange": true,
+      "target": {
+        "itemIds": [],
+        "range": {
+          "min": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "exalted-orb"
+          },
+          "max": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "chaos-orb"
+          }
+        }
+      },
+      "effects": {
+        "beam": "White",
+        "icon": "1 Yellow Circle",
+        "font": {
+          "fontSize": 42,
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 139 87 255"
+        },
+        "sound": {
+          "type": "builtin",
+          "id": 2,
+          "volume": 300
+        }
+      }
+    },
+    {
+      "id": "default-chaos",
+      "name": "混沌石价格档",
+      "enabled": true,
+      "hidden": false,
+      "autoRange": true,
+      "target": {
+        "itemIds": [],
+        "range": {
+          "min": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "chaos-orb"
+          },
+          "max": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "orb-of-annulment"
+          }
+        }
+      },
+      "effects": {
+        "beam": "Yellow",
+        "icon": "1 Yellow Circle",
+        "font": {
+          "fontSize": 42,
+          "textColor": "0 0 0 255",
+          "borderColor": "0 0 0 255",
+          "backgroundColor": "245 105 90 255"
+        },
+        "sound": {
+          "type": "builtin",
+          "id": 2,
+          "volume": 300
+        }
+      }
+    },
+    {
+      "id": "default-annulment",
+      "name": "剥离石价格档",
+      "enabled": true,
+      "hidden": false,
+      "autoRange": true,
+      "target": {
+        "itemIds": [],
+        "range": {
+          "min": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "orb-of-annulment"
+          },
+          "max": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "divine-orb"
+          }
+        }
+      },
+      "effects": {
+        "beam": "Red",
+        "icon": "0 Red Circle",
+        "font": {
+          "fontSize": 45,
+          "textColor": "255 255 255 255",
+          "borderColor": "255 255 255 255",
+          "backgroundColor": "245 105 90 255"
+        },
+        "sound": {
+          "type": "builtin",
+          "id": 1,
+          "volume": 300
+        }
+      }
+    },
+    {
+      "id": "default-divine",
+      "name": "神圣石价格档",
+      "enabled": true,
+      "hidden": false,
+      "autoRange": true,
+      "target": {
+        "itemIds": [],
+        "range": {
+          "min": {
+            "amount": 1,
+            "currency": "exalted",
+            "referenceItemId": "divine-orb"
+          }
+        }
+      },
+      "effects": {
+        "beam": "Red",
+        "icon": "0 Red Star",
+        "font": {
+          "fontSize": 45,
+          "textColor": "255 0 0 255",
+          "borderColor": "255 0 0 255",
+          "backgroundColor": "255 255 255 255"
+        },
+        "sound": {
+          "type": "builtin",
+          "id": 6,
+          "volume": 300
+        }
+      }
+    }
+  ]
+}

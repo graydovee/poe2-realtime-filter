@@ -13,11 +13,25 @@ test("NeverSink baseline and generated data are vendored", () => {
   assert.ok(catalog.items.some((item) => item.matcher?.baseType === "Divine Orb"));
 });
 
-test("four currency defaults are enabled", () => {
-  const presets = JSON.parse(readFileSync("data/visual-presets.json", "utf8")).presets;
-  assert.equal(presets.length, 21);
-  assert.equal(presets.filter((preset) => preset.enabled).length, 4);
-  assert.ok(presets.filter((preset) => preset.enabled).every((preset) => preset.autoRange && preset.range.min.referenceItemId));
+test("default rules ship four price tiers", () => {
+  const rules = JSON.parse(readFileSync("data/default-rules.json", "utf8")).rules;
+  assert.equal(rules.length, 4);
+  assert.deepEqual(rules.map((rule) => rule.id), ["default-exalted", "default-chaos", "default-annulment", "default-divine"]);
+  for (const rule of rules) {
+    assert.equal(rule.autoRange, true);
+    assert.ok(rule.target.range.min.referenceItemId);
+    assert.ok(Object.keys(rule.effects).length > 0, "默认规则需要带特效：" + rule.id);
+  }
+});
+
+test("catalog exposes category menus and keeps every group", () => {
+  const catalog = JSON.parse(readFileSync("data/item-catalog.json", "utf8"));
+  const groups = new Set(catalog.items.map((item) => item.categoryPath[0]));
+  assert.ok(groups.has("crafting"));
+  assert.ok(groups.has("equipment"));
+  assert.ok(groups.has("gems"));
+  const crafting = catalog.items.filter((item) => item.categoryPath[0] === "crafting").map((item) => item.categoryPath[1]);
+  for (const key of ["currency", "bones", "omens", "temple"]) assert.ok(crafting.includes(key), "缺少分组 " + key);
 });
 
 test("market worker is valid JavaScript", () => {
@@ -27,5 +41,5 @@ test("market worker is valid JavaScript", () => {
 test("generated safety policy is documented", () => {
   const readme = readFileSync("README.md", "utf8");
   assert.match(readme, /未知物品/);
-  assert.match(readme, /白名单/);
+  assert.match(readme, /跳过/);
 });

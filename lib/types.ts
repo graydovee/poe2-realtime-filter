@@ -80,61 +80,56 @@ export type PresetSound =
   | { type: "neversink"; fileName: string }
   | { type: "custom"; fileName: string };
 
-export type VisualPreset = {
-  appearanceItemId?: string;
-  followTemplate?: boolean;
-  sourceItemId?: string;
-  autoRange?: boolean;
-  id: string;
-  name: string;
-  enabled: boolean;
-  effect: string;
-  minimapIcon?: string;
+/** 规则适用物品：物品集合与价格区间可单选或同时使用，同时使用时取交集。 */
+export type RuleTarget = {
+  itemIds: string[];
+  range?: PriceRange;
+};
+
+export type RuleFont = {
+  fontSize?: number;
   textColor?: string;
   borderColor?: string;
   backgroundColor?: string;
-  fontSize?: number;
-  range: PriceRange;
-  sound: PresetSound;
 };
 
-export type WhitelistEntry = {
+/** 只写已填写的动作；留空的项交给基础过滤器。 */
+export type RuleEffects = {
+  beam?: string;
+  icon?: string;
+  font?: RuleFont;
+  sound?: PresetSound;
+};
+
+export type FilterRule = {
   id: string;
-  label: string;
-  itemIds: string[];
-};
-
-export type SoundPackConfig = {
-  pack: "neversink" | "custom";
-  customFileName?: string;
-  alertLevel: "economy" | "valuable" | "ultra";
-};
-
-export type VisualOverrides = {
-  showBeams: boolean;
-  showMinimapIcons: boolean;
-  fontSize: number;
-  highValueColor: string;
-  valuableColor: string;
-  unknownColor: string;
+  name: string;
+  enabled: boolean;
+  hidden: boolean;
+  autoRange?: boolean;
+  target: RuleTarget;
+  effects: RuleEffects;
 };
 
 export type FilterProfile = {
+  schemaVersion: 2;
   league: string;
-  /** The league originally selected by the user, even after a retired league is remapped. */
   originalLeague?: string;
   strictness: Strictness;
   style: FilterStyle;
   locale: Locale;
-  itemLevelMin: number;
-  areaLevelMin: number;
-  hideBelowEnabled: boolean;
-  hideBelowAmount: number;
-  hideBelowCurrency: Currency;
-  whitelist: WhitelistEntry[];
-  visualPresets: VisualPreset[];
-  sound: SoundPackConfig;
-  visuals: VisualOverrides;
+  rules: FilterRule[];
+  skippedItemIds: string[];
+};
+
+/** 从基础过滤器里抽取的特效预设集合（data/neversink-effects.json）。 */
+export type EffectPresets = {
+  version: number;
+  beams: string[];
+  icons: string[];
+  fonts: RuleFont[];
+  sounds: PresetSound[];
+  customSounds: string[];
 };
 
 export type SafetyReport = {
@@ -146,7 +141,7 @@ export type SafetyReport = {
   unpricedItems: number;
   ambiguousItems: number;
   hiddenHighValueItems: string[];
-  whitelistViolations: string[];
+  exclusionViolations: string[];
   warnings: string[];
   passed: boolean;
 };
@@ -156,6 +151,6 @@ export type GeneratedBundle = {
   baselineFile: string;
   fileName: string;
   soundFiles: string[];
-  appliedPresets: Array<{ presetId: string; presetName: string; itemCount: number }>;
+  appliedRules: Array<{ ruleId: string; ruleName: string; itemCount: number }>;
   safetyReport: SafetyReport;
 };

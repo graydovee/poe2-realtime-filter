@@ -46,15 +46,21 @@
 - `app/components/ui/controls.tsx`：Select / Checkbox / Switch / Slider / TextInput / SearchInput / FileInput（Radix 无样式原语 + CVA 变体）
 - `app/components/ui/nav.tsx`：TabBar / Disclosure / Tooltip / ScrollArea
 - `app/components/app-shell.tsx`：品牌头、标题区、页脚
-- `app/components/sections/`：season / basic-filter / whitelist / presets / visuals / summary-sidebar
-- `app/components/`：`item-picker`、`preset-editor`、`save-as-scheme`、`preview-view`
+- `app/components/sections/`：season / basic-filter / excluded-items / rules / summary-sidebar
+- `app/components/`：`item-picker`、`rule-editor`、`save-as-scheme`、`preview-view`
 
-白名单选择器（`item-picker`）的交互约定：
+自定义规则编辑器（`rule-editor`）的交互约定：
+
+- 一条规则 = 「适用物品」+「特效」+「是否隐藏」。适用物品由物品集合与价格区间两个条件组成，可以只填一个，也可以同时填（生成时取交集）。
+- 特效分光柱 / 地图图标 / 字体 / 音效四行：每行上方是预设下拉（取自 `data/neversink-effects.json`），选中后把该行字段填满；字段本身可继续手改，留空表示交给基础过滤器、不写任何动作。
+- 隐藏是规则里的开关，隐藏规则照样可以配特效；列表顺序就是优先级，卡片的上下箭头调整顺序。
+
+物品选择器（`item-picker`）的交互约定：
 
 - 分类菜单按 poe.ninja 经济侧栏的顺序排列（基础通货、碎片、深渊骨骸、精华、预兆、探险、液化情绪、催化剂、维金，然后是自定义的神庙与试炼钥匙），顺序写在 `data/item-mechanics.json` 的 `order` 字段；其余分支保持原有插入顺序，整类匹配排在最后。
 - 每张分类卡片右侧是独立的整类勾选按钮（`role="checkbox"`，支持 `aria-checked="mixed"` 的半选态）；点卡片主体进入下一级，点勾选框整选/取消该分类下的全部物品。
-- 当前分类顶部有一条汇总条（本类 N 项 / 已选 M）与「选择本类 / 取消本类」，适合一次性把整套装备槽位或整个玩法拉进白名单。
-- 已选区按条目展示：整类条目显示为「深渊 · 19 项」，单件显示物品名，都可以整条移除。
+- 当前分类顶部有一条汇总条（本类 N 项 / 已选 M）与「选择本类 / 取消本类」，适合一次性把整套装备槽位或整个玩法拉进规则或跳过名单。
+- 已选区按条目展示：整类条目显示为「深渊骨骸 · 11 项」，单件显示物品名，都可以整条移除。
 
 `app/page.tsx` 只保留状态与数据流，不写样式实现细节。
 
@@ -70,6 +76,7 @@
 - `docs/screenshots/builder-1024.png`：配置页（1024）
 - `docs/screenshots/builder-430.png`：配置页（移动端）
 - `docs/screenshots/preview-1440.png`：预览与导出页
-- `docs/screenshots/whitelist-mechanics-1440.png`：白名单的商店分类（通货与材料）
-- `docs/screenshots/whitelist-mechanics-selected-1440.png`：整类勾选深渊后的已选条目
-- `docs/screenshots/whitelist-mechanics-430.png`：商店分类（移动端）
+- `docs/screenshots/rules-1440.png`：自定义过滤规则编辑器
+- `docs/screenshots/rules-430.png`：规则编辑器（移动端）
+- `docs/screenshots/excluded-items-1440.png`：跳过名单与物品选择器
+- `docs/screenshots/excluded-items-selected-1440.png`：整类勾选深渊骨骸后的跳过名单

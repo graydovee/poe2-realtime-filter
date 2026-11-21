@@ -52,10 +52,10 @@ export function SchemeManager({ profile, sounds, leagueCatalog, onOpen }: { prof
 
   async function open(item: Scheme) {
     const files: Record<string, File> = {};
-    for (const preset of item.profile.visualPresets) if (preset.sound.type === "custom") {
-      const response = await fetch(`/api/profiles/${item.id}/sounds/${encodeURIComponent(preset.sound.fileName)}`);
+    for (const rule of item.profile.rules ?? []) if (rule.effects.sound?.type === "custom") {
+      const response = await fetch(`/api/profiles/${item.id}/sounds/${encodeURIComponent(rule.effects.sound.fileName)}`);
       if (!response.ok) throw new Error("音效读取失败");
-      files[preset.id] = new File([await response.blob()], preset.sound.fileName);
+      files[rule.id] = new File([await response.blob()], rule.effects.sound.fileName);
     }
     onOpen(item.profile, files);
     setLink("");

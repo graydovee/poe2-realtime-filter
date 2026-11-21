@@ -1,4 +1,4 @@
-import type { Currency, MarketRates, MarketSnapshot, PricePoint, VisualPreset } from "./types";
+import type { Currency, FilterRule, MarketRates, MarketSnapshot, PricePoint } from "./types";
 
 export const CURRENCY_ANCHORS: Record<string, string> = {
   "exalted-orb": "崇高石", "chaos-orb": "混沌石", "orb-of-annulment": "剥离石", "divine-orb": "神圣石",
@@ -39,6 +39,7 @@ export function toExalted(point: PricePoint, rates?: MarketRates, prices?: Marke
 
 export type CurrencyPriceTier = { itemId: string; name: string; exaltedValue: number };
 
+/** 四枚锚点通货当日的 E 价值，缺任意一枚就返回空数组（不做部分降级）。 */
 export function currencyPriceTiers(snapshot: MarketSnapshot): CurrencyPriceTier[] {
   const tiers: CurrencyPriceTier[] = [];
   for (const [itemId, name] of Object.entries(CURRENCY_ANCHORS)) {
@@ -47,6 +48,26 @@ export function currencyPriceTiers(snapshot: MarketSnapshot): CurrencyPriceTier[
     tiers.push({ itemId, name, exaltedValue });
   }
   return tiers.sort((a, b) => a.exaltedValue - b.exaltedValue);
+}
+
+/**
+ * 把 autoRange 规则的价格区间按当日锚点重排为 [锚点_i, 锚点_{i+1})，最高档无上限。
+ * 锚点缺价时该规则置为禁用（返回的数组里 enabled=false），由生成器汇总成 warning。
+ * 保持规则原有顺序：区间互不重叠，首个命中即生效，不替用户重排优先级。
+ */
+export function resolveAutoRanges(rules: FilterRule[], snapshot: MarketSnapshot): FilterRule[] {
+  const tiers = currencyPriceTiers(snapshot);
+  const complete = tiers.length === Object.keys(CURRENCY_ANCHORS).length;
+  const point = (itemId: string): PricePoint => ({ amount: 1, currency: "exalted", referenceItemId: itemId });
+  return rules.map((rule) => {
+    if (!rule.autoRange) return rule;
+    const anchorId = rule.target.range?.min?.referenceItemId;
+    if (!complete || !anchorId) return { ...rule, enabled: false };
+    const index = tiers.findIndex((tier) => tier.itemId === anchorId);
+    if (index < 0) return { ...rule, enabled: false };
+    const next = tiers[index + 1];
+    return { ...rule, target: { ...rule.target, range: { min: point(anchorId), ...(next ? { max: point(next.itemId) } : {}) } } };
+  });
 }
 
 export function displayPrice(divines: number, rates?: MarketRates): PricePoint {
@@ -62,23 +83,4 @@ export function formatPrice(point: PricePoint, snapshot?: MarketSnapshot): strin
     return point.amount + " " + name + (value === undefined ? "（等待行情）" : " ≈ " + formatPrice({ amount: value, currency: "exalted" }));
   }
   return Number(point.amount.toPrecision(6)) + " " + CURRENCY_SYMBOLS[point.currency];
-}
-
-// Only automatic defaults follow market ordering; manually edited ranges retain their order and values.
-export function currencyDefaultRanges(presets: VisualPreset[], snapshot: MarketSnapshot): VisualPreset[] {
-  const anchors = currencyPriceTiers(snapshot);
-  if (anchors.length !== Object.keys(CURRENCY_ANCHORS).length) {
-    return presets.map((preset) => preset.autoRange ? { ...preset, enabled: false } : preset);
-  }
-  const resolved = presets.map((preset) => {
-    if (!preset.autoRange || !preset.sourceItemId) return preset;
-    const index = anchors.findIndex((anchor) => anchor.itemId === preset.sourceItemId);
-    if (index < 0) return preset;
-    const point = (id: string): PricePoint => ({ amount: 1, currency: "exalted", referenceItemId: id });
-    const next = anchors[index + 1];
-    return { ...preset, range: { min: point(preset.sourceItemId), ...(next ? { max: point(next.itemId) } : {}) } };
-  });
-  const automatic = resolved.filter((preset) => preset.autoRange && preset.sourceItemId && CURRENCY_ANCHORS[preset.sourceItemId]);
-  automatic.sort((a, b) => anchors.findIndex((anchor) => anchor.itemId === a.sourceItemId) - anchors.findIndex((anchor) => anchor.itemId === b.sourceItemId));
-  return resolved.map((preset) => preset.autoRange && preset.sourceItemId && CURRENCY_ANCHORS[preset.sourceItemId] ? automatic.shift()! : preset);
 }

@@ -3,21 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 
 import { FALLBACK_SNAPSHOT } from "../lib/data";
-import type { Currency, FilterProfile, FilterStyle, LeagueCatalog, Locale, MarketSnapshot, Strictness, VisualPreset } from "../lib/types";
+import type { FilterProfile, FilterRule, FilterStyle, LeagueCatalog, Locale, MarketSnapshot, Strictness } from "../lib/types";
 
-import { applyTemplateAppearances } from "../lib/neversink-appearance";
 import { DEFAULT_PROFILE } from "../lib/default-profile";
-import { currencyDefaultRanges, currencyPriceTiers, formatPrice } from "../lib/pricing";
 
 import { AppShell } from "./components/app-shell";
 import { PreviewView, type Generated } from "./components/preview-view";
 import { SchemeManager } from "./components/scheme-manager";
 import { BasicFilterSection } from "./components/sections/basic-filter-section";
-import { PresetsSection } from "./components/sections/presets-section";
+import { ExcludedItemsSection } from "./components/sections/excluded-items-section";
+import { RulesSection } from "./components/sections/rules-section";
 import { SeasonSection } from "./components/sections/season-section";
 import { SummarySidebar } from "./components/sections/summary-sidebar";
-import { VisualsSection } from "./components/sections/visuals-section";
-import { WhitelistSection } from "./components/sections/whitelist-section";
 import type { ItemPickerToggle } from "./components/item-picker";
 import { TabBar } from "./components/ui/nav";
 
@@ -94,43 +91,71 @@ export default function HomePage() {
     setProfile((current) => ({ ...current, [key]: value }));
   }
 
-  function toggleWhitelist({ ids, checked, label, key }: ItemPickerToggle) {
-    setProfile((profile) => {
-      const entries = profile.whitelist ?? [];
-      if (checked) {
-        const existing = new Set(entries.flatMap((entry) => entry.itemIds));
-        const added = ids.filter((id) => !existing.has(id));
-        if (!added.length) return profile;
-        const base = "wl-" + key.replace(/[^a-zA-Z0-9_-]+/g, "-");
-        const used = new Set(entries.map((entry) => entry.id));
-        let id = base;
-        for (let index = 2; used.has(id); index += 1) id = base + "-" + index;
-        return { ...profile, whitelist: [...entries, { id, label, itemIds: added }] };
-      }
-      const removed = new Set(ids);
-      const next = entries
-        .map((entry) => ({ ...entry, itemIds: entry.itemIds.filter((itemId) => !removed.has(itemId)) }))
-        .filter((entry) => entry.itemIds.length > 0);
-      return next.length === entries.length ? profile : { ...profile, whitelist: next };
+  function updateRule(id: string, patch: Partial<FilterRule>) {
+    setProfile((current) => ({
+      ...current,
+      rules: current.rules.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)),
+    }));
+  }
+
+  function addRule() {
+    setProfile((current) => ({
+      ...current,
+      rules: [
+        ...current.rules,
+        {
+          id: "rule-" + Date.now().toString(36),
+          name: "新规则 " + (current.rules.length + 1),
+          enabled: true,
+          hidden: false,
+          target: { itemIds: [], range: { min: { amount: 1, currency: "exalted" } } },
+          effects: {},
+        },
+      ],
+    }));
+  }
+
+  function removeRule(id: string) {
+    setProfile((current) => ({ ...current, rules: current.rules.filter((rule) => rule.id !== id) }));
+    setCustomSounds((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
     });
   }
 
-  function removeWhitelistEntry(entryId: string) {
-    setProfile((profile) => ({ ...profile, whitelist: (profile.whitelist ?? []).filter((entry) => entry.id !== entryId) }));
+  function moveRule(id: string, delta: number) {
+    setProfile((current) => {
+      const index = current.rules.findIndex((rule) => rule.id === id);
+      const target = index + delta;
+      if (index < 0 || target < 0 || target >= current.rules.length) return current;
+      const rules = [...current.rules];
+      const [rule] = rules.splice(index, 1);
+      rules.splice(target, 0, rule);
+      return { ...current, rules };
+    });
   }
 
-  function updatePreset(id: string, patch: Partial<VisualPreset>) {
-    update("visualPresets", profile.visualPresets.map((preset) => preset.id === id ? { ...preset, ...patch } : preset));
+  function toggleSkipped({ ids, checked }: ItemPickerToggle) {
+    setProfile((current) => {
+      const next = new Set(current.skippedItemIds);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return { ...current, skippedItemIds: [...next] };
+    });
   }
 
-  function addPreset() {
-    const id = "custom-" + Date.now();
-    update("visualPresets", [...profile.visualPresets, { id, name: "自定义光效", enabled: false, effect: "Blue", range: {}, sound: { type: "neversink", fileName: "1maybevaluable.mp3" } }]);
+  function clearSkipped() {
+    update("skippedItemIds", []);
   }
 
-  function removePreset(id: string) {
-    update("visualPresets", profile.visualPresets.filter((preset) => preset.id !== id));
-    setCustomSounds((current) => { const next = { ...current }; delete next[id]; return next; });
+  function setRuleSound(id: string, file: File | undefined) {
+    if (!file) return;
+    setCustomSounds((current) => ({ ...current, [id]: file }));
+    updateRule(id, { effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
   }
 
   async function generate() {
@@ -217,37 +242,16 @@ export default function HomePage() {
                 onStyleChange={(style: FilterStyle) => update("style", style)}
                 onLocaleChange={(locale: Locale) => update("locale", locale)}
               />
-              <WhitelistSection
-                profile={profile}
-                onHideEnabled={(enabled) => update("hideBelowEnabled", enabled)}
-                onHideAmount={(amount) => update("hideBelowAmount", amount)}
-                onHideCurrency={(currency: Currency) => update("hideBelowCurrency", currency)}
-                whitelistEntries={profile.whitelist.map((entry) => ({ id: entry.id, label: entry.label, itemIds: entry.itemIds }))}
-                onToggleItem={toggleWhitelist}
-                onRemoveEntry={removeWhitelistEntry}
-              />
-              <PresetsSection
+              <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
+              <RulesSection
                 profile={profile}
                 market={selectedMarket}
                 customSounds={customSounds}
-                onPresetChange={updatePreset}
-                onRemovePreset={removePreset}
-                onAddPreset={addPreset}
-                onSound={(id, file) => {
-                  if (!file) return;
-                  setCustomSounds((current) => ({ ...current, [id]: file }));
-                  updatePreset(id, { sound: { type: "custom", fileName: safeSoundName(file.name) } });
-                }}
-              />
-              <VisualsSection
-                visuals={profile.visuals}
-                itemLevelMin={profile.itemLevelMin}
-                areaLevelMin={profile.areaLevelMin}
-                onItemLevelMin={(value) => update("itemLevelMin", value)}
-                onAreaLevelMin={(value) => update("areaLevelMin", value)}
-                onFontSize={(value) => update("visuals", { ...profile.visuals, fontSize: value })}
-                onShowBeams={(value) => update("visuals", { ...profile.visuals, showBeams: value })}
-                onShowMinimapIcons={(value) => update("visuals", { ...profile.visuals, showMinimapIcons: value })}
+                onRuleChange={updateRule}
+                onRemoveRule={removeRule}
+                onAddRule={addRule}
+                onMoveRule={moveRule}
+                onSound={setRuleSound}
               />
             </div>
 

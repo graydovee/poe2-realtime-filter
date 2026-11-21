@@ -196,7 +196,7 @@ export function ItemPicker({
                         <small className="truncate text-[10px] leading-tight text-ink-muted">{item.name}</small>
                       </span>
                       <em className="shrink-0 text-[10px] not-italic text-ink-muted">
-                        {item.ambiguous ? "沿用原始规则" : checked ? "已加入白名单" : ""}
+                        {item.ambiguous ? "沿用原始规则" : checked ? "已选中" : ""}
                       </em>
                     </label>
                   );
@@ -233,7 +233,7 @@ export function ItemPicker({
 
       <div className="border-t border-line/70 pt-4">
         <h3 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
-          已选白名单
+          已选物品
           <span className="font-mono text-[11px] font-normal text-ink-muted">{selectedCount}</span>
         </h3>
         {entries.length === 0 ? (
@@ -241,7 +241,7 @@ export function ItemPicker({
         ) : (
           <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-auto pr-1">
             {entries.map((entry) => (
-              <Chip key={entry.id} onRemove={() => onRemoveEntry(entry.id)} removeLabel={"移除白名单：" + entry.label}>
+              <Chip key={entry.id} onRemove={() => onRemoveEntry(entry.id)} removeLabel={"移除：" + entry.label}>
                 {entry.label}
                 {entry.itemIds.length > 1 ? <span className="ml-1 font-mono text-ink-muted">· {entry.itemIds.length} 项</span> : null}
               </Chip>

@@ -1,0 +1,1490 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/extract-neversink-effects.mjs",
+  "sources": {
+    "files": 56,
+    "styles": [
+      "default",
+      "aura",
+      "cobalt",
+      "customsounds",
+      "darkmode",
+      "mythic",
+      "vaal",
+      "zen"
+    ]
+  },
+  "beams": [
+    "Blue",
+    "Blue Temp",
+    "Brown",
+    "Cyan",
+    "Cyan Temp",
+    "Green",
+    "Green Temp",
+    "Orange",
+    "Orange Temp",
+    "Pink",
+    "Purple",
+    "Purple Temp",
+    "Red",
+    "White",
+    "White Temp",
+    "Yellow",
+    "Yellow Temp"
+  ],
+  "icons": [
+    "0 Blue Diamond",
+    "0 Cyan Pentagon",
+    "0 Green Pentagon",
+    "0 Orange Circle",
+    "0 Orange Pentagon",
+    "0 Pink Pentagon",
+    "0 Purple Square",
+    "0 Purple Star",
+    "0 Red Circle",
+    "0 Red Diamond",
+    "0 Red Hexagon",
+    "0 Red Kite",
+    "0 Red Star",
+    "0 Red UpsideDownHouse",
+    "0 Yellow Star",
+    "1 Blue Circle",
+    "1 Blue Diamond",
+    "1 Blue Star",
+    "1 Brown Star",
+    "1 Cyan Pentagon",
+    "1 Cyan Triangle",
+    "1 Green Diamond",
+    "1 Orange Kite",
+    "1 Orange Pentagon",
+    "1 Pink Pentagon",
+    "1 Pink Square",
+    "1 Purple Circle",
+    "1 Red Square",
+    "1 White Cross",
+    "1 White Diamond",
+    "1 White Hexagon",
+    "1 White Kite",
+    "1 White Square",
+    "1 White UpsideDownHouse",
+    "1 Yellow Circle",
+    "1 Yellow Cross",
+    "1 Yellow Diamond",
+    "1 Yellow Hexagon",
+    "1 Yellow Kite",
+    "1 Yellow Square",
+    "1 Yellow UpsideDownHouse",
+    "2 Blue Diamond",
+    "2 Blue Star",
+    "2 Brown Star",
+    "2 Cyan Pentagon",
+    "2 Green Circle",
+    "2 Grey Circle",
+    "2 Purple Square",
+    "2 White Circle",
+    "2 White Hexagon",
+    "2 White Square",
+    "2 White UpsideDownHouse"
+  ],
+  "fonts": [
+    {
+      "borderColor": "0 0 0 255"
+    },
+    {
+      "borderColor": "120 0 0 240"
+    },
+    {
+      "borderColor": "122 87 0"
+    },
+    {
+      "borderColor": "220 220 0"
+    },
+    {
+      "borderColor": "220 50 0 255"
+    },
+    {
+      "borderColor": "250 0 0 255"
+    },
+    {
+      "textColor": "0 0 0 255",
+      "backgroundColor": "200 200 200 255"
+    },
+    {
+      "textColor": "0 0 0 255",
+      "backgroundColor": "235 235 235 255"
+    },
+    {
+      "textColor": "0 204 255 255",
+      "borderColor": "0 204 255 255"
+    },
+    {
+      "textColor": "0 204 255 255"
+    },
+    {
+      "textColor": "145 30 220 255",
+      "borderColor": "145 30 220 255",
+      "backgroundColor": "200 200 200 255"
+    },
+    {
+      "textColor": "145 30 220 255",
+      "borderColor": "145 30 220 255",
+      "backgroundColor": "235 220 245 255"
+    },
+    {
+      "textColor": "180 180 180",
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "textColor": "180 180 180",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "textColor": "200 200 200",
+      "backgroundColor": "20 20 0 0"
+    },
+    {
+      "textColor": "245 175 0"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "backgroundColor": "20 20 0 0"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "backgroundColor": "50 50 50"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "120 50 120"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "50 50 50"
+    },
+    {
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255"
+    },
+    {
+      "textColor": "255 255 255 255"
+    },
+    {
+      "fontSize": 18,
+      "backgroundColor": "20 20 0 0"
+    },
+    {
+      "fontSize": 18,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 0"
+    },
+    {
+      "fontSize": 26,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 140"
+    },
+    {
+      "fontSize": 30,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 140"
+    },
+    {
+      "fontSize": 30,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "fontSize": 32,
+      "backgroundColor": "80 80 80 190"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 140"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "0 200 95"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "125 125 125 255"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "136 136 255"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "200 200 200 255"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "245 175 0",
+      "backgroundColor": "20 140 60"
+    },
+    {
+      "fontSize": 32,
+      "borderColor": "255 127 127",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "0 240 190 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "136 136 255",
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 240"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "136 136 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "20 20 0 240"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "160 75 205 255",
+      "borderColor": "160 75 205 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "160 75 205 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "170 158 130"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "20 240 240"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "200 200 200",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "20 20 0 240"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "210 160 100"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "220 170 100 255"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "20 20 0 0"
+    },
+    {
+      "fontSize": 32,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "50 50 50"
+    },
+    {
+      "fontSize": 32
+    },
+    {
+      "fontSize": 35,
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "fontSize": 35,
+      "backgroundColor": "20 20 0 220"
+    },
+    {
+      "fontSize": 35,
+      "backgroundColor": "35 35 35 240"
+    },
+    {
+      "fontSize": 35,
+      "backgroundColor": "80 80 80 190"
+    },
+    {
+      "fontSize": 35,
+      "borderColor": "0 0 0 0",
+      "backgroundColor": "20 20 0 180"
+    },
+    {
+      "fontSize": 35,
+      "borderColor": "127 127 127"
+    },
+    {
+      "fontSize": 35,
+      "borderColor": "136 136 255"
+    },
+    {
+      "fontSize": 35,
+      "borderColor": "220 220 0"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "180 75 235 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "47 0 74 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "170 158 130"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "180 75 235 255",
+      "borderColor": "180 75 235 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "180 75 235 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "188 96 37 255",
+      "borderColor": "0 240 190 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "188 96 37 255",
+      "borderColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "220 170 100 255",
+      "borderColor": "220 170 100 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "220 170 100 255"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "50 50 50"
+    },
+    {
+      "fontSize": 35,
+      "textColor": "74 230 58 255"
+    },
+    {
+      "fontSize": 35
+    },
+    {
+      "fontSize": 38,
+      "backgroundColor": "35 35 35 240"
+    },
+    {
+      "fontSize": 38,
+      "borderColor": "180 180 180"
+    },
+    {
+      "fontSize": 38,
+      "textColor": "0 70 255 255",
+      "borderColor": "0 70 255 255"
+    },
+    {
+      "fontSize": 38,
+      "textColor": "200 75 200 255",
+      "borderColor": "200 75 200 255"
+    },
+    {
+      "fontSize": 38,
+      "textColor": "220 175 132",
+      "borderColor": "220 175 132"
+    },
+    {
+      "fontSize": 38
+    },
+    {
+      "fontSize": 40,
+      "backgroundColor": "10 0 40"
+    },
+    {
+      "fontSize": 40,
+      "backgroundColor": "20 20 0 220"
+    },
+    {
+      "fontSize": 40,
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 40,
+      "backgroundColor": "30 0 70 255"
+    },
+    {
+      "fontSize": 40,
+      "backgroundColor": "35 35 35 240"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "0 0 0 255"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "0 200 95"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "100 100 100",
+      "backgroundColor": "10 60 40"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "127 127 127"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "180 180 180"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "20 140 60"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "200 200 200 255"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "245 175 0",
+      "backgroundColor": "10 60 40"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "245 175 0",
+      "backgroundColor": "20 140 60"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "245 175 0"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "255 127 127",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 40,
+      "borderColor": "255 255 255 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "240 180 100 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "0 204 255 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "0 240 190 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "0 70 255 255",
+      "borderColor": "0 70 255 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "154 222 210 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "170 158 130",
+      "borderColor": "170 158 130"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "170 158 130"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "180 130 90 230"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "180 215 248 255",
+      "borderColor": "180 215 248 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "184 205 255 255",
+      "borderColor": "184 205 255 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "190 120 90 255",
+      "borderColor": "190 120 90 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "200 200 200 255",
+      "borderColor": "200 200 200 255",
+      "backgroundColor": "66 34 71 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "200 200 200 255",
+      "borderColor": "200 200 200 255",
+      "backgroundColor": "73 40 73 210"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "200 75 200 255",
+      "borderColor": "200 75 200 255",
+      "backgroundColor": "50 0 75"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "200 75 200 255",
+      "borderColor": "200 75 200 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "205 192 165 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "220 175 132",
+      "borderColor": "220 175 132"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "240 0 0 255",
+      "borderColor": "240 0 0 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "240 180 100 255",
+      "borderColor": "240 180 100 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "240 207 132",
+      "borderColor": "240 207 132"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "255 255 255 255",
+      "borderColor": "115 115 115 255",
+      "backgroundColor": "65 20 80"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "80 120 160"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "30 235 0 255",
+      "borderColor": "30 235 0 255"
+    },
+    {
+      "fontSize": 40,
+      "textColor": "30 235 0 255"
+    },
+    {
+      "fontSize": 40
+    },
+    {
+      "fontSize": 42,
+      "backgroundColor": "30 0 70 255"
+    },
+    {
+      "fontSize": 42,
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 42,
+      "borderColor": "0 0 0 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "125 180 240 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "180 75 225 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "220 0 255 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "240 180 100 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "245 105 90 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "245 139 87 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "70 130 225 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "0 75 30 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "47 0 74 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "0 70 255 255",
+      "borderColor": "0 70 255 255",
+      "backgroundColor": "30 0 70 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "188 96 37 255",
+      "borderColor": "188 96 37 255",
+      "backgroundColor": "53 13 13 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240",
+      "backgroundColor": "6 0 60"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "220 175 132",
+      "borderColor": "220 175 132"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "220 220 0",
+      "borderColor": "220 220 0",
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "240 0 0 255",
+      "borderColor": "240 0 0 255",
+      "backgroundColor": "70 0 20 255"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "255 255 0 255",
+      "borderColor": "220 220 0",
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 42,
+      "textColor": "74 230 58 255"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "10 0 40"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "20 20 0"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "30 0 70 255"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "40 40 0"
+    },
+    {
+      "fontSize": 45,
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "0 0 0 255"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "0 200 95"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "10 14 35 255"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "10 60 40"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "100 100 100",
+      "backgroundColor": "10 60 40"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "180 180 180"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "200 200 200 255"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "245 175 0",
+      "backgroundColor": "10 14 35 255"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "245 175 0",
+      "backgroundColor": "10 60 40"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "245 175 0"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "255 127 127",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "borderColor": "255 255 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "0 112 221 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "125 180 240 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "130 30 190"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "154 222 210 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "163 53 238 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "180 76 58 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "190 30 30 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "203 176 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "220 0 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "226 155 25 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "240 48 70 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "245 105 90 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "50 70 190"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "70 130 225 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 0 0 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 112 221 255",
+      "borderColor": "0 112 221 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 204 255 255",
+      "borderColor": "0 204 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 204 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "0 75 30 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 240 190 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "47 0 74 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 240 190 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 255 255 255",
+      "borderColor": "0 255 255 255",
+      "backgroundColor": "255 0 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 70 255 255",
+      "borderColor": "0 70 255 255",
+      "backgroundColor": "10 0 40"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "0 70 255 255",
+      "borderColor": "0 70 255 255",
+      "backgroundColor": "30 0 70 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "125 255 89 255",
+      "borderColor": "125 255 89 255",
+      "backgroundColor": "0 50 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "154 222 210 255",
+      "borderColor": "154 222 210 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "154 222 210 255",
+      "borderColor": "154 222 210 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "154 222 210 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "163 53 238 255",
+      "borderColor": "163 53 238 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "164 234 166 255",
+      "borderColor": "164 234 166 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "164 234 166 255",
+      "borderColor": "164 234 166 255",
+      "backgroundColor": "34 12 54 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "164 234 166 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "170 158 130",
+      "borderColor": "170 158 130"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 130 90 230",
+      "borderColor": "180 130 90 230"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 180 180",
+      "borderColor": "180 180 180"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 75 225 255",
+      "borderColor": "180 75 225 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 75 235 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 76 58 255",
+      "borderColor": "180 76 58 255",
+      "backgroundColor": "50 0 75"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "180 76 58 255",
+      "borderColor": "180 76 58 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "184 205 255 255",
+      "borderColor": "184 205 255 255",
+      "backgroundColor": "10 14 35 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "184 205 255 255",
+      "borderColor": "184 205 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "188 96 37 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "53 13 13 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "188 96 37 255",
+      "borderColor": "188 96 37 255",
+      "backgroundColor": "53 13 13 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "188 96 37 255",
+      "borderColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "190 110 111 255",
+      "borderColor": "190 110 111 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "190 120 90 255",
+      "borderColor": "190 120 90 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240",
+      "backgroundColor": "6 0 60"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "20 240 240",
+      "borderColor": "20 240 240"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "200 200 200 255",
+      "borderColor": "200 200 200 255",
+      "backgroundColor": "66 34 71 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "203 176 255 255",
+      "borderColor": "203 176 255 255",
+      "backgroundColor": "32 19 50 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "203 176 255 255",
+      "borderColor": "203 176 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "205 192 165 255",
+      "borderColor": "205 192 165 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "205 192 165 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "220 0 255 255",
+      "borderColor": "220 0 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "220 220 0",
+      "borderColor": "220 220 0",
+      "backgroundColor": "40 40 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "220 220 0",
+      "borderColor": "220 220 0",
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "230 204 128 255",
+      "borderColor": "122 87 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "230 204 128 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "230 84 128 255",
+      "borderColor": "230 84 128 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "240 0 0 255",
+      "borderColor": "240 0 0 255",
+      "backgroundColor": "20 20 0 240"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "240 0 0 255",
+      "borderColor": "240 0 0 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "240 0 0 255",
+      "borderColor": "240 0 0 255",
+      "backgroundColor": "70 0 20 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "240 180 100 255",
+      "borderColor": "240 180 100 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "240 48 70 255",
+      "borderColor": "240 48 70 255",
+      "backgroundColor": "36 10 15 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "245 105 90 255",
+      "borderColor": "245 105 90 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "245 105 90 255",
+      "borderColor": "245 105 90 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "245 139 87 255",
+      "borderColor": "245 139 87 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "247 211 164 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 0 0 255",
+      "borderColor": "255 0 0 255",
+      "backgroundColor": "255 255 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 119 119 255",
+      "borderColor": "0 0 0 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 119 119 255",
+      "borderColor": "164 234 166 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 119 119 255",
+      "borderColor": "234 226 164",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 119 119 255",
+      "borderColor": "255 119 119 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 119 119 255",
+      "borderColor": "255 119 119 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 128 0 255",
+      "borderColor": "255 128 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 0 255",
+      "borderColor": "220 220 0",
+      "backgroundColor": "20 20 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 0 255",
+      "borderColor": "220 220 0",
+      "backgroundColor": "40 40 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 0 255",
+      "borderColor": "220 220 0",
+      "backgroundColor": "75 75 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "0 240 190 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "130 15 255 255",
+      "backgroundColor": "65 20 80"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "210 20 210 255",
+      "backgroundColor": "65 20 80"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 127 127 255",
+      "backgroundColor": "65 0 0"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "130 30 190"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "185 0 120"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "188 96 37 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "190 30 30 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "20 20 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "220 0 255 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "240 48 70 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "245 105 90 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "255 128 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "28 55 135 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "50 70 190"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "255 255 255 255",
+      "borderColor": "255 255 255 255",
+      "backgroundColor": "80 120 160"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "30 235 0 255",
+      "borderColor": "30 235 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "30 235 0 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "50 70 190",
+      "borderColor": "50 70 190"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "74 230 58 255"
+    },
+    {
+      "fontSize": 45,
+      "textColor": "80 120 160",
+      "borderColor": "80 120 160"
+    },
+    {
+      "fontSize": 45
+    }
+  ],
+  "sounds": [
+    {
+      "type": "builtin",
+      "id": 3,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 2,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 1,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 6,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 5,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 4,
+      "volume": 300
+    },
+    {
+      "type": "builtin",
+      "id": 2,
+      "volume": 100
+    },
+    {
+      "type": "neversink",
+      "fileName": "3uniques.mp3"
+    },
+    {
+      "type": "neversink",
+      "fileName": "2currency.mp3"
+    },
+    {
+      "type": "neversink",
+      "fileName": "1maybevaluable.mp3"
+    },
+    {
+      "type": "neversink",
+      "fileName": "6veryvaluable.mp3"
+    },
+    {
+      "type": "neversink",
+      "fileName": "5highmaps.mp3"
+    },
+    {
+      "type": "neversink",
+      "fileName": "4maps.mp3"
+    }
+  ],
+  "customSounds": [
+    "1maybevaluable.mp3",
+    "2currency.mp3",
+    "3uniques.mp3",
+    "4maps.mp3",
+    "5highmaps.mp3",
+    "6veryvaluable.mp3"
+  ]
+}

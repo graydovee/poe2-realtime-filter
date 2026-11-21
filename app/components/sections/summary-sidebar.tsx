@@ -4,10 +4,8 @@ import { Fragment } from "react";
 import { ArrowRight } from "lucide-react";
 
 import { LOCALE_LABELS, STRICTNESS_LABELS, STYLE_LABELS } from "../../../lib/data";
-import type { Currency, FilterProfile } from "../../../lib/types";
+import type { FilterProfile } from "../../../lib/types";
 import { Alert, Button, Panel } from "../ui/primitives";
-
-const currencyShort: Record<Currency, string> = { divine: "D", chaos: "C", exalted: "E" };
 
 export function SummarySidebar({
   profile,
@@ -22,17 +20,15 @@ export function SummarySidebar({
   error: string;
   onGenerate: () => void;
 }) {
+  const rules = profile.rules ?? [];
   const rows: Array<[string, string]> = [
     ["赛季", profile.league],
     ["基础档位", STRICTNESS_LABELS[profile.strictness]],
     ["视觉风格", STYLE_LABELS[profile.style]],
     ["客户端语言", LOCALE_LABELS[profile.locale]],
-    ["白名单", profile.whitelist.flatMap((entry) => entry.itemIds).length + " 项"],
-    ["启用光效", profile.visualPresets.filter((preset) => preset.enabled).length + " / " + profile.visualPresets.length],
-    [
-      "低价值隐藏",
-      profile.hideBelowEnabled ? "低于 " + profile.hideBelowAmount + " " + currencyShort[profile.hideBelowCurrency] : "未启用",
-    ],
+    ["自定义规则", rules.length + " 条（启用 " + rules.filter((rule) => rule.enabled).length + "）"],
+    ["隐藏规则", rules.filter((rule) => rule.enabled && rule.hidden).length + " 条"],
+    ["跳过物品", profile.skippedItemIds.length + " 项"],
   ];
 
   return (

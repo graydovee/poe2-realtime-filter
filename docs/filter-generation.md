@@ -1,8 +1,8 @@
 # 过滤器生成流程
 
-一句话：**profile（用户配置）+ 当日行情快照 → 选中的 NeverSink 基线 → 三类覆盖规则（白名单 / 价格光效 / 低价值隐藏）→ 安全检查 → `.filter` 文本（或 ZIP）**。
+一句话：**profile（基础过滤器 + 自定义规则 + 跳过名单）+ 当日行情快照 → 选中的 NeverSink 基线 → 逐条规则生成的覆盖块 → 安全检查 → `.filter` 文本（或 ZIP）**。
 
-基线永远原样保留，新规则只叠在文件最前面；任何拿不准的情况（未定价、歧义匹配、快照缺失）都退回 NeverSink 原始规则。
+基线永远原样保留，规则块只叠在文件最前面；规则里没有填写的动作一律不写，交给基线决定。
 
 ## 1. 代码位置
 
@@ -10,12 +10,13 @@
 |---|---|---|
 | HTTP 入口 | `app/api/generate/route.ts`、`app/api/export/route.ts` | `POST` |
 | 方案/订阅入口 | `lib/profiles.ts` | `latestManifest` → `renderManifest` |
+| 参数归一 | `lib/profile.ts` | `normalizeProfile` |
 | 生成核心 | `lib/filter-engine.ts` | `generateFilter`、`validateSafety` |
 | 行情快照 | `worker/market-service.mjs`、`lib/market.ts` | `getMarketSnapshot`、`loadMarketSnapshot` |
 | 行情解析 | `worker/market-adapter.mjs` | `parseExchange`、`NINJA_TYPES` |
-| 价格换算与分档 | `lib/pricing.ts` | `toExalted`、`currencyDefaultRanges` |
-| 模板外观 | `lib/neversink-appearance.ts` | `applyTemplateAppearances` |
-| 数据 | `data/item-catalog.json`、`data/visual-presets.json`、`data/neversink-currency-appearances.json`、`data/item-mechanics.json` | — |
+| 价格换算 / 分档 | `lib/pricing.ts` | `toExalted`、`currencyPriceTiers`、`resolveAutoRanges` |
+| 特效预设 | `scripts/extract-neversink-effects.mjs` | 生成 `data/neversink-effects.json` 与 `data/default-rules.json` |
+| 数据 | `data/item-catalog.json`、`data/item-mechanics.json`、`data/neversink-effects.json`、`data/default-rules.json` | — |
 | 基线规则 | `vendor/neversink/**` | — |
 | 定时刷新 | `worker/price-sync.mjs` | 每 6 小时全赛季刷新 |
 
@@ -26,10 +27,7 @@ POST /api/generate            POST /api/export (multipart)
         │                              │
         └──────────┬───────────────────┘
                    ▼
-        DEFAULT_PROFILE ← 请求体        （visualPresets 缺省用 DEFAULT_VISUAL_PRESETS）
-                   │
-                   ▼
-        normalizeLeague(league)        （trim / 长度 ≤120 / 拒绝控制字符）
+        normalizeProfile(请求体)      （补齐默认字段 / 统一赛季名；旧格式直接 400）
                    │
                    ▼
         loadMarketSnapshot(league) ───► 缓存有效？→ 直接返回
@@ -37,28 +35,27 @@ POST /api/generate            POST /api/export (multipart)
                    ▼                     失败 → 同赛季旧缓存 → 仍无 → 空快照
         generateFilter(profile, snapshot)
                    │
-       ┌───────────┼────────────┬─────────────────────┐
-       ▼           ▼            ▼                     ▼
-  读基线文件   解析光效预设   合成覆盖规则          安全检查
-  (严格度+风格) (模板外观+    (白名单→光效→隐藏)    (safetyReport)
-                价格分档)
-       │           │            │                     │
-       └───────────┴────────────┴──────────┬──────────┘
-                                           ▼
-                   header + 覆盖规则 + 原样基线 → filterFile
-                                           │
-                             ┌─────────────┴─────────────┐
-                             ▼                           ▼
-                    JSON（预览/下载）        ZIP（filter + manifest + 音效）
+       ┌───────────┼────────────┬───────────────────────┐
+       ▼           ▼            ▼                       ▼
+  读基线文件   解析 autoRange  逐条规则生成覆盖块      安全检查
+  (严格度+风格) (锚点重排)     (跳过名单 > 规则 > 基线)  (safetyReport)
+       │           │            │                       │
+       └───────────┴────────────┴──────────┬────────────┘
+                                            ▼
+                   header + 规则块 + 原样基线 → filterFile
+                                            │
+                              ┌─────────────┴─────────────┐
+                              ▼                           ▼
+                     JSON（预览/下载）        ZIP（filter + manifest + 音效）
 ```
 
 ## 3. 请求入口与参数归一
 
 - 生成：`POST /api/generate`，body 为 JSON profile。
-- 导出：`POST /api/export`，`multipart/form-data`，字段 `profile`（JSON 字符串）加 `sound:<presetId>` 自定义音效文件。
-- 两者都先做 `{ ...DEFAULT_PROFILE, ...body }`，`visualPresets` 缺省回落到 `DEFAULT_VISUAL_PRESETS`（21 条，默认启用 4 条锚点通货）。
-- 赛季名统一走 `normalizeLeague`：`trim()`、非空、长度 ≤ 120、拒绝 `\u0000-\u001f`；不合法直接 400。
-- 现状差异（重要）：**这两个生成接口不做完整字段校验**，只有保存方案/创建订阅时才走 `validateProfile`（严格度 0–6、风格白名单、阈值范围、白名单条目 id/标签/长度上限 3000、光效 id 与颜色、音效文件名、价格端点、图标格式）。因此直接调 API 时请自行保证结构；页面侧所有输入都经过受控组件。
+- 导出：`POST /api/export`，`multipart/form-data`，字段 `profile`（JSON 字符串）加 `sound:<ruleId>` 自定义音效文件。
+- 两者都先走 `normalizeProfile`：补齐 `DEFAULT_PROFILE` 缺失字段、`normalizeLeague`（trim、长度 ≤ 120、拒绝控制字符）、规范化每条规则的 `target.itemIds` 与 `effects`。
+- 旧版方案（`whitelist` + `visualPresets`）不再兼容：缺少 `rules` 会直接报「方案格式已更新，请重新添加自定义过滤规则」。
+- 完整字段校验只在保存方案/创建订阅时走 `validateProfile`（见第 11 节）；直接调生成接口时只做归一，结构错误会表现为 400 或空输出。
 - 失败一律 `400` + `{ "error": "..." }`。
 
 ## 4. 行情快照
@@ -83,68 +80,81 @@ POST /api/generate            POST /api/export (multipart)
 
 ### 4.2 解析（`parseExchange`）
 
-- 只接受 `core.primary === "divine"` 的 payload，否则抛错（宁可不生成价格）。
-- 名称匹配：`item.name.toLowerCase()` ↔ catalog 的 `marketKey.toLowerCase()`，**精确匹配、不做模糊匹配**；命中后写 `prices[itemId] = { amount: line.primaryValue, currency: "divine", … }`。
+- 只接受 `core.primary === "divine"` 的 payload，否则抛错。
+- 名称匹配：`item.name.toLowerCase()` ↔ catalog 的 `marketKey.toLowerCase()`，**精确匹配、不做模糊匹配**。
 - 汇率：`core.rates.chaos` → `divineToChaos`，`core.rates.exalted` → `divineToExalted`，并给 Divine / Chaos / Exalted 三枚锚点补上以 D 计价的 price。
 
 ### 4.3 使用条件
 
-`generateFilter` 只接受「同一个 league」且 `snapshotUsable`（`source !== fallback` 且 `expiresAt >= now`）的快照，否则用空快照 —— 此时所有物品都走 NeverSink 原始规则，并在 warnings 里说明。
+`generateFilter` 只接受同一个 league 且 `snapshotUsable`（`source !== fallback` 且 `expiresAt >= now`）的快照，否则用空快照 —— 此时所有**价格条件**都不成立，只有「选择物品」的条件仍然生效。
 
 ## 5. 基础过滤器选择
 
 `baselineFileFor(profile)`：
 
-- 严格度 → 文件名后缀：`0-SOFT`、`1-REGULAR`、`2-SEMI-STRICT`、`3-STRICT`、`4-VERY-STRICT`、`5-UBER-STRICT`、`6-UBER-PLUS-STRICT`。
-- 风格 → 目录：`default` 在 `vendor/neversink/` 根下；其余在 `(STYLE) AURA|COBALT|CUSTOMSOUNDS|DARKMODE|MYTHIC|VAAL|ZEN/` 下，文件名形如 `NeverSink's filter 2 - 2-SEMI-STRICT (aura) .filter`。
-- 文件不存在时回落到同严格度的 default 文件（不改变严格度，只丢风格外观）。
+- 严格度 → 文件名后缀：`0-SOFT` … `6-UBER-PLUS-STRICT`。
+- 风格 → 目录：`default` 在 `vendor/neversink/` 根下；其余在 `(STYLE) AURA|COBALT|CUSTOMSOUNDS|DARKMODE|MYTHIC|VAAL|ZEN/` 下。
+- 文件不存在时回落到同严格度的 default 文件。
 
-## 6. 光效预设解析（两步）
+## 6. 自定义规则模型
 
-1. **套模板外观** —— `applyTemplateAppearances`
-   `preset.followTemplate !== false` 时，用 `style:strictness` 从 `data/neversink-currency-appearances.json` 里取该通货在 NeverSink 模板中的 `effect / minimapIcon / 文本·边框·背景色 / 字号 / 音效`，整体覆盖预设；key 取 `appearanceItemId ?? sourceItemId`。用户自传的 `custom` 音效不会被覆盖。
-2. **按当日价格重排区间** —— `currencyDefaultRanges`
-   - 锚点固定四枚：`exalted-orb`、`chaos-orb`、`orb-of-annulment`、`divine-orb`（`CURRENCY_ANCHORS`），各自换算成 E 后升序排序。
-   - 对 `autoRange && sourceItemId` 的预设，区间改成 `[锚点_i, 锚点_{i+1})`，最高档无上限；最后一个自动档之后才允许手工档。
-   - 任一锚点缺价 → 该赛季**所有** autoRange 预设禁用（不做部分降级）。
-3. 最后只保留 `enabled` 的预设参与匹配。
-
-## 7. 覆盖规则合成（顺序即优先级）
-
-只有三类规则，全部写在基线文件**前面**：
-
-| 顺序 | 规则 | 触发条件 | 生成的语句 |
-|---|---|---|---|
-| 1 | 白名单 | `whitelist` 条目里的物品（`ambiguous` 项跳过） | `Show # poe2-filter whitelist: …` |
-| 2 | 价格光效 | 有价且 E 值命中某已启用预设 | `Show # poe2-filter preset: <预设名> / <物品名>` |
-| 3 | 低价值隐藏 | `hideBelowEnabled` 且有价低于阈值、且不在白名单 | `Hide # poe2-filter optional low-value rule: …` |
-
-匹配器由 `matcherLines` 生成，顺序固定：`Class == "…"` → `BaseType == "…"` → `Rarity …`（有哪个写哪个）。
-
-### 7.1 白名单
-
-- 单件条目：一条规则，匹配器同物品。
-- 整类条目（分类勾选）：按 `(class, rarity)` 分组合并成 `BaseType == "A" "B" …`，每 24 个 BaseType 一块，标注 `(1-24/129) [129]` 方便排查。
-- 动作固定：`SetFontSize 42`、白字白边、`MinimapIcon 0 White Star`、`PlayEffect White`、`PlayAlertSound 6 300`。
-- 白名单在最前面，所以能压过基线与后面的价格/隐藏规则；`ambiguous`（类别级/歧义匹配）条目不会生成白名单规则，继续沿用 NeverSink 原始规则。
-
-### 7.2 主循环
-
-遍历 `ITEM_CATALOG`（当前 1417 条）：
-
-```text
-price      = item.priceable ? snapshot.prices[item.id] : undefined
-E 值        = price && rates ? toExalted({amount, currency}, rates) : undefined
-白名单中    = whitelistIds.has(item.id)
-
-if 白名单 && !ambiguous            → continue（规则已写过）
-if E 值命中某预设（含下界、不含上界、第一条命中）→ 写 presetRule，记录音效与计数，continue
-if 隐藏开启 && E 值 < 阈值 && 未白名单 && !ambiguous → 写 hideRule，记入 hidden
+```ts
+type RuleTarget = { itemIds: string[]; range?: PriceRange };
+type RuleEffects = { beam?: string; icon?: string; font?: RuleFont; sound?: PresetSound };
+type FilterRule = { id; name; enabled; hidden; autoRange?; target; effects };
 ```
 
-- `toExalted`：D 直接乘 `divineToExalted`；C 乘 `divineToExalted / divineToChaos`；E 原值；带 `referenceItemId` 时按锚点通货的当日报价换算。
-- 隐藏阈值同样先换算成 E（`hideBelowAmount + hideBelowCurrency`），再与物品 E 值比较。
-- 未定价物品不会新增光效也不会被隐藏；`ambiguous` 项两者都不参与。
+### 6.1 匹配条件（物品 ∩ 价格）
+
+| itemIds | range | 命中范围 |
+|---|---|---|
+| 有 | 无 | 就是这些物品，不看价格 |
+| 无 | 有 | 所有**有价**且落在 `[min, max)` 的物品 |
+| 有 | 有 | 交集：物品在这些 id 里，且价格落在区间 |
+| 无 | 无 | 非法（保存时 400，UI 也不允许） |
+
+### 6.2 优先级与匹配流程
+
+**跳过名单 > 规则（数组顺序，首个命中）> 基线**。
+
+```text
+skipped = Set(profile.skippedItemIds)
+rules   = enabled 规则，autoRange 先按当日锚点重排区间
+for item of ITEM_CATALOG:
+    if item.ambiguous or skipped.has(item.id) -> continue
+    for rule of rules:
+        if 物品条件不满足 -> continue
+        if 价格条件不满足（无价也算不满足）-> continue
+        emit block(rule, item)      // Show 或 Hide + 仅已填写的动作
+        break                        // 首个命中即生效
+未命中的物品                        -> 不写任何块，基线照旧
+```
+
+### 6.3 动作合成
+
+| 字段 | 有值 | 留空 |
+|---|---|---|
+| `beam` | `PlayEffect <beam>` | 不写 |
+| `icon` | `MinimapIcon <icon>` | 不写 |
+| `font` | 按已填的子字段写 `SetFontSize` / `SetTextColor` / `SetBorderColor` / `SetBackgroundColor` | 不写 |
+| `sound` | `PlayAlertSound <id> <volume>` 或 `CustomAlertSound "<file>" 300` | 不写 |
+
+- `hidden` → 块首行是 `Hide`，动作照写（合法；游戏内 Alt 可见）。
+- 四个特效都留空且不隐藏 → 不生成块。
+- 块注释：`Show|Hide # poe2-filter rule: <规则名> / <物品名>`。
+
+### 6.4 跟随市价
+
+`autoRange` 规则把区间重排成 `[锚点_i, 锚点_{i+1})`，锚点是崇高石 / 混沌石 / 剥离石 / 神圣石，最高档无上限。四枚锚点任一缺价 → 该规则被禁用并在 warnings 里点名；规则顺序保持用户列表顺序（区间互不重叠，不需要重排）。
+
+## 7. 特效预设集合
+
+`scripts/extract-neversink-effects.mjs` 扫描全部 56 个 vendored 过滤器（default + 7 套 STYLE × 7 档），生成：
+
+- `data/neversink-effects.json`：`beams`（PlayEffect）、`icons`（MinimapIcon）、`fonts`（字号 + 文字/边框/背景色的组合）、`sounds`（内置与模板音效）、`customSounds`。
+- `data/default-rules.json`：4 条默认规则（`default-exalted` / `default-chaos` / `default-annulment` / `default-divine`），把 default 风格 2-SEMI-STRICT 里对应通货的 beam/icon/font/sound 直接写成具体值。
+
+UI 里的下拉只是预设：选中元素后把对应字段填满，字段本身是普通文本/数字，可以继续编辑；生成器不读取集合，只读取规则里存的具体值，所以生成过程保持离线、确定。
 
 ## 8. 输出拼装
 
@@ -153,29 +163,30 @@ if 隐藏开启 && E 值 < 阈值 && 未白名单 && !ambiguous → 写 hideRule
 # Base: <baselineFile>
 # League: <league>
 # Strictness: <0-6> - <中文档位>
+# Rules: <启用条数> enabled / <跳过物品数> skipped items
 # Market: <snapshot.source> @ <capturedAt>
-# Safety: unpriced and ambiguous items remain under the NeverSink baseline.
+# Safety: 未配置的动作交给 NeverSink 基线；隐藏规则会让安全检查失败。
 
-<覆盖规则，块之间空行>
+<规则块，块之间空行>
 
 <基线文件原文，一字不改>
 ```
 
-- 文件名：`poe2-filter-<league 转 slug>-<档位小写>.filter`，例如 `poe2-filter-forbidden-rites-3-strict.filter`。
-- `soundFiles`：先收集预设里的非内置音效名，再从最终文本里扫 `CustomAlertSound(Optional) "…"` 兜底（覆盖模板音效）。
-- 返回 `GeneratedBundle`：`filterFile`、`baselineFile`、`fileName`、`soundFiles`、`appliedPresets`（每条预设命中多少物品）、`safetyReport`。
+- 文件名：`poe2-filter-<league 转 slug>-<档位小写>.filter`。
+- `soundFiles`：先收集规则里用到的非内置音效，再从最终文本扫 `CustomAlertSound(Optional) "…"` 兜底。
+- 返回 `GeneratedBundle`：`filterFile`、`baselineFile`、`fileName`、`soundFiles`、`appliedRules`（每条命中多少物品）、`safetyReport`。
 
 ## 9. 安全检查（safetyReport）
 
 | 字段 | 含义 |
 |---|---|
-| `coveredItems` | 基线里能被匹配的 BaseType / Class 值总数（从基线文本正则统计） |
-| `catalogSize` / `unknownItems` | 目录总条目 / 未识别条目 |
-| `unpricedItems` | 可定价但没有当日价格的条数 |
-| `ambiguousItems` | 类别级/歧义匹配条数 |
-| `hiddenHighValueItems` | 被隐藏但 E 值 ≥ 1D 的物品（**必须为空**） |
-| `whitelistViolations` | 同时出现在白名单与隐藏列表里的物品（**必须为空**） |
-| `warnings` | 快照缺失、未定价数量、歧义数量、启用隐藏等人话提示 |
+| `coveredItems` / `catalogSize` | 基线可匹配的 BaseType/Class 值总数 / 目录总条目 |
+| `unknownItems` | 未识别条目 |
+| `unpricedItems` | 可定价但没有当日价格的条数（不参与价格条件） |
+| `ambiguousItems` | 类别级/歧义匹配条数（规则一律跳过） |
+| `hiddenHighValueItems` | 被隐藏且 E 值 ≥ 1D 的物品（**必须为空**） |
+| `exclusionViolations` | 跳过名单里的物品被隐藏（**必须为空**，正常不会发生） |
+| `warnings` | 无启用规则、锚点缺价、规则未命中、快照缺失、跳过名单等说明 |
 | `passed` | 上两项都为空 |
 
 订阅渲染（`renderManifest`）把 `passed === false` 当作硬错误：不发布新版本，保留上一版并标 `stale: true`。
@@ -186,55 +197,61 @@ if 隐藏开启 && E 值 < 阈值 && 未白名单 && !ambiguous → 写 hideRule
 
 | 条目 | 内容 |
 |---|---|
-| `<fileName>` | 上面拼出的过滤器文本 |
-| `poe2-filter-manifest.json` | `generatedAt`、`baseline`、`market` 快照、`appliedPresets`、`safety` |
-| 上传音效 | 只收 `sound:<presetId>` 且文件名出现在 `bundle.soundFiles` 里的文件 |
+| `<fileName>` | 过滤器文本 |
+| `poe2-filter-manifest.json` | `generatedAt`、`baseline`、`market` 快照、`appliedRules`、`safety` |
+| 上传音效 | 只收 `sound:<ruleId>` 且文件名出现在 `bundle.soundFiles` 里的文件 |
 | 内置音效 | `vendor/neversink/(STYLE) CUSTOMSOUNDS/` 里同名文件；缺失则跳过（manifest 里仍列出） |
 
-## 11. 订阅 / 客户端链路
+## 11. 校验规则（`validateProfile`）
+
+保存方案/创建订阅时逐项校验：
+
+- 规则 ≤ 100 条，id 唯一且匹配 `^[a-zA-Z0-9_-]{1,100}$`，名称 1–100 字符。
+- `target.itemIds` ≤ 2000 且都存在于物品目录；`target.range` 端点金额 ≤ 1e12、货币合法、`referenceItemId` 只能是四枚锚点之一；`itemIds` 与 `range` 不能同时为空。
+- `effects.beam` / `effects.icon` 必须匹配游戏内取值格式；`font.fontSize` 18–45，颜色为 `R G B [A]` 且每项 ≤ 255。
+- `sound`：内置 1–16 号、音量 0–300；自定义文件名 `safeName` 后不变、扩展名 mp3/wav/ogg。
+- `skippedItemIds` ≤ 5000，每个 id 都存在于目录。
+
+## 12. 订阅 / 客户端链路
 
 `latestManifest`（同一方案并发去重）→ `renderManifest`：
 
-1. `validateProfile` 校验配置，`resolveProfileLeague` 把已下架的赛季挪到永久区（保留 `originalLeague` 展示）。
+1. `validateProfile` → `resolveProfileLeague`（下架赛季挪到永久区，保留 `originalLeague`）。
 2. 行情必须有效（`rates` 存在且未过期），否则直接失败。
 3. `generateFilter`，`!passed` 失败。
-4. 音效优先取方案里上传过的（按 sha256），否则取 vendor 内置；过滤器文本里把音效路径重写成 `poe2-filter-assets/<profileId>/<revision>/<name>`。
-5. `revision = sha256(filter + 音效哈希).slice(0, 32)`，manifest 列出每个文件的 `sha256`/大小，写入 `revisions/` 与 `sync_status`。
+4. 音效优先取方案上传过的（按 sha256），否则取 vendor 内置；过滤器文本里把音效路径重写成 `poe2-filter-assets/<profileId>/<revision>/<name>`。
+5. `revision = sha256(filter + 音效哈希).slice(0, 32)`，manifest 列出每个文件的 `sha256` / 大小。
 6. 校验方案版本未在渲染期间变化；失败则记 `sync_status.error`，有上一版就返回 `stale` 版本。
 
-## 12. 降级矩阵
+## 13. 降级矩阵
 
 | 情况 | 结果 |
 |---|---|
-| 行情缺失 / 过期 | 空快照 → 全部沿用 NeverSink 规则，warnings 提示 |
-| 只有部分物品有价 | 有价的走光效/隐藏，其余不动，`unpricedItems` 计数 |
+| 行情缺失 / 过期 | 空快照：价格条件不成立，物品条件照常；warnings 提示 |
+| 只有部分物品有价 | 有价的按规则处理，无价的不参与价格条件，`unpricedItems` 计数 |
 | 快照 league 与请求不一致 | 直接丢弃，按「缺失」处理 |
 | 风格文件缺失 | 回落到同严格度 default 文件 |
-| 四枚锚点任一缺价 | 所有 autoRange 价格档禁用（不生成半套区间） |
-| 隐藏规则会藏掉 ≥1D 物品或白名单物品 | `passed = false`；订阅不发布，网页仍可下载但会红字警告 |
+| 四枚锚点任一缺价 | 所有 `autoRange` 规则禁用，warning 点名 |
+| 规则两个条件都空 | 校验 400；生成时该规则被忽略 |
+| 隐藏会藏掉 ≥1D 物品 | `passed = false`；订阅不发布，网页仍可下载但会红字警告 |
+| 跳过名单物品 | 不参与任何规则；若仍被隐藏则 `passed = false` |
 | 导出时自定义音效不在 `soundFiles` | 忽略该文件 |
 | poe.ninja 返回非 divine 主币或结构异常 | 抛错 → 该赛季保留旧缓存；无缓存则空快照 |
 
-## 13. 复现与排查
-
-本地跑一次生成（dev server）：
+## 14. 复现与排查
 
 ```bash
 npm run dev -- --port 3100
-curl -s http://127.0.0.1:3100/api/generate \
-  -H 'content-type: application/json' \
-  -d '{"league":"Standard","strictness":3,"style":"default","locale":"cn"}' \
-  | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j.fileName);console.log(j.safetyReport)})"
+curl -s http://127.0.0.1:3100/api/generate -H 'content-type: application/json' \
+  -d '{"league":"Standard","strictness":3,"style":"default","locale":"cn","schemaVersion":2,"rules":[{"id":"r1","name":"示例","enabled":true,"hidden":false,"target":{"itemIds":["divine-orb"]},"effects":{"beam":"White"}}],"skippedItemIds":[]}' \
+  | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j.fileName, j.appliedRules, j.safetyReport.passed)})"
 ```
-
-导出的 ZIP 用 `POST /api/export`，带 `-F profile='<json>'`，可选 `-F sound:<presetId>=@custom.mp3`。
 
 定位生成内容：
 
 ```bash
-# 覆盖规则块（白名单 / 光效 / 隐藏）
-grep -n '^Show # poe2-filter' generated.filter
-grep -n '^Hide # poe2-filter' generated.filter
+grep -n '^Show # poe2-filter rule:' generated.filter
+grep -n '^Hide # poe2-filter rule:' generated.filter
 ```
 
 直接调函数（测试里的做法，把 TS 编成 CJS 再 require）：
@@ -246,11 +263,12 @@ node -e "const {generateFilter}=require('./.tmp-engine/lib/filter-engine.js');co
 rm -rf .tmp-engine
 ```
 
-回归测试覆盖的不变量（`tests/currency-defaults.test.mjs`）：模板外观随风格变化、价格区间含下界不含上界、行情变化只重排自动档、缺锚点不生成半套价格、过期或错赛季快照被丢弃、白名单优先于隐藏、隐含高价值物品会让安全检查失败。
+回归测试覆盖的不变量（`tests/filter-rules.test.mjs`、`tests/neversink-effects.test.mjs`）：默认 4 条规则复刻基线外观、留空动作不写、物品 ∩ 价格取交集、规则顺序首命中、隐藏块可带特效、跳过名单硬优先、隐藏高价值会失败、锚点缺价禁用 autoRange、快照赛季不一致不生效。
 
-## 14. 已知限制
+## 15. 已知限制
 
-- 生成接口自身不做 `validateProfile`，保存/订阅才校验；绕过页面直接调 API 时结构错误只会表现为生成结果异常或 400。
-- 价格匹配按名称精确匹配，poe.ninja 改名或中英对齐不一致的物品会落到「未定价」。
-- 隐藏规则只按 `ItemLevel` 与价格阈值判断，不评估词缀价值；高价值判断完全依赖当日行情。
-- 基线与模板音效来自 vendored 的 NeverSink 文件，升级供应商需要重新跑 `scripts/extract-neversink-appearances.mjs` 与 `npm run validate:data`。
+- 生成接口本身不做完整 `validateProfile`，保存/订阅才校验。
+- 价格匹配按名称精确匹配，poe.ninja 改名或中英对齐不一致的物品会落到「未定价」，不参与价格条件。
+- 规则只按价格与物品匹配，不评估词缀价值；高价值判断完全依赖当日行情。
+- 默认 4 条规则的特效值固定在 default 风格 2-SEMI-STRICT 的原始外观；换风格后需要手动改，或重新跑 `scripts/extract-neversink-effects.mjs`。
+- 旧版方案（白名单 + 光效预设）不再兼容，需要重新保存。
