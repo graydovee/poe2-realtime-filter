@@ -21,7 +21,7 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
   - `E = 崇高石数量`
 - 未知物品、没有可靠价格、汇率或安全匹配器的物品继续使用 NeverSink 原始规则。
 - 自定义音效按光效预设上传并随 ZIP 一起导出。
-- 生成前输出覆盖率、未定价、歧义匹配和潜在误隐藏安全报告。
+- 生成前输出覆盖率、未定价、歧义匹配和潜在误隐藏安全报告；判定规则见 [生成流程](docs/filter-generation.md)。
 
 ## 安全原则
 
@@ -39,6 +39,10 @@ PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，�
 - 页面只保留状态与数据流（`app/page.tsx`），面板拆到 `app/components/sections/*`，基础组件在 `app/components/ui/*`。
 - 字体 token、Tailwind 主题与复合组件样式集中定义，新增界面请复用 `ui/*` 组件。
 - 界面改动后的回归：`npx tsc --noEmit --incremental false && npm run lint && npm run build`。
+
+## 生成流程
+
+从请求到 `.filter` 的完整链路（行情快照、基线选择、光效分档、覆盖规则优先级、安全检查与降级矩阵）见 [docs/filter-generation.md](docs/filter-generation.md)。
 
 ## 本地开发
 
