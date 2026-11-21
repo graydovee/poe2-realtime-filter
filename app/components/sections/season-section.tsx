@@ -22,10 +22,11 @@ export function SeasonSection({
   onLeagueChange: (league: string) => void;
 }) {
   const loading = leaguesLoading || marketLoading;
-  const tone = loading ? "gold" : marketError ? "ember" : selectedMarket.rates ? "sage" : "muted";
+  const usable = selectedMarket.rates && Date.parse(selectedMarket.expiresAt) >= Date.now();
+  const tone = loading ? "gold" : marketError ? "ember" : usable ? "sage" : "muted";
   const statusText = loading
     ? "正在加载 " + profile.league + " 行情…"
-    : marketError || (selectedMarket.rates ? "行情更新：" + new Date(selectedMarket.capturedAt).toLocaleString("zh-CN") : "暂无可用行情");
+    : marketError || (selectedMarket.rates ? (usable ? "行情更新：" : "缓存已过期 · ") + new Date(selectedMarket.capturedAt).toLocaleString("zh-CN") : "暂无可用行情");
 
   const leagueGroups: SelectGroup[] | undefined = leagueCatalog
     ? [false, true].map((permanent) => ({
@@ -35,6 +36,9 @@ export function SeasonSection({
           .map((option) => ({ value: option.id, label: option.label })),
       }))
     : undefined;
+  if (leagueGroups && !leagueCatalog?.leagues.some((option) => option.id === profile.league)) {
+    leagueGroups.unshift({ label: "方案原有赛季", options: [{ value: profile.league, label: profile.league }] });
+  }
   const leagueOptions = leagueCatalog ? undefined : [{ value: profile.league, label: profile.league }];
 
   return (
@@ -43,7 +47,7 @@ export function SeasonSection({
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">选择赛季</h2>
           <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
-            赛季决定行情、价格区间和生成版本。赛季结束后，已保存方案会保留原始赛季并自动归入对应永久区。
+            赛季决定行情、价格区间和生成版本。旧赛季方案会保留原有赛季，可手动切换。
           </p>
         </div>
         <div className="min-w-0">

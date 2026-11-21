@@ -1,76 +1,36 @@
-# poe2-filter
+# PoE2 Realtime Filter
 
-PoE2 安全优先掉落过滤器生成器：选择 NeverSink 基础严格度，使用完整物品目录、每日 poe.ninja 价格和 D/C/E 汇率配置光效，再导出 `.filter` 与音效 ZIP。
+Windows x64 单机过滤器编辑器。内置 NeverSink 基础过滤器和物品目录，从 poe.ninja 获取赛季行情。可以离线编辑、保存、分享和预览本地方案。
 
-## 能力
+[下载 Windows 安装包](https://github.com/graydovee/poe2-realtime-filter/releases/latest)
 
-- 选择赛季或永久区；物价、D/C/E 汇率和默认光效价格区间按赛季独立加载。
-- 赛季选项来自 PoE2 官方交易站与 poe.ninja 行情索引，切换赛季会清空旧行情与旧预览。
+## 使用
 
-- 七个 NeverSink PoE2 基础档位和八套官方视觉风格。
-- 从 NeverSink 基础规则解析的完整物品目录（当前包含 1417 个 BaseType/Class 条目）。
-- **自定义过滤规则**：列表顺序即优先级，第一个命中的规则生效。每条规则的条件是「物品集合 ∩ 价格区间」，两个条件各有一个启用开关，可以只启用物品、只启用价格、或两者都启用取交集（例如「基础通货 ∩ 1E–1C」，深渊骨骸即使在区间内也不会命中）；UI 不允许把两个条件都关掉。
-- 物品选择沿用 poe.ninja 经济分组（基础通货 / 碎片 / 深渊骨骸 / 精华 / 预兆 / 探险 / 液化情绪 / 催化剂 / 维金 / 神庙，再往上是装备等分支），可以整类勾选，也可以只勾单件，支持三语搜索。
-- 每条规则有一个**完整特效预设**选择器：一个预设就是一套外观（光柱 + 地图图标 + 字体 + 音效），按视觉风格从 NeverSink 基线里抽取（每套风格 60–104 种），点一下整套填好，之后仍可逐项修改；**留空的项不写任何动作**，交给基础过滤器。
-- **隐藏是规则里的选项**：隐藏块同样可以配特效（游戏内 Alt 可见），因此可以有多条不同特效的隐藏规则，没有全局隐藏阈值。
-- **跳过名单**：名单里的物品不参与任何自定义规则，保持基础过滤器原样（不会再被强制加图标或音效）。
-- 默认带 4 条价格规则（崇高石 / 混沌石 / 剥离石 / 神圣石），特效取原过滤器里这几枚通货的设置，区间跟随当日市价。
-- 价格端点默认跟随通货市价，也可切换为固定 D/C/E 价格；行情缺失时价格条件不生效，带物品条件的规则照常工作。
-- 价格范围输入单位为 D（神圣石）、C（混沌石）或 E（崇高石）。
-- 价格排序与区间比较统一使用 E，基于同一份 poe.ninja 快照：
-  - `D × divineToExalted = E`
-  - `C × divineToExalted / divineToChaos = E`
-  - `E = 崇高石数量`
-- 未知物品、没有可靠价格、汇率或安全匹配器的物品继续使用 NeverSink 原始规则。
-- 自定义音效按光效预设上传并随 ZIP 一起导出。
-- 生成前输出覆盖率、未定价、歧义匹配和潜在误隐藏安全报告；判定规则见 [生成流程](docs/filter-generation.md)。
+1. 选择赛季，配置严格度、外观和自定义规则。
+2. 填写方案名称，选择「保存并安装到游戏」。在 PoE2 的物品过滤器设置中选择同名方案。
+3. 已安装方案默认每 30 分钟刷新。关闭窗口后托盘会继续运行，右键托盘图标可彻底退出。行情暂不可用时保留现有游戏文件。
+4. 在本地方案列表复制分享码。接收方粘贴代码即可导入规则，自定义音效需要另行补齐。
+5. 版本号旁出现「更新」时可以下载新版，签名验证通过后选择「安装并重启」。旧版 v0.4.x 用户首次请手动安装。
 
-## 安全原则
+本地方案和行情缓存位于 `%LOCALAPPDATA%\com.graydove.poe2-realtime-filter`。过滤器写入 Windows 文档目录下的 `My Games\Path of Exile 2`。
 
-- NeverSink 模板原样 vendored，新增规则只放在文件前面。
-- 规则没填写的动作一律不写，不会凭空出现音效或图标。
-- 跳过名单硬优先：名单物品不参与任何规则。
-- 隐藏高价值物品（≥1D）或被跳过名单的物品时，安全检查会失败，订阅不会发布。
-- 规则区间重叠时，列表靠前的那条先生效（与游戏内首命中一致）。
-- 价格或汇率同步失败时保留上一份有效快照；没有有效快照则只使用基础过滤器。
-- Kubernetes 更新只通过项目 Git、Chart 和 ArgoCD 完成，不使用直接 `kubectl` 修改。
+未知物品沿用 NeverSink 基础规则。可以将物品加入跳过名单，避免被自定义规则覆盖。
 
-## 界面与设计系统
+## 开发与发布
 
-网页端使用 Tailwind CSS + Radix 无样式原语重构，配色取自 PoE2 的暗黑奇幻基调，稀有度沿用游戏官方配色；Cinzel / Inter / JetBrains Mono 全部自托管，不请求外部字体或 CDN。设计 token 与组件规范见 [docs/design-system.md](docs/design-system.md)。
+需要 Node.js 22、Rust stable、Visual Studio C++ Build Tools 和 WebView2。
 
-- 页面只保留状态与数据流（`app/page.tsx`），面板拆到 `app/components/sections/*`，基础组件在 `app/components/ui/*`。
-- 字体 token、Tailwind 主题与复合组件样式集中定义，新增界面请复用 `ui/*` 组件。
-- 界面改动后的回归：`npx tsc --noEmit --incremental false && npm run lint && npm run build`。
-
-## 生成流程
-
-从请求到 `.filter` 的完整链路（行情快照、基线选择、光效分档、覆盖规则优先级、安全检查与降级矩阵）见 [docs/filter-generation.md](docs/filter-generation.md)。
-
-## 本地开发
-
-```bash
-npm install
-npm run dev
+```powershell
+npm ci
 npm test
-npm run validate:data
-npx tsc --noEmit --incremental false
-npm run build
+npm run build:engine
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+npm run tauri dev
 ```
 
-市场 worker 默认每 6 小时同步一次，也可以单次执行：
+将 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 和 `src-tauri/tauri.conf.json` 中的版本同步后打 `vX.Y.Z` 标签。Windows GitHub Actions 使用 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 创建签名安装包和 `latest.json`。
 
-```bash
-RUN_ONCE=1 npm run sync:prices
-```
-
-## 发布与部署
-
-Gitea Actions 只在 `v*` tag 上构建 amd64/arm64 镜像，推送到 Harbor 并回写项目 Chart 的 `image.tag`。ArgoCD Application 从本仓库的 `charts/poe2-filter` 拉取 Chart 并部署。
-
-NeverSink 过滤器及音效遵循其仓库中的许可证和来源说明；PoE2 游戏数据属于 Grinding Gear Games。
-
-物品分类使用客户端 ItemClass，可在更新客户端数据后运行 `node scripts/build-catalog-groups.mjs <客户端版本目录>` 重建；未识别的条目保留在其他分类。
+## 物品数据与特效
 
 ### 通货与材料的分组
 
@@ -122,24 +82,3 @@ node scripts/extract-neversink-effects.mjs
 - 规则卡片上有「播放音效」按钮：模板音效直接播放 `vendor/neversink` 里的同一个 mp3；内置音效（`PlayAlertSound 1–16`）播放 `public/sounds/alert-sound-N.ogg`（从游戏 `FMOD/Desktop/Four_ItemFilter.bank` 导出，见 [public/sounds/README.md](public/sounds/README.md)），缺失时按钮置灰。
 
 wiki 侧的分类与三语对照方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill。
-
-## 赛季行情
-
-`GET /api/leagues` 返回可选赛季；`GET /api/market?league=<赛季ID>` 返回该赛季快照。生成和 ZIP 导出配置均包含 `league`，结果文件名、文件头和清单标记赛季。
-
-行情按赛季保存到 DATA_DIR/markets/ 独立文件，同一赛季缺失或过期时拉取新数据；失败时仅使用该赛季仍有效的缓存，否则沿用 NeverSink 基线。旧版单文件缓存只会被同名赛季使用。同步 worker 每个周期更新全部可选经济区。`POE2_LEAGUE` 只控制默认选择，用户仍可在网页切换。自定义 `MARKET_SNAPSHOT_URL` 接收 league 查询参数，返回 JSON 的 league 必须与请求完全一致。
-
-## Windows 客户端
-
-登录后保存方案并创建只读订阅链接，在 [Windows 客户端](https://git.graydove.cn/graydove/poe2-filter/releases) 中添加链接。客户端默认定位 `C:\Users\<用户>\Documents\My Games\Path of Exile 2`，托盘常驻，每 30 分钟检查一次；首次需要在游戏内选择客户端生成的本地过滤器。
-
-匿名用户只可在网页内生成和下载，关闭网页后配置不保存。
-
-
-### 登录和方案同步
-
-匿名访问只在当前页面内保存编辑状态，可以生成并下载过滤器。登录后可保存多个方案、上传方案音效、复制方案和创建只读同步链接；客户端使用同步链接，不需要登录网站。
-
-Casdoor OIDC 配置完成后设置 `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET` 和 `PUBLIC_ORIGIN`。未配置 OIDC 时登录按钮会提示尚未配置，匿名功能不受影响。
-
-同步链接只允许读取已发布的固定版本 manifest 和文件，版本使用 SHA-256 校验；方案删除、停用或重置密钥后客户端会停止更新并保留现有文件。

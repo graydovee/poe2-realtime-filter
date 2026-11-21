@@ -81,7 +81,7 @@ test("Most Popular uses the reciprocal quote and converts D, C and E before matc
   assert.match(blocks[0], /^Hide .*Greater Jeweller/);
 });
 
-test("subscription filter bytes stay stable when only the market timestamp changes", () => {
+test("generated filter bytes stay stable when only the market timestamp changes", () => {
   const nextMarket = { ...snapshot, capturedAt: new Date(Date.parse(snapshot.capturedAt) + 60_000).toISOString() };
   const config = profile({ skippedItemIds: [] });
   const options = { includeMarketTimestamp: false };

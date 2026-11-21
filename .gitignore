@@ -12,3 +12,7 @@ public/uploads/
 
 desktop/target/
 desktop/diagnostics.json
+src-tauri/target/
+src-tauri/generated/
+src-tauri/gen/
+*.tsbuildinfo

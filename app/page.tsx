@@ -1,5 +1,7 @@
 "use client";
 
+import { listen } from "@tauri-apps/api/event";
+import { explain, isDesktop, local } from "../lib/desktop";
 import { useEffect, useRef, useState } from "react";
 
 import { FALLBACK_SNAPSHOT } from "../lib/data";
@@ -22,6 +24,7 @@ const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
 
 export default function HomePage() {
   const [market, setMarket] = useState<MarketSnapshot>(FALLBACK_SNAPSHOT);
+  const [schemeId, setSchemeId] = useState<string | null>(null);
   const [profile, setProfile] = useState<FilterProfile>(DEFAULT_PROFILE);
   const [customSounds, setCustomSounds] = useState<Record<string, File>>({});
   const [generated, setGenerated] = useState<Generated | null>(null);
@@ -29,59 +32,59 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
   const [leagueCatalog, setLeagueCatalog] = useState<LeagueCatalog | null>(null);
-  const [leaguesLoading, setLeaguesLoading] = useState(true);
-  const [marketLoading, setMarketLoading] = useState(true);
+  const leaguesLoading = false;
+  const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
   const requestVersion = useRef(0);
   const leagueChosen = useRef(false);
-  const selectedMarket: MarketSnapshot = market.league === profile.league ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
+  const selectedMarket: MarketSnapshot = market.league === profile.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/leagues", { signal: controller.signal }).then(async (response) => {
-      if (!response.ok) throw new Error("无法获取赛季列表");
-      return response.json() as Promise<LeagueCatalog>;
-    }).then((catalog) => {
-      if (controller.signal.aborted) return;
+    if (!isDesktop()) return;
+    let active = true;
+    const load = async () => {
+      const catalog = await local<LeagueCatalog>("local_catalog");
+      if (!active) return;
       setLeagueCatalog(catalog);
-      if (!leagueChosen.current && catalog.defaultLeague !== DEFAULT_PROFILE.league) {
-        requestVersion.current += 1;
-        setProfile((current) => ({ ...current, league: catalog.defaultLeague, originalLeague: catalog.defaultLeague }));
-        setGenerated(null);
-        setBusy(false);
+      if (!leagueChosen.current) {
+        setProfile((current) => catalog.defaultLeague === current.league ? current : { ...current, league: catalog.defaultLeague, originalLeague: catalog.defaultLeague });
       }
-    }).catch(() => {
-      if (!controller.signal.aborted) setMarketError("暂时无法更新赛季列表，请稍后刷新重试。");
-    }).finally(() => { if (!controller.signal.aborted) setLeaguesLoading(false); });
-    return () => controller.abort();
+    };
+    void load().catch(() => {});
+    const listener = listen<string | null>("local-refresh", ({ payload }) => {
+      void load().catch(() => {});
+      if (active) setMarketError(payload || "");
+    });
+    return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (!isDesktop()) return;
+    let active = true;
     const league = profile.league;
-    setMarket({ ...FALLBACK_SNAPSHOT, league });
+    const load = async () => {
+      const cached = await local<MarketSnapshot | null>("local_market", { league });
+      if (active) setMarket(cached ?? { ...FALLBACK_SNAPSHOT, league });
+    };
+    void load().catch(() => {});
+    const listener = listen("local-refresh", () => { void load().catch(() => {}); });
+    return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
+  }, [profile.league]);
+
+  async function refreshMarket() {
     setMarketLoading(true);
     setMarketError("");
-    fetch("/api/market?league=" + encodeURIComponent(league), { signal: controller.signal }).then(async (response) => {
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "行情加载失败");
-      if (payload.league !== league) throw new Error("返回的行情与所选赛季不一致");
-      if (!controller.signal.aborted) {
-        setMarket(payload);
-        if (!payload.rates) setMarketError("该赛季暂无可用行情，物品将使用 NeverSink 原始规则。");
-      }
-    }).catch((cause) => {
-      if (!controller.signal.aborted) setMarketError(cause instanceof Error ? cause.message : "行情加载失败");
-    }).finally(() => { if (!controller.signal.aborted) setMarketLoading(false); });
-    return () => controller.abort();
-  }, [profile.league]);
+    try { await local("refresh_market", { league: profile.league }); }
+    catch (error) { setMarketError(explain(error)); throw error; }
+    finally { setMarketLoading(false); }
+  }
 
   function selectLeague(league: string) {
     leagueChosen.current = true;
     requestVersion.current += 1;
     setProfile((current) => ({ ...current, league, originalLeague: league }));
     setMarket({ ...FALLBACK_SNAPSHOT, league });
-    setMarketLoading(true);
+    setMarketLoading(false);
     setGenerated(null);
     setBusy(false);
     setError("");
@@ -166,37 +169,26 @@ export default function HomePage() {
     setBusy(true);
     setError("");
     try {
-      const response = await fetch("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(profile) });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "生成失败");
+      const payload = await local<Generated>("preview", { profile });
       if (version !== requestVersion.current) return;
       if (payload.market?.league !== league) throw new Error("生成结果与所选赛季不一致");
       setGenerated(payload);
       setActiveTab("preview");
     } catch (cause) {
-      if (version === requestVersion.current) setError(cause instanceof Error ? cause.message : "生成失败");
+      if (version === requestVersion.current) setError(explain(cause));
     } finally {
       if (version === requestVersion.current) setBusy(false);
     }
   }
 
   function downloadFilter() {
-    if (!generated) return;
-    const url = URL.createObjectURL(new Blob([generated.filterFile], { type: "text/plain;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = generated.fileName; anchor.click(); URL.revokeObjectURL(url);
+    if (generated) void local("export_filter", { name: generated.fileName, text: generated.filterFile }).catch((error) => setError(explain(error)));
   }
 
   async function downloadBundle() {
-    const version = requestVersion.current;
-    const form = new FormData();
-    form.set("profile", JSON.stringify(profile));
-    for (const [id, file] of Object.entries(customSounds)) form.set("sound:" + id, file);
-    const response = await fetch("/api/export", { method: "POST", body: form });
-    if (!response.ok) throw new Error("ZIP 导出失败");
-    const blob = await response.blob();
-    if (version !== requestVersion.current) return;
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = "poe2-filter.zip"; anchor.click(); URL.revokeObjectURL(url);
+    if (!schemeId) { setError("请先保存方案再导出 ZIP"); return; }
+    try { await local("export_bundle", { id: schemeId }); }
+    catch (error) { setError(explain(error)); }
   }
 
   return (
@@ -208,15 +200,27 @@ export default function HomePage() {
           leaguesLoading={leaguesLoading}
           marketLoading={marketLoading}
           marketError={marketError}
-          selectedMarket={selectedMarket}
+          selectedMarket={market.league === profile.league ? market : selectedMarket}
           onLeagueChange={selectLeague}
         />
 
         <SchemeManager
           profile={profile}
           sounds={customSounds}
-          leagueCatalog={leagueCatalog}
-          onOpen={(nextProfile, sounds) => {
+          onRefresh={refreshMarket}
+          onNew={() => {
+            leagueChosen.current = true;
+            requestVersion.current += 1;
+            setBusy(false);
+            setSchemeId(null);
+            setCustomSounds({});
+            setProfile({ ...DEFAULT_PROFILE, league: profile.league, originalLeague: profile.league });
+            setGenerated(null);
+            setError("");
+            setActiveTab("builder");
+          }}
+          onOpen={(nextProfile, sounds, id) => {
+            setSchemeId(id);
             leagueChosen.current = true;
             requestVersion.current += 1;
             setProfile(nextProfile);
@@ -270,6 +274,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="pt-2">
+            {error && <p role="alert" className="mb-2 text-sm text-ember">{error}</p>}
             <PreviewView
               generated={generated}
               onGenerate={() => void generate()}

@@ -67,7 +67,7 @@
 
 ### 复合组件（方案管理）
 
-`app/components/scheme-manager.tsx` 与预览页的保存入口沿用既有结构（避免改动已上线的方案/订阅逻辑），其样式由 `app/globals.css` 末尾的复合组件样式层提供；该层通过一组 legacy 变量别名（`--surface`、`--border`、`--cyan` 等）映射到同一套调色板，因此视觉与 Tailwind 组件一致。
+`app/components/scheme-manager.tsx` 使用同一套 Panel、Button、TextInput 组件呈现本地方案、分享码和后台刷新设置。
 
 > Tailwind 的 preflight 被关闭（`corePlugins.preflight = false`），以免重置影响这些复合组件；`app/globals.css` 的 `@layer base` 里只保留必要的底色、按钮归零与滚动条样式。
 

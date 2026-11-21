@@ -1,5 +1,4 @@
 import { DEFAULT_PROFILE } from "./default-profile";
-import { normalizeLeague } from "./market";
 import type { FilterProfile, FilterRule } from "./types";
 
 /**
@@ -9,7 +8,8 @@ import type { FilterProfile, FilterRule } from "./types";
 export function normalizeProfile(input: unknown): FilterProfile {
   const raw = (input ?? {}) as Partial<FilterProfile>;
   if (!Array.isArray(raw.rules)) throw new Error("方案格式已更新，请重新添加自定义过滤规则");
-  const league = normalizeLeague(raw.league ?? process.env.POE2_LEAGUE ?? DEFAULT_PROFILE.league);
+  const league = normalizeLeague(raw.league ?? DEFAULT_PROFILE.league);
+  if (raw.schemaVersion !== 2) throw new Error("不支持的方案格式版本");
   const rules = raw.rules.map((rule) => {
     const candidate = (rule ?? {}) as FilterRule;
     return {
@@ -25,11 +25,18 @@ export function normalizeProfile(input: unknown): FilterProfile {
   });
   return {
     ...DEFAULT_PROFILE,
-    ...raw,
+    strictness: raw.strictness ?? DEFAULT_PROFILE.strictness,
+    style: raw.style ?? DEFAULT_PROFILE.style,
+    locale: raw.locale ?? DEFAULT_PROFILE.locale,
     schemaVersion: 2,
     league,
-    originalLeague: typeof raw.originalLeague === "string" && raw.originalLeague.trim() ? raw.originalLeague.trim() : league,
+    originalLeague: typeof raw.originalLeague === "string" && raw.originalLeague.trim() ? normalizeLeague(raw.originalLeague) : league,
     rules,
     skippedItemIds: Array.isArray(raw.skippedItemIds) ? raw.skippedItemIds : [],
   };
+}
+
+export function normalizeLeague(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 120 || /[\x00-\x1f]/.test(value)) throw new Error("无效赛季");
+  return value.trim();
 }

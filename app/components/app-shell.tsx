@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { ClientDownload } from "./client-download";
+import { DesktopUpdate } from "./desktop-update";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -9,11 +9,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex min-h-16 max-w-[1440px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 sm:px-8 lg:px-10">
           <div className="flex items-center gap-3">
             <Image src="/brand/poe2-filter.png" alt="" width={36} height={36} className="shrink-0" unoptimized />
-            <strong className="font-display text-[15px] font-semibold tracking-wide text-ink">poe2-filter</strong>
+            <strong className="font-display text-[15px] font-semibold tracking-wide text-ink">PoE2 Realtime Filter</strong>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-mono text-xs font-medium text-ink-muted">{process.env.NEXT_PUBLIC_APP_VERSION || "开发版"}</span>
-            <ClientDownload />
+            <span className="font-mono text-xs font-medium text-ink-muted">{"v" + process.env.NEXT_PUBLIC_APP_VERSION}</span>
+            <DesktopUpdate />
           </div>
         </div>
       </header>

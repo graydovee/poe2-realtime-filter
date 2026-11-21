@@ -1,7 +1,0 @@
-node_modules
-.next
-.git
-.gitignore
-vendor/neversink/.git
-*.log
-desktop/target

@@ -1,130 +1,168 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { FilterProfile, LeagueCatalog } from "../../lib/types";
-import { SchemeSaveControls } from "./scheme-save-controls";
+import { listen } from "@tauri-apps/api/event";
+import { useEffect, useState } from "react";
+import { explain, fileToBase64, isDesktop, local, readSound, type Library, type LocalScheme } from "../../lib/desktop";
+import type { FilterProfile } from "../../lib/types";
+import { TextInput } from "./ui/controls";
+import { Button, Panel } from "./ui/primitives";
 
-type Scheme = { id: string; name: string; profile: FilterProfile; version: number; updatedAt: string; subscriptionEnabled: boolean; subscriberCount: number };
-type EditingScheme = Pick<Scheme, "id" | "name" | "version">;
-type Modal = { title: string; message: string; confirmLabel: string; danger?: boolean; action: () => Promise<void> };
+type Props = {
+  profile: FilterProfile;
+  sounds: Record<string, File>;
+  onOpen: (profile: FilterProfile, sounds: Record<string, File>, id: string | null) => void;
+  onRefresh: () => Promise<void>;
+  onNew: () => void;
+};
 
-export function SchemeManager({ profile, sounds, leagueCatalog, onOpen }: { profile: FilterProfile; sounds: Record<string, File>; leagueCatalog: LeagueCatalog | null; onOpen: (p: FilterProfile, sounds: Record<string, File>) => void }) {
-  const [account, setAccount] = useState<{ name: string } | null>(null);
-  const [configured, setConfigured] = useState(true);
-  const [items, setItems] = useState<Scheme[]>([]);
-  const [editing, setEditing] = useState<EditingScheme | null>(null);
-  const [saveFeedback, setSaveFeedback] = useState<{ text: string; error?: boolean } | null>(null);
+export function SchemeManager({ profile, sounds, onOpen, onRefresh, onNew }: Props) {
+  const [library, setLibrary] = useState<Library>();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [link, setLink] = useState("");
-  const [filterLeague, setFilterLeague] = useState("all");
-  const [importUrl, setImportUrl] = useState("");
-  const [menuId, setMenuId] = useState<string | null>(null);
-  const [modal, setModal] = useState<Modal | null>(null);
-  const [renameId, setRenameId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [interval, setIntervalValue] = useState("30");
+  const [shareCode, setShareCode] = useState("");
+  const [importName, setImportName] = useState("");
+  const [openShare, setOpenShare] = useState(false);
+  const [remove, setRemove] = useState<LocalScheme>();
+  const [removeFile, setRemoveFile] = useState(false);
 
-  const call = async (url: string, init?: RequestInit) => {
-    const response = await fetch(url, init);
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload) throw new Error(payload?.error || `请求失败（HTTP ${response.status}）`);
-    return payload;
-  };
-
-  const refresh = useCallback(async () => {
-    const response = await fetch("/api/auth/session");
-    const session = await response.json();
-    setAccount(session.user);
-    setConfigured(session.configured);
-    if (!session.user) { setItems([]); setEditing(null); return; }
-    const profiles = await fetch("/api/profiles");
-    if (profiles.ok) setItems((await profiles.json()).profiles);
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let active = true;
+    const update = () => local<Library>("library").then((value) => { if (active) setLibrary(value); });
+    void update().then(() => local<Library>("library")).then((value) => { if (active) setIntervalValue(String(value.settings.intervalMinutes)); }).catch((error) => { if (active) setFeedback(explain(error)); });
+    const listener = listen("local-refresh", () => { void update().catch(() => {}); });
+    return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
   }, []);
 
-  useEffect(() => { void refresh().catch(() => setMessage("无法读取账号状态")); }, [refresh]);
-
-  async function run(work: () => Promise<void>) {
-    setBusy(true); setMessage(""); setMenuId(null);
-    try { await work(); await refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : "请求失败"); }
-    finally { setBusy(false); }
-  }
-
-  async function open(id: string) {
-    const item: Scheme = await call(`/api/profiles/${id}`, { cache: "no-store" });
-    const files: Record<string, File> = {};
-    for (const rule of item.profile.rules ?? []) if (rule.effects.sound?.type === "custom") {
-      const response = await fetch(`/api/profiles/${item.id}/sounds/${encodeURIComponent(rule.effects.sound.fileName)}`);
-      if (!response.ok) throw new Error("音效读取失败");
-      files[rule.id] = new File([await response.blob()], rule.effects.sound.fileName);
-    }
-    setEditing({ id: item.id, name: item.name, version: item.version });
-    setSaveFeedback(null);
-    onOpen(item.profile, files);
-    setLink("");
-    setMessage(item.profile.originalLeague && item.profile.originalLeague !== item.profile.league ? `原始赛季 ${item.profile.originalLeague} 已结束，当前使用 ${item.profile.league}。` : "已打开方案，可在配置页切换赛季。");
-  }
-
-  async function save(name?: string) {
-    if (busy) return false;
-    const target = name === undefined ? editing : null;
-    if (!target && !name) return false;
+  async function run(action: () => Promise<void>) {
     setBusy(true);
-    setMenuId(null);
-    setSaveFeedback({ text: "正在保存…" });
-    try {
-      const form = new FormData();
-      form.set("profile", JSON.stringify(profile));
-      if (target) form.set("version", String(target.version));
-      else if (name) form.set("name", name);
-      for (const rule of profile.rules) {
-        const file = sounds[rule.id];
-        const sound = rule.effects.sound;
-        if (file && sound?.type === "custom" && file.name.replace(/[^a-zA-Z0-9._-]/g, "_") === sound.fileName) {
-          form.set(`sound:${rule.id}`, file);
-        }
-      }
-      const saved: Scheme = await call(target ? `/api/profiles/${target.id}` : "/api/profiles", {
-        method: target ? "PUT" : "POST",
-        body: form,
-      });
-      setEditing({ id: saved.id, name: saved.name, version: saved.version });
-      setItems((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      setSaveFeedback({ text: `已保存「${saved.name}」。` });
-      return true;
-    } catch (error) {
-      setSaveFeedback({ text: error instanceof Error ? error.message : "保存失败", error: true });
-      return false;
-    } finally {
+    setFeedback("");
+    try { await action(); }
+    catch (error) { setFeedback(explain(error)); }
+    finally {
+      try { setLibrary(await local<Library>("library")); }
+      catch (error) { setFeedback(explain(error)); }
       setBusy(false);
     }
   }
 
-  function ask(modalValue: Modal) { setMenuId(null); setModal(modalValue); }
-  function startRename(item: Scheme) { setRenameId(item.id); setRenameValue(item.name); setMenuId(null); }
-  const visibleItems = items.filter((item) => filterLeague === "all" || item.profile.league === filterLeague || item.profile.originalLeague === filterLeague);
-  const leagueLabel = (id: string) => leagueCatalog?.leagues.find((league) => league.id === id)?.label || id;
-  const filterOptions = [...new Set([...((leagueCatalog?.leagues || []).map((league) => league.id)), ...items.map((item) => item.profile.originalLeague || item.profile.league)])];
+  async function open(scheme: LocalScheme) {
+    const cached = new Map<string, Promise<File>>();
+    const files = await Promise.all(scheme.profile.rules.map(async (rule) => {
+      const sound = rule.effects.sound;
+      if (sound?.type !== "custom") return undefined;
+      if (!cached.has(sound.fileName)) cached.set(sound.fileName, readSound(sound.fileName, scheme.id, true));
+      try { return [rule.id, await cached.get(sound.fileName)!] as const; }
+      catch { return undefined; }
+    }));
+    setEditing(scheme.id);
+    setName(scheme.name);
+    onOpen(scheme.profile, Object.fromEntries(files.filter((file) => file !== undefined)), scheme.id);
+  }
 
-  return <><section className="panel schemes-panel">
-    <div className="scheme-heading"><div><h2>我的方案</h2><p>{account ? account.name : "未登录的修改只在当前页面保留，关闭后不保存。"}</p></div>{account ? <button disabled={busy} onClick={() => void run(async () => { await call("/api/auth/logout", { method: "POST" }); setAccount(null); setItems([]); setEditing(null); setSaveFeedback(null); setLink(""); })}>退出登录</button> : configured ? <a href="/api/auth/login">登录管理方案</a> : <button disabled title="Casdoor OIDC 尚未配置">登录管理方案（待配置）</button>}</div>
-    {!configured && !account && <p className="field-help">账号登录正在配置中，仍可生成和下载过滤器。</p>}
-    {account && <>
-      <div className="scheme-import-row"><label>导入订阅链接<input value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="粘贴 poe2-filter 订阅链接" /></label><button className="secondary-button" disabled={busy || !importUrl.trim()} onClick={() => void run(async () => { const item = await call("/api/profiles/import", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: importUrl }) }); setImportUrl(""); setMessage(`已导入方案“${item.name}”。`); })}>导入方案</button></div>
-      <div className="scheme-toolbar"><span>已保存方案</span><label>按赛季筛选<select value={filterLeague} onChange={(event) => setFilterLeague(event.target.value)}><option value="all">全部赛季</option>{filterOptions.map((id) => <option key={id} value={id}>{leagueCatalog?.leagues.some((league) => league.id === id) ? leagueLabel(id) : `${id}（已结束）`}</option>)}</select></label></div>
-      <div className="scheme-list">{visibleItems.length === 0 ? <p>{items.length ? "当前赛季没有方案。" : "还没有保存的方案。"}</p> : visibleItems.map((item) => <div key={item.id} className="scheme-row"><div><strong>{item.name}</strong><small>{item.profile.originalLeague && item.profile.originalLeague !== item.profile.league ? `${leagueLabel(item.profile.originalLeague)} → ${leagueLabel(item.profile.league)}` : leagueLabel(item.profile.league)} · {new Date(item.updatedAt).toLocaleString("zh-CN")} · 累计订阅设备 {item.subscriberCount ?? 0} 台</small></div><div className="scheme-row-actions"><button disabled={busy} onClick={() => void run(() => open(item.id))}>打开编辑</button><button disabled={busy} onClick={() => void run(async () => { let key = await call(`/api/profiles/${item.id}/subscription`); if (!key.enabled) key = await call(`/api/profiles/${item.id}/subscription`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create" }) }); setLink(`${location.origin}/sync/${item.id}#key=${key.key}`); setMessage("订阅链接已生成。"); })}>订阅链接</button><div className="more-menu"><button aria-expanded={menuId === item.id} disabled={busy} onClick={() => setMenuId(menuId === item.id ? null : item.id)}>更多</button>{menuId === item.id && <div className="more-menu-popover" role="menu"><button role="menuitem" onClick={() => void run(async () => { await call(`/api/profiles/${item.id}/copy`, { method: "POST" }); setMessage("方案已复制。"); })}>复制方案</button><button role="menuitem" onClick={() => startRename(item)}>重命名</button>{item.subscriptionEnabled && <><button role="menuitem" onClick={() => ask({ title: "停用订阅", message: "停用后客户端会停止更新，但已安装文件会保留。", confirmLabel: "停用", action: async () => { await call(`/api/profiles/${item.id}/subscription`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "disable" }) }); setLink(""); } })}>停用订阅</button><button role="menuitem" onClick={() => ask({ title: "重置订阅密钥", message: "重置后现有客户端链接会立即失效，需要重新添加。", confirmLabel: "重置", action: async () => { const key = await call(`/api/profiles/${item.id}/subscription`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reset" }) }); setLink(`${location.origin}/sync/${item.id}#key=${key.key}`); } })}>重置密钥</button></>}<button role="menuitem" onClick={() => ask({ title: "删除方案", message: "删除后客户端会停止更新，但已安装文件会保留。", confirmLabel: "删除", danger: true, action: async () => { await call(`/api/profiles/${item.id}`, { method: "DELETE" }); if (editing?.id === item.id) { setEditing(null); setSaveFeedback(null); } setLink(""); } })}>删除方案</button></div>}</div></div></div>)}</div>
-      {link && <div className="sync-link"><label>只读订阅链接<input readOnly value={link} onFocus={(event) => event.target.select()} /></label><button onClick={() => void navigator.clipboard.writeText(link).then(() => setMessage("订阅链接已复制。")).catch(() => setMessage("请手动复制链接。"))}>复制链接</button><p>在 Windows 客户端中添加此链接，即可定时更新。</p></div>}
-    </>}
-    {message && <p role="status" className="field-help">{message}</p>}
-    {renameId && <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="rename-title"><h3 id="rename-title">重命名方案</h3><label>方案名称<input autoFocus maxLength={80} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} /></label><div className="modal-actions"><button onClick={() => setRenameId(null)}>取消</button><button disabled={!renameValue.trim() || busy} onClick={() => void run(async () => { await call(`/api/profiles/${renameId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: renameValue }) }); setRenameId(null); setMessage("方案已重命名。"); })}>保存</button></div></div></div>}
-    {modal && <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><h3 id="confirm-title">{modal.title}</h3><p>{modal.message}</p><div className="modal-actions"><button onClick={() => setModal(null)}>取消</button><button className={modal.danger ? "danger-button" : ""} disabled={busy} onClick={() => void run(async () => { await modal.action(); setModal(null); })}>{modal.confirmLabel}</button></div></div></div>}
-  </section>
-    {account && <SchemeSaveControls
-      key={editing?.id ?? "draft"}
-      schemeName={editing ? items.find((item) => item.id === editing.id)?.name ?? editing.name : null}
-      busy={busy}
-      feedback={saveFeedback}
-      onSave={() => save()}
-      onSaveAs={save}
-    />}
-  </>;
+  async function save(asNew = false) {
+    const uploads: Record<string, string> = {};
+    let bytes = 0;
+    for (const rule of profile.rules) {
+      const sound = rule.effects.sound;
+      const file = sounds[rule.id];
+      if (sound?.type !== "custom" || !file || uploads[sound.fileName] !== undefined) continue;
+      bytes += file.size;
+      if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
+      uploads[sound.fileName] = await fileToBase64(file);
+    }
+    const id = await local<string>("scheme_save", { edit: { id: asNew ? null : editing, name, profile, sounds: uploads } });
+    const saved = (await local<Library>("library")).schemes.find((item) => item.id === id);
+    setEditing(id);
+    if (saved) { setName(saved.name); onOpen(saved.profile, sounds, id); }
+    setFeedback("方案已保存");
+    return id;
+  }
+
+  return <Panel>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-sm font-semibold text-ink">本地方案</h2>
+      <Button size="sm" disabled={busy} onClick={() => { setEditing(null); setName(""); setFeedback(""); onNew(); }}>新建方案</Button>
+    </div>
+    <form className="my-3 flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void run(async () => { await save(); }); }}>
+      <label className="min-w-48 text-xs text-ink-muted">{editing ? "方案名称（可改名）" : "新方案名称"}
+        <TextInput className="mt-1" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
+      </label>
+      <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !name.trim()}>保存方案</Button>
+      {editing && <Button type="button" size="sm" disabled={busy || !name.trim()} onClick={() => void run(async () => { await save(true); })}>另存为</Button>}
+      <Button type="button" size="sm" disabled={busy || !library || !name.trim()} onClick={() => void run(async () => {
+        const id = await save();
+        await local("scheme_install", { id });
+        setFeedback("过滤器已保存到游戏目录");
+      })}>保存并安装到游戏</Button>
+      <Button type="button" size="sm" disabled={!library} aria-expanded={openShare} onClick={() => setOpenShare(!openShare)}>导入分享码</Button>
+    </form>
+    {openShare && <form className="my-3 grid gap-2 rounded border border-line p-3" onSubmit={(event) => {
+      event.preventDefault();
+      void run(async () => {
+        const result = await local<{ id: string; missing: string[] }>("scheme_import", { code: shareCode, name: importName.trim() || null });
+        const imported = (await local<Library>("library")).schemes.find((item) => item.id === result.id);
+        if (imported) await open(imported);
+        setFeedback(result.missing.length ? `已导入。请在规则中补齐音效：${result.missing.join("、")}` : "已导入方案");
+        setShareCode("");
+        setImportName("");
+        setOpenShare(false);
+      });
+    }}>
+      <textarea aria-label="分享码" className="min-h-24 rounded border border-line bg-surface px-3 py-2 font-mono text-sm" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1400000} onChange={(event) => setShareCode(event.target.value)} />
+      <div className="flex flex-wrap gap-2">
+        <TextInput aria-label="导入名称" className="max-w-xs" placeholder="可选：指定新名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
+        <Button type="submit" size="sm" disabled={busy || !shareCode.trim()}>导入</Button>
+      </div>
+    </form>}
+    <ul className="grid gap-2">
+      {library?.schemes.map((scheme) => <li key={scheme.id} className="flex flex-wrap justify-between gap-2 rounded border border-line bg-surface px-3 py-2">
+        <div className="min-w-0">
+          <strong className="block break-words text-sm text-ink">{scheme.name}</strong>
+          <span className="break-words text-xs text-ink-muted">{scheme.profile.league} · {scheme.installed ? (scheme.status || "已安装") : (scheme.status || "未安装")}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {scheme.installed && <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={scheme.autoRefresh} disabled={busy} onChange={(event) => {
+            const enabled = event.target.checked;
+            void run(() => local("scheme_auto", { id: scheme.id, enabled }));
+          }} />自动刷新</label>}
+          <Button size="sm" disabled={busy} onClick={() => void run(() => open(scheme))}>编辑</Button>
+          <Button size="sm" disabled={busy} onClick={() => void run(async () => { await local("scheme_copy", { id: scheme.id }); setFeedback("已复制方案"); })}>复制</Button>
+          <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+            const code = await local<string>("scheme_share", { id: scheme.id });
+            try { await navigator.clipboard.writeText(code); setFeedback("分享码已复制"); }
+            catch { setShareCode(code); setOpenShare(true); setFeedback("请手动复制分享码"); }
+          })}>分享码</Button>
+          <Button size="sm" disabled={busy} onClick={() => { setRemove(scheme); setRemoveFile(false); }}>删除</Button>
+        </div>
+      </li>)}
+    </ul>
+    {remove && <div className="modal-backdrop" role="presentation"><div className="modal-card" role="dialog" aria-modal="true" aria-label="删除方案">
+      <h3>删除「{remove.name}」？</h3>
+      {remove.installed && <label className="flex items-center gap-2"><input type="checkbox" checked={removeFile} onChange={(event) => setRemoveFile(event.target.checked)} />同时删除游戏里的过滤器文件</label>}
+      <div className="modal-actions"><Button size="sm" onClick={() => setRemove(undefined)}>取消</Button><Button size="sm" disabled={busy} onClick={() => void run(async () => {
+        await local("scheme_remove", { id: remove.id, removeFile });
+        if (editing === remove.id) { setEditing(null); setName(""); onNew(); }
+        setRemove(undefined);
+        setFeedback("方案已删除");
+      })}>确认删除</Button></div>
+    </div></div>}
+    {feedback && <p role="status" className="my-2 text-sm text-ink">{feedback}</p>}
+    <form className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3" onSubmit={(event) => {
+      event.preventDefault();
+      if (!library) return;
+      void run(() => local("save_settings", { settings: { ...library.settings, intervalMinutes: Number(interval) } }));
+    }}>
+      <label className="text-xs text-ink-muted">刷新间隔（分钟）<TextInput className="mt-1 w-28" type="number" min="1" max="1440" value={interval} onChange={(event) => setIntervalValue(event.target.value)} /></label>
+      <Button type="submit" size="sm" disabled={!library || busy}>应用间隔</Button>
+      <label className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={library?.settings.paused ?? false} disabled={!library || busy} onChange={(event) => {
+        const paused = event.target.checked;
+        if (library) void run(() => local("save_settings", { settings: { ...library.settings, paused } }));
+      }} />暂停后台刷新</label>
+      <Button type="button" size="sm" disabled={!library || busy} onClick={() => void run(async () => { await onRefresh(); setFeedback("行情已刷新"); })}>刷新当前赛季</Button>
+    </form>
+  </Panel>;
 }

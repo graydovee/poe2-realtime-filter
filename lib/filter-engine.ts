@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
 import { resolveAutoRanges, toExalted } from "./pricing";
 import type {
@@ -40,14 +38,6 @@ export function baselineFileFor(profile: FilterProfile): string {
   const dir = STYLE_DIRS[profile.style] ?? STYLE_DIRS.customsounds;
   const styleName = profile.style === "customsounds" ? "customsounds" : profile.style;
   return dir + "/NeverSink's filter 2 - " + suffix + " (" + styleName + ") .filter";
-}
-
-function readBaseline(profile: FilterProfile): { contents: string; file: string } {
-  const file = baselineFileFor(profile);
-  const fullPath = path.join(process.cwd(), "vendor", "neversink", file);
-  if (fs.existsSync(fullPath)) return { contents: fs.readFileSync(fullPath, "utf8"), file };
-  const fallback = path.join(process.cwd(), "vendor", "neversink", "NeverSink's filter 2 - " + BASELINE_NAMES[profile.strictness] + ".filter");
-  return { contents: fs.readFileSync(fallback, "utf8"), file: path.basename(fallback) };
 }
 
 function quote(value: string): string {
@@ -152,8 +142,8 @@ function validateSafety(
   };
 }
 
-export function generateFilter(profile: FilterProfile, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean } = {}): GeneratedBundle {
-  const { contents: baseline, file: baselineFile } = readBaseline(profile);
+export function generateFilter(profile: FilterProfile, baseline: string, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean } = {}): GeneratedBundle {
+  const baselineFile = baselineFileFor(profile);
   const league = profile.league ?? "Standard";
   const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot)
     ? inputSnapshot

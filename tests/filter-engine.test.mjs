@@ -34,8 +34,8 @@ test("catalog exposes category menus and keeps every group", () => {
   for (const key of ["currency", "bones", "omens", "temple"]) assert.ok(crafting.includes(key), "缺少分组 " + key);
 });
 
-test("market worker is valid JavaScript", () => {
-  execFileSync(process.execPath, ["--check", "worker/price-sync.mjs"], { cwd: root, stdio: "pipe" });
+test("market adapter is valid JavaScript", () => {
+  execFileSync(process.execPath, ["--check", "worker/market-adapter.mjs"], { cwd: root, stdio: "pipe" });
 });
 
 test("generated safety policy is documented", () => {

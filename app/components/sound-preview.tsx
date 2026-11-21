@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Square, Volume2 } from "lucide-react";
 
+import { readSound } from "../../lib/desktop";
 import type { PresetSound } from "../../lib/types";
 import { Button } from "./ui/primitives";
 
@@ -72,7 +73,12 @@ export function SoundPreviewButton({ sound, file, className }: { sound?: PresetS
       const url = URL.createObjectURL(file);
       urlRef.current = url;
       source = url;
-    } else source = "/api/sounds/" + encodeURIComponent(sound.fileName);
+    } else if (sound.type === "neversink") {
+      try {
+        source = URL.createObjectURL(await readSound(sound.fileName));
+        urlRef.current = source;
+      } catch { return; }
+    }
     if (!source) return;
     const audio = new Audio(source);
     audio.volume = sound.type === "builtin" ? Math.min(1, Math.max(0.05, sound.volume / 300)) : 1;

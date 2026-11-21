@@ -1,0 +1,63 @@
+name: Release Windows client
+
+on:
+  push:
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Validate versions and toolchain
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($env:GITHUB_REF_NAME -notmatch '^v\d+\.\d+\.\d+$') { throw 'A stable vX.Y.Z tag is required' }
+          $frontend = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $bundle = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $native = (Select-String '^version = "([^"]+)"' src-tauri/Cargo.toml)[0].Matches[0].Groups[1].Value
+          if ($frontend -ne $version -or $bundle -ne $version -or $native -ne $version) { throw "Package versions must match $version" }
+          rustup update stable
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm test
+      - run: npm run build:engine
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - name: Build signed NSIS installer
+        run: npm run tauri -- build --ci --target x86_64-pc-windows-msvc -- --locked
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Publish installer and update manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $installers = @(Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -Filter '*-setup.exe')
+          if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          $filename = "poe2-realtime-filter-windows-x64-$tag-setup.exe"
+          Copy-Item -LiteralPath $installers[0].FullName -Destination $filename
+          $signature = (Get-Content -Raw -LiteralPath ($installers[0].FullName + '.sig')).Trim()
+          if (!$signature) { throw 'Missing updater signature' }
+          @{
+            version = $tag.Substring(1)
+            pub_date = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            platforms = @{ 'windows-x86_64' = @{
+              url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$filename"
+              signature = $signature
+            } }
+          } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
+          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes 'Windows x64 installer with offline WebView2 support. Users of the old v0.4.x client install this version manually.'
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

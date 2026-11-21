@@ -1,0 +1,57 @@
+{
+    "$schema":  "https://schema.tauri.app/config/2",
+    "productName":  "PoE2 Realtime Filter",
+    "identifier":  "com.graydove.poe2-realtime-filter",
+    "build":  {
+                  "beforeDevCommand":  "npm run build:engine \u0026\u0026 npm run dev",
+                  "devUrl":  "http://localhost:3000",
+                  "beforeBuildCommand":  "npm run build:desktop-web",
+                  "frontendDist":  "../out"
+              },
+    "app":  {
+                "windows":  [
+                                {
+                                    "label":  "main",
+                                    "title":  "PoE2 Realtime Filter",
+                                    "width":  1280,
+                                    "height":  900,
+                                    "minWidth":  720,
+                                    "minHeight":  600
+                                }
+                            ],
+                "security":  {
+                                 "csp":  "default-src \u0027self\u0027; script-src \u0027self\u0027 \u0027unsafe-inline\u0027; style-src \u0027self\u0027 \u0027unsafe-inline\u0027; font-src \u0027self\u0027; img-src \u0027self\u0027 data:; media-src \u0027self\u0027 blob:; connect-src \u0027self\u0027 ipc: http://ipc.localhost"
+                             }
+            },
+    "bundle":  {
+                   "active":  true,
+                   "targets":  [
+                                   "nsis"
+                               ],
+                   "icon":  [
+                                "icons/icon.png",
+                                "icons/icon.ico"
+                            ],
+                   "resources":  {
+                                     "../vendor/neversink/":  "neversink/"
+                                 },
+                   "windows":  {
+                                   "webviewInstallMode":  {
+                                                              "type":  "offlineInstaller"
+                                                          }
+                               },
+                   "createUpdaterArtifacts":  true
+               },
+    "plugins":  {
+                    "updater":  {
+                                    "pubkey":  "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxMjhBMzEzQUMyMENCQ0QKUldUTnl5Q3NFNk1vZ1Mxc1lCb0RzTmJ5d0Nva1IxTzdmZ2FPQ2N5bjNhNis3QUNQT1YrdUpqMi8K",
+                                    "endpoints":  [
+                                                      "https://github.com/graydovee/poe2-realtime-filter/releases/latest/download/latest.json"
+                                                  ],
+                                    "windows":  {
+                                                    "installMode":  "passive"
+                                                }
+                                }
+                },
+    "version":  "0.5.0"
+}
