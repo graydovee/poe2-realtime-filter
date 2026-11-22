@@ -6,12 +6,18 @@ export type LocalScheme = {
   name: string;
   profile: FilterProfile;
   autoRefresh: boolean;
-  installed: { name: string } | null;
+  installed: { name: string; directory: string } | null;
   status: string;
 };
 
-export type Settings = { intervalMinutes: number; paused: boolean };
-export type Library = { settings: Settings; schemes: LocalScheme[] };
+export type Settings = { intervalMinutes: number; paused: boolean; filterDirectory: string | null };
+export type Library = { settings: Settings; schemes: LocalScheme[]; filterDirectory: string };
+export function displayDirectory(path: string): string {
+  if (path.startsWith("\\\\?\\UNC\\")) return "\\\\" + path.slice(8);
+  if (/^\\\\\?\\[A-Za-z]:/.test(path)) return path.slice(4);
+  return path;
+}
+
 export const explain = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
 export const isDesktop = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 export const local = invoke;

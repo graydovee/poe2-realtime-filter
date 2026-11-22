@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
+import { cn } from "../../../lib/cn";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
-export function ConfirmDialog({ title, busy, onCancel, children }: {
+export function ConfirmDialog({ title, busy, onCancel, children, className }: {
   title: string;
+  className?: string;
   busy?: boolean;
   onCancel: () => void;
   children: ReactNode;
@@ -17,7 +19,7 @@ export function ConfirmDialog({ title, busy, onCancel, children }: {
   }, []);
 
   return (
-    <dialog ref={dialog} className="modal-card m-auto max-w-[calc(100%-2rem)] text-ink backdrop:bg-black/75" aria-labelledby={titleId} onCancel={(event) => {
+    <dialog ref={dialog} className={cn("modal-card m-auto max-h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] overflow-y-auto text-ink backdrop:bg-black/75", className)} aria-labelledby={titleId} onCancel={(event) => {
       event.preventDefault();
       if (!busy) onCancel();
     }}>

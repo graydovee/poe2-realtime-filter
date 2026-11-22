@@ -1,7 +1,6 @@
 "use client";
 
 import type { ComponentPropsWithoutRef } from "react";
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import * as SwitchPrimitive from "@radix-ui/react-switch";
@@ -85,33 +84,6 @@ export function Select({
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     </SelectPrimitive.Root>
-  );
-}
-
-export function Checkbox({
-  checked,
-  onCheckedChange,
-  label,
-  className,
-}: {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <label className={cn("inline-flex min-h-8 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-ink", className)}>
-      <CheckboxPrimitive.Root
-        checked={checked}
-        onCheckedChange={(value) => onCheckedChange(value === true)}
-        className="ui-checkbox"
-      >
-        <CheckboxPrimitive.Indicator className="grid place-items-center">
-          <Check aria-hidden="true" className="size-3.5" strokeWidth={3} />
-        </CheckboxPrimitive.Indicator>
-      </CheckboxPrimitive.Root>
-      <span>{label}</span>
-    </label>
   );
 }
 

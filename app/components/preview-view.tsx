@@ -1,10 +1,8 @@
 "use client";
 
-import { Download, FileArchive, Sparkles } from "lucide-react";
-
 import type { MarketSnapshot } from "../../lib/types";
 import { Disclosure } from "./ui/nav";
-import { Alert, Button, EmptyState, Panel } from "./ui/primitives";
+import { Alert, Panel } from "./ui/primitives";
 
 export type Generated = {
   filterFile: string;
@@ -24,36 +22,7 @@ export type Generated = {
   market: MarketSnapshot;
 };
 
-export function PreviewView({
-  generated,
-  onGenerate,
-  onDownload,
-  onBundle,
-  busy,
-}: {
-  generated: Generated | null;
-  onGenerate: () => void;
-  onDownload: () => void;
-  onBundle: () => Promise<void>;
-  busy: boolean;
-}) {
-  if (!generated) {
-    return (
-      <Panel className="p-0">
-        <EmptyState
-          icon={<Sparkles aria-hidden="true" className="size-6" />}
-          title="还没有生成过滤器"
-          description="在配置页设置规则后，生成并下载 .filter 文件或包含音效的 ZIP。"
-          action={
-            <Button variant="primary" onClick={onGenerate} disabled={busy}>
-              {busy ? "生成中…" : "开始生成"}
-            </Button>
-          }
-        />
-      </Panel>
-    );
-  }
-
+export function PreviewView({ generated }: { generated: Generated }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.5fr)]">
       <Panel className="min-w-0">
@@ -62,19 +31,11 @@ export function PreviewView({
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">生成结果</span>
             <h2 className="mt-1 truncate font-mono text-sm text-ink">{generated.fileName}</h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" onClick={onDownload}>
-              <Download aria-hidden="true" className="size-3.5" />
-              下载 .filter
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => void onBundle()}>
-              <FileArchive aria-hidden="true" className="size-3.5" />
-              导出 ZIP
-            </Button>
-          </div>
         </div>
 
-        {!generated.safetyReport.passed && (
+        {generated.safetyReport.passed ? (
+          <Alert tone="gold" role="status" title="安全检查通过" className="mb-4" />
+        ) : (
           <Alert tone="ember" title="生成结果存在规则冲突" className="mb-4">
             请检查自定义规则与隐藏规则后重新生成。
           </Alert>

@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { DesktopUpdate } from "./desktop-update";
 
-export function AppShell({ title, navigation, children }: { title: string; navigation: ReactNode; children: ReactNode }) {
+export function AppShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="app-vignette min-h-screen">
       <header className="border-b border-line bg-surface">
@@ -11,7 +11,6 @@ export function AppShell({ title, navigation, children }: { title: string; navig
             <Image src="/brand/poe2-filter.png" alt="" width={36} height={36} className="shrink-0" unoptimized />
             <strong className="font-display text-[15px] font-semibold tracking-wide text-ink">PoE2 Realtime Filter</strong>
           </div>
-          {navigation}
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-xs font-medium text-ink-muted">{"v" + process.env.NEXT_PUBLIC_APP_VERSION}</span>
             <DesktopUpdate />

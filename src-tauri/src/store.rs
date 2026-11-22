@@ -24,6 +24,7 @@ const AUDIO_TOTAL_MAX: usize = 32 * 1024 * 1024;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Installed {
+    pub directory: PathBuf,
     name: String,
     sha256: String,
 }
@@ -52,6 +53,8 @@ impl Scheme {
 pub struct Settings {
     pub interval_minutes: u32,
     pub paused: bool,
+    #[serde(default)]
+    pub filter_directory: Option<PathBuf>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,6 +69,7 @@ impl Default for Library {
             settings: Settings {
                 interval_minutes: 30,
                 paused: false,
+                filter_directory: None,
             },
             schemes: vec![],
         }
@@ -91,7 +95,7 @@ pub struct Edit {
 pub struct Store {
     root: PathBuf,
     templates: PathBuf,
-    pub game: PathBuf,
+    pub default_game: PathBuf,
 }
 
 pub fn digest(bytes: &[u8]) -> String {
@@ -113,6 +117,53 @@ pub fn write_file(path: &Path, data: &[u8], replace: bool) -> Result<()> {
     result
         .map(|_| ())
         .map_err(|e| format!("{}: {}", path.display(), e.error))
+}
+
+pub fn filter_zip(name: &str, filter: &str, sounds: BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>> {
+    let name = scheme_name(name)?;
+    let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    archive
+        .start_file(format!("{name}.filter"), options)
+        .map_err(|e| e.to_string())?;
+    archive
+        .write_all(filter.as_bytes())
+        .map_err(|e| e.to_string())?;
+    for (name, bytes) in sounds {
+        archive
+            .start_file(name, options)
+            .map_err(|e| e.to_string())?;
+        archive.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
+    Ok(archive.finish().map_err(|e| e.to_string())?.into_inner())
+}
+
+/// Check permissions with the same kind of temporary file used for atomic writes.
+pub fn writable_directory(path: &Path) -> Result<PathBuf> {
+    if !path.is_absolute() || !path.is_dir() {
+        return Err(format!("请选择已存在的绝对目录: {}", path.display()));
+    }
+    let path = fs::canonicalize(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    tempfile::NamedTempFile::new_in(&path)
+        .map_err(|e| format!("目录不可写 {}: {e}", path.display()))?;
+    Ok(path)
+}
+
+pub fn display_directory(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    #[cfg(windows)]
+    {
+        if let Some(network) = text.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{network}");
+        }
+        if let Some(local) = text.strip_prefix(r"\\?\") {
+            if local.as_bytes().get(1) == Some(&b':') {
+                return local.to_owned();
+            }
+        }
+    }
+    text.into_owned()
 }
 
 fn valid_windows_name(name: &str) -> bool {
@@ -209,7 +260,7 @@ impl Store {
         Self {
             root,
             templates,
-            game,
+            default_game: game,
         }
     }
 
@@ -313,58 +364,91 @@ impl Store {
         let Some(id) = edit.id else {
             return self.add(library, &edit.name, edit.profile, edit.sounds);
         };
-        let name = scheme_name(&edit.name)?;
-        self.check_unique(library, &name, Some(&id))?;
         let scheme = Self::get_mut(library, &id)?;
-        let old = scheme.clone();
         scheme.profile = engine::call("validate", edit.profile)?;
         self.store_sounds(scheme, edit.sounds)?;
-        let mut renamed = None;
-        if name != scheme.name {
-            if let Some(installation) = &mut scheme.installed {
-                let next = format!("{name}.filter");
-                let from = self.filter_path(&installation.name)?;
-                let to = self.filter_path(&next)?;
-                if self.read_owned(installation)?.is_some() {
-                    move_file(&from, &to)?;
-                    renamed = Some((from, to));
-                } else if to.exists() {
-                    return Err("游戏目录内已有同名过滤器".into());
-                }
-                installation.name = next;
-            }
-            scheme.name = name;
+        self.persist(library)?;
+        Ok(id)
+    }
+
+    pub fn rename(&self, library: &mut Library, id: &str, raw_name: &str) -> Result<()> {
+        let name = scheme_name(raw_name)?;
+        self.check_unique(library, &name, Some(id))?;
+        let scheme = Self::get_mut(library, id)?;
+        if name == scheme.name {
+            return Ok(());
         }
+        let old = scheme.clone();
+        let mut renamed = None;
+        if let Some(installed) = &mut scheme.installed {
+            if Self::read_owned(installed)?.is_some() {
+                let next = format!("{name}.filter");
+                let from = Self::filter_path(&installed.directory, &installed.name)?;
+                let to = Self::filter_path(&installed.directory, &next)?;
+                move_file(&from, &to)?;
+                renamed = Some((from, to));
+                installed.name = next;
+            } else {
+                scheme.installed = None;
+                scheme.status = "原过滤器已不存在，请重新安装".into();
+            }
+        }
+        scheme.name = name;
         if let Err(error) = self.persist(library) {
+            *Self::get_mut(library, id)? = old;
             if let Some((from, to)) = renamed {
                 move_file(&to, &from)
                     .map_err(|rollback| format!("{error}，恢复旧文件名失败: {rollback}"))?;
             }
-            *Self::get_mut(library, &id)? = old;
             return Err(error);
         }
-        Ok(id)
+        Ok(())
     }
 
-    pub fn remove(&self, library: &mut Library, id: &str, remove_file: bool) -> Result<()> {
-        let mut removed = None;
-        if remove_file {
-            if let Some(installed) = &Self::get(library, id)?.installed {
-                if let Some(bytes) = self.read_owned(installed)? {
-                    let path = self.filter_path(&installed.name)?;
-                    fs::remove_file(&path).map_err(|e| e.to_string())?;
-                    removed = Some((path, bytes));
-                }
-            }
-        }
-        library.schemes.retain(|scheme| scheme.id != id);
+    fn remove_installed(installed: Option<&Installed>) -> Result<Option<(PathBuf, Vec<u8>)>> {
+        let Some(installed) = installed else {
+            return Ok(None);
+        };
+        let Some(bytes) = Self::read_owned(installed)? else {
+            return Ok(None);
+        };
+        let path = Self::filter_path(&installed.directory, &installed.name)?;
+        fs::remove_file(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        Ok(Some((path, bytes)))
+    }
+
+    fn persist_removal(
+        &self,
+        library: &Library,
+        removed: Option<(PathBuf, Vec<u8>)>,
+    ) -> Result<()> {
         if let Err(error) = self.persist(library) {
             if let Some((path, bytes)) = removed {
-                write_file(&path, &bytes, false)?;
+                write_file(&path, &bytes, false)
+                    .map_err(|rollback| format!("{error}，恢复过滤器失败: {rollback}"))?;
             }
             return Err(error);
         }
         Ok(())
+    }
+
+    pub fn uninstall(&self, library: &mut Library, id: &str) -> Result<()> {
+        let scheme = Self::get_mut(library, id)?;
+        let removed = Self::remove_installed(scheme.installed.as_ref())?;
+        scheme.installed = None;
+        scheme.status = "过滤器已卸载".into();
+        self.persist_removal(library, removed)
+    }
+
+    pub fn remove(&self, library: &mut Library, id: &str, remove_file: bool) -> Result<()> {
+        let scheme = Self::get(library, id)?;
+        let removed = if remove_file {
+            Self::remove_installed(scheme.installed.as_ref())?
+        } else {
+            None
+        };
+        library.schemes.retain(|scheme| scheme.id != id);
+        self.persist_removal(library, removed)
     }
 
     pub fn share(scheme: &Scheme) -> Result<String> {
@@ -510,42 +594,77 @@ impl Store {
         Ok((text, assets))
     }
 
-    fn filter_path(&self, name: &str) -> Result<PathBuf> {
-        if !valid_windows_name(name) || !name.ends_with(".filter") {
-            return Err("无效过滤器路径".into());
-        }
-        Ok(self.game.join(name))
-    }
-
-    fn read_owned(&self, installed: &Installed) -> Result<Option<Vec<u8>>> {
-        match fs::read(self.filter_path(&installed.name)?) {
-            Ok(bytes) if digest(&bytes) == installed.sha256 => Ok(Some(bytes)),
-            Ok(_) => Err("游戏目录中的过滤器已被外部修改，已保留该文件".into()),
-            Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e.to_string()),
-        }
-    }
-
-    pub fn install(&self, scheme: &mut Scheme, market: Option<Value>) -> Result<()> {
+    pub fn prepare_filter(
+        &self,
+        scheme: &Scheme,
+        market: Option<Value>,
+    ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         let result = self.generate(scheme.profile.clone(), market)?;
         if engine::call::<bool>("requiresMarket", &scheme.profile)?
             && result["market"]["rates"].is_null()
         {
-            return Err("等待当前赛季的有效行情，游戏过滤器已保留".into());
+            return Err("等待当前赛季的有效行情".into());
         }
-        let (filter, assets) = self.bundle(scheme, &result)?;
-        let name = format!("{}.filter", scheme.name);
-        let output = self.filter_path(&name)?;
-        let previous = if let Some(installed) = &scheme.installed {
-            self.read_owned(installed)?
+        self.bundle(scheme, &result)
+    }
+
+    fn filter_path(directory: &Path, name: &str) -> Result<PathBuf> {
+        if !directory.is_absolute() || !valid_windows_name(name) || !name.ends_with(".filter") {
+            return Err("无效过滤器路径".into());
+        }
+        Ok(directory.join(name))
+    }
+
+    fn read_owned(installed: &Installed) -> Result<Option<Vec<u8>>> {
+        let path = Self::filter_path(&installed.directory, &installed.name)?;
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if !metadata.is_file() => {
+                return Err(format!(
+                    "过滤器路径不是常规文件，已保留: {}",
+                    path.display()
+                ));
+            }
+            Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(format!("{}: {e}", path.display())),
+            Ok(_) => {}
+        }
+        match fs::read(&path) {
+            Ok(bytes) if digest(&bytes) == installed.sha256 => Ok(Some(bytes)),
+            Ok(_) => Err("游戏目录中的过滤器已被外部修改，已保留该文件".into()),
+            Err(e) => Err(format!("{}: {e}", path.display())),
+        }
+    }
+
+    pub fn install(
+        &self,
+        scheme: &mut Scheme,
+        market: Option<Value>,
+        custom_directory: Option<&Path>,
+    ) -> Result<()> {
+        let (filter, assets) = self.prepare_filter(scheme, market)?;
+        let directory = if let Some(installed) = &scheme.installed {
+            installed.directory.clone()
         } else {
-            None
+            let target = custom_directory.unwrap_or(&self.default_game);
+            if custom_directory.is_none() {
+                fs::create_dir_all(target).map_err(|e| format!("{}: {e}", target.display()))?;
+            }
+            writable_directory(target)?
+        };
+        if !directory.is_dir() {
+            return Err(format!("过滤器目录不存在: {}", directory.display()));
+        }
+        let name = format!("{}.filter", scheme.name);
+        let output = Self::filter_path(&directory, &name)?;
+        let previous = match &scheme.installed {
+            Some(installed) => Self::read_owned(installed)?,
+            None => None,
         };
         if previous.is_none() && output.exists() {
             return Err("游戏目录已有同名过滤器，请改用其他方案名".into());
         }
         for (name, bytes) in assets {
-            let path = self.game.join(name);
+            let path = directory.join(name);
             match fs::read(&path) {
                 Ok(existing) if existing == bytes => {}
                 Ok(_) => return Err(format!("游戏目录音效文件冲突: {}", path.display())),
@@ -558,6 +677,7 @@ impl Store {
             write_file(&output, filter.as_bytes(), previous.is_some())?;
         }
         scheme.installed = Some(Installed {
+            directory,
             name,
             sha256: digest(filter.as_bytes()),
         });
@@ -628,11 +748,11 @@ mod tests {
             .add(&mut library, "终极打宝", profile(), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
-        store.install(scheme, None).unwrap();
-        let installed = store.game.join("终极打宝.filter");
+        store.install(scheme, None, None).unwrap();
+        let installed = store.default_game.join("终极打宝.filter");
         assert!(installed.is_file());
         let modified = fs::metadata(&installed).unwrap().modified().unwrap();
-        store.install(scheme, None).unwrap();
+        store.install(scheme, None, None).unwrap();
         assert_eq!(
             fs::metadata(&installed).unwrap().modified().unwrap(),
             modified
@@ -651,28 +771,132 @@ mod tests {
         );
         assert!(store.import(&mut library, "POE2F2.AAAAA", None).is_err());
         assert!(store.import(&mut library, "POE2F1.$$$", None).is_err());
-        let renamed = store.game.join("新名字.filter");
+        let renamed = store.default_game.join("新名字.filter");
         fs::write(&renamed, "User filter").unwrap();
-        let edit = || Edit {
-            id: Some(id.clone()),
-            name: "新名字".into(),
-            profile: profile(),
-            sounds: BTreeMap::new(),
-        };
-        assert!(store.save(&mut library, edit()).is_err());
+        assert!(store.rename(&mut library, &id, "新名字").is_err());
         assert!(installed.is_file());
         assert_eq!(fs::read_to_string(&renamed).unwrap(), "User filter");
         fs::remove_file(&renamed).unwrap();
-        store.save(&mut library, edit()).unwrap();
+        store.rename(&mut library, &id, "新名字").unwrap();
         assert!(!installed.exists());
         assert!(renamed.exists());
         store.remove(&mut library, &id, false).unwrap();
         assert!(renamed.exists());
         store
-            .install(Store::get_mut(&mut library, &copy).unwrap(), None)
+            .install(Store::get_mut(&mut library, &copy).unwrap(), None, None)
             .unwrap();
         store.remove(&mut library, &copy, true).unwrap();
-        assert!(!store.game.join("离线副本.filter").exists());
+        assert!(!store.default_game.join("离线副本.filter").exists());
+    }
+
+    #[test]
+    fn directory_changes_only_affect_new_installs_and_uninstall_keeps_scheme() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let id = store
+            .add(&mut library, "原目录", profile(), BTreeMap::new())
+            .unwrap();
+        let original = store.default_game.join("原目录.filter");
+        store
+            .install(Store::get_mut(&mut library, &id).unwrap(), None, None)
+            .unwrap();
+        let installed_bytes = fs::read(&original).unwrap();
+        let new_directory = temp.path().join("其他文件夹");
+        assert!(writable_directory(&new_directory).is_err());
+        assert!(writable_directory(&original).is_err());
+        fs::create_dir(&new_directory).unwrap();
+        library.settings.filter_directory = Some(writable_directory(&new_directory).unwrap());
+        store.persist(&library).unwrap();
+        let mut library = fixture(temp.path()).load().unwrap();
+        let new_location = library.settings.filter_directory.clone().unwrap();
+        store
+            .install(
+                Store::get_mut(&mut library, &id).unwrap(),
+                None,
+                Some(&new_location),
+            )
+            .unwrap();
+        assert!(original.is_file());
+        assert!(!new_directory.join("原目录.filter").exists());
+
+        // Editing even a stale draft that supplies a different name never changes a game file.
+        let edit = Edit {
+            id: Some(id.clone()),
+            name: "草稿旧名称".into(),
+            profile: profile(),
+            sounds: BTreeMap::new(),
+        };
+        store.save(&mut library, edit).unwrap();
+        assert_eq!(Store::get(&library, &id).unwrap().name, "原目录");
+        assert_eq!(fs::read(&original).unwrap(), installed_bytes);
+
+        fs::write(&original, b"edited outside the app").unwrap();
+        assert!(store
+            .rename(&mut library, &id, "不能改名")
+            .unwrap_err()
+            .contains("外部修改"));
+        assert!(store
+            .uninstall(&mut library, &id)
+            .unwrap_err()
+            .contains("外部修改"));
+        assert_eq!(fs::read(&original).unwrap(), b"edited outside the app");
+        assert!(Store::get(&library, &id).unwrap().installed.is_some());
+        fs::write(&original, installed_bytes).unwrap();
+        store.rename(&mut library, &id, "新名称").unwrap();
+        let renamed = store.default_game.join("新名称.filter");
+        assert!(renamed.is_file());
+        assert!(!original.exists());
+        store.uninstall(&mut library, &id).unwrap();
+        assert!(!renamed.exists());
+        assert!(Store::get(&library, &id).unwrap().installed.is_none());
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        store.install(scheme, None, Some(&new_location)).unwrap();
+        let relocated = new_directory.join("新名称.filter");
+        assert!(relocated.is_file());
+        fs::remove_file(&relocated).unwrap();
+        store.uninstall(&mut library, &id).unwrap();
+        let reloaded = store.load().unwrap();
+        assert!(Store::get(&reloaded, &id).unwrap().installed.is_none());
+        assert_eq!(reloaded.settings.filter_directory, Some(new_location));
+    }
+
+    #[test]
+    fn downloadable_zip_contains_the_filter_and_its_custom_audio() {
+        use std::io::Read;
+
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut input = profile();
+        input["rules"] = json!([{"id":"sound","name":"音效","enabled":true,"hidden":false,"target":{"itemIds":["divine-orb"]},"effects":{"sound":{"type":"custom","fileName":"trade.ogg"}}}]);
+        let contents = b"archive fixture";
+        let uploaded = BTreeMap::from([(
+            "trade.ogg".into(),
+            base64::engine::general_purpose::STANDARD.encode(contents),
+        )]);
+        let id = store.add(&mut library, "安装包", input, uploaded).unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let (text, sounds) = store.prepare_filter(scheme, None).unwrap();
+        let asset_name = format!("poe2rf-{}.ogg", digest(contents));
+        assert!(text.contains(&asset_name));
+        let zip = filter_zip(&scheme.name, &text, sounds).unwrap();
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip)).unwrap();
+        let mut output = String::new();
+        archive
+            .by_name("安装包.filter")
+            .unwrap()
+            .read_to_string(&mut output)
+            .unwrap();
+        assert_eq!(output, text);
+        let mut output = Vec::new();
+        archive
+            .by_name(&asset_name)
+            .unwrap()
+            .read_to_end(&mut output)
+            .unwrap();
+        assert_eq!(output, contents);
+        assert!(!store.default_game.exists());
     }
 
     #[test]
@@ -684,11 +908,14 @@ mod tests {
             .add(&mut library, "基本", profile(), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
-        store.install(scheme, None).unwrap();
-        let path = store.game.join("基本.filter");
+        store.install(scheme, None, None).unwrap();
+        let path = store.default_game.join("基本.filter");
         let expected = fs::read(&path).unwrap();
         scheme.profile["rules"] = json!([{"id":"price","name":"价格","enabled":true,"hidden":false,"target":{"itemIds":[],"range":{"min":{"amount":1,"currency":"exalted"}}},"effects":{}}]);
-        assert!(store.install(scheme, None).unwrap_err().contains("等待"));
+        assert!(store
+            .install(scheme, None, None)
+            .unwrap_err()
+            .contains("等待"));
         assert_eq!(fs::read(&path).unwrap(), expected);
         scheme.profile["rules"] = json!([{"id":"sound","name":"音效","enabled":true,"hidden":false,"target":{"itemIds":["divine-orb"]},"effects":{"sound":{"type":"custom","fileName":"trade.ogg"}}}]);
         let uploaded = BTreeMap::from([(
@@ -703,7 +930,7 @@ mod tests {
         let copy = Store::get_mut(&mut library, &id_copy).unwrap();
         assert_eq!(store.missing(copy), vec!["trade.ogg"]);
         assert!(store
-            .install(copy, None)
+            .install(copy, None, None)
             .unwrap_err()
             .contains("缺少自定义音效"));
         assert_eq!(fs::read(&path).unwrap(), expected);

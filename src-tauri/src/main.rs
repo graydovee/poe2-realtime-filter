@@ -8,11 +8,11 @@ use engine::Result;
 use serde_json::{json, Value};
 use std::{
     collections::BTreeSet,
-    io::Write,
+    path::{Path, PathBuf},
     sync::{mpsc, Mutex},
     time::Duration,
 };
-use store::{Edit, Settings, Store};
+use store::{display_directory, writable_directory, Edit, Store};
 use tauri::{tray::TrayIconBuilder, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -91,7 +91,9 @@ impl Desktop {
                 }
                 match &outcome {
                     Ok(snapshot) => {
-                        if let Err(reason) = self.store.install(scheme, Some(snapshot.clone())) {
+                        if let Err(reason) =
+                            self.store.install(scheme, Some(snapshot.clone()), None)
+                        {
                             scheme.status = reason;
                         }
                     }
@@ -114,8 +116,18 @@ impl Desktop {
 }
 
 #[tauri::command]
-fn library(state: State<'_, Desktop>) -> Result<store::Library> {
-    state.store.load()
+fn library(state: State<'_, Desktop>) -> Result<Value> {
+    let library = state.store.load()?;
+    let effective = library
+        .settings
+        .filter_directory
+        .as_deref()
+        .unwrap_or(&state.store.default_game);
+    Ok(json!({
+        "settings": library.settings,
+        "schemes": library.schemes,
+        "filterDirectory": display_directory(effective),
+    }))
 }
 
 #[tauri::command]
@@ -150,16 +162,54 @@ async fn refresh_market(app: tauri::AppHandle, league: String) -> Result<()> {
 }
 
 #[tauri::command]
-fn save_settings(state: State<'_, Desktop>, settings: Settings) -> Result<()> {
-    if !(1..=1440).contains(&settings.interval_minutes) {
+fn save_settings(state: State<'_, Desktop>, interval_minutes: u32, paused: bool) -> Result<()> {
+    if !(1..=1440).contains(&interval_minutes) {
         return Err("刷新间隔应在 1–1440 分钟之间".into());
     }
     let _guard = state.changes.lock().map_err(|e| e.to_string())?;
     let mut library = state.store.load()?;
-    library.settings = settings;
+    library.settings.interval_minutes = interval_minutes;
+    library.settings.paused = paused;
     state.store.persist(&library)?;
     let _ = state.schedule.send(());
     Ok(())
+}
+
+#[tauri::command]
+async fn pick_filter_directory(app: tauri::AppHandle, current: String) -> Result<Option<String>> {
+    on_worker(move || {
+        let mut dialog = app.dialog().file().set_title("选择游戏过滤器目录");
+        let path = PathBuf::from(current);
+        if path.is_absolute() && path.is_dir() {
+            dialog = dialog.set_directory(path);
+        }
+        dialog
+            .blocking_pick_folder()
+            .map(|picked| {
+                picked
+                    .into_path()
+                    .map(|path| display_directory(&path))
+                    .map_err(|e| e.to_string())
+            })
+            .transpose()
+    })
+    .await
+}
+
+#[tauri::command]
+async fn save_filter_directory(app: tauri::AppHandle, directory: Option<String>) -> Result<()> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let directory = directory
+            .as_deref()
+            .map(|path| writable_directory(Path::new(path.trim())))
+            .transpose()?;
+        let _guard = state.changes.lock().map_err(|e| e.to_string())?;
+        let mut library = state.store.load()?;
+        library.settings.filter_directory = directory;
+        state.store.persist(&library)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -199,6 +249,26 @@ fn scheme_remove(state: State<'_, Desktop>, id: String, remove_file: bool) -> Re
 }
 
 #[tauri::command]
+async fn scheme_rename(app: tauri::AppHandle, id: String, name: String) -> Result<()> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let _guard = state.changes.lock().map_err(|e| e.to_string())?;
+        state.store.rename(&mut state.store.load()?, &id, &name)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn scheme_uninstall(app: tauri::AppHandle, id: String) -> Result<()> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let _guard = state.changes.lock().map_err(|e| e.to_string())?;
+        state.store.uninstall(&mut state.store.load()?, &id)
+    })
+    .await
+}
+
+#[tauri::command]
 fn scheme_share(state: State<'_, Desktop>, id: String) -> Result<String> {
     Store::share(Store::get(&state.store.load()?, &id)?)
 }
@@ -230,9 +300,10 @@ async fn scheme_install(app: tauri::AppHandle, id: String) -> Result<()> {
         let state = app.state::<Desktop>();
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
         let mut library = state.store.load()?;
+        let directory = library.settings.filter_directory.clone();
         let scheme = Store::get_mut(&mut library, &id)?;
         let snapshot = state.market.snapshot(scheme.league());
-        let result = state.store.install(scheme, snapshot);
+        let result = state.store.install(scheme, snapshot, directory.as_deref());
         if let Err(reason) = &result {
             scheme.status = reason.to_owned();
         }
@@ -259,35 +330,13 @@ fn local_sound(
 }
 
 #[tauri::command]
-async fn export_filter(app: tauri::AppHandle, name: String, text: String) -> Result<()> {
-    on_worker(move || {
-        let Some(file) = app
-            .dialog()
-            .file()
-            .set_file_name(name)
-            .add_filter("PoE2 Filter", &["filter"])
-            .blocking_save_file()
-        else {
-            return Ok(());
-        };
-        store::write_file(
-            &file.into_path().map_err(|e| e.to_string())?,
-            text.as_bytes(),
-            true,
-        )
-    })
-    .await
-}
-
-#[tauri::command]
-async fn export_bundle(app: tauri::AppHandle, id: String) -> Result<()> {
+async fn scheme_download(app: tauri::AppHandle, id: String) -> Result<bool> {
     on_worker(move || {
         let state = app.state::<Desktop>();
         let library = state.store.load()?;
         let scheme = Store::get(&library, &id)?;
         let snapshot = state.market.snapshot(scheme.league());
-        let result = state.store.generate(scheme.profile.clone(), snapshot)?;
-        let (text, sounds) = state.store.bundle(scheme, &result)?;
+        let (text, sounds) = state.store.prepare_filter(scheme, snapshot)?;
         let Some(file) = app
             .dialog()
             .file()
@@ -295,25 +344,17 @@ async fn export_bundle(app: tauri::AppHandle, id: String) -> Result<()> {
             .add_filter("ZIP", &["zip"])
             .blocking_save_file()
         else {
-            return Ok(());
+            return Ok(false);
         };
-        let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored);
-        archive
-            .start_file(format!("{}.filter", scheme.name), options)
-            .map_err(|e| e.to_string())?;
-        archive
-            .write_all(text.as_bytes())
-            .map_err(|e| e.to_string())?;
-        for (name, bytes) in sounds {
-            archive
-                .start_file(name, options)
-                .map_err(|e| e.to_string())?;
-            archive.write_all(&bytes).map_err(|e| e.to_string())?;
-        }
-        let bytes = archive.finish().map_err(|e| e.to_string())?.into_inner();
-        store::write_file(&file.into_path().map_err(|e| e.to_string())?, &bytes, true)
+        let path = file.into_path().map_err(|e| e.to_string())?;
+        let (path, replace) = match path.extension() {
+            Some(extension) if extension.eq_ignore_ascii_case("zip") => (path, true),
+            None => (path.with_extension("zip"), false),
+            _ => return Err("请选择 .zip 文件名".into()),
+        };
+        let bytes = store::filter_zip(&scheme.name, &text, sounds)?;
+        store::write_file(&path, &bytes, replace)?;
+        Ok(true)
     })
     .await
 }
@@ -410,7 +451,24 @@ fn open_main(app: &tauri::AppHandle) {
 
 fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let handle = app.handle().clone();
-    let root = app.path().app_local_data_dir()?;
+    let executable = std::env::current_exe()?;
+    let root = executable
+        .parent()
+        .ok_or("无法确定客户端安装目录")?
+        .join("data");
+    let prepare_data_directory = || -> Result<()> {
+        std::fs::create_dir_all(&root).map_err(|e| format!("{}: {e}", root.display()))?;
+        writable_directory(&root)?;
+        Ok(())
+    };
+    if let Err(reason) = prepare_data_directory() {
+        app.dialog()
+            .message(format!("无法写入安装目录的数据。\n{reason}"))
+            .title("PoE2 Realtime Filter")
+            .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+            .show(move |_| handle.exit(1));
+        return Ok(());
+    }
     let game = app
         .path()
         .document_dir()?
@@ -434,6 +492,24 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
             ..Default::default()
         }),
     });
+    let window = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .ok_or("主窗口配置不存在")?;
+    let webview = tauri::WebviewWindowBuilder::from_config(app, window)?
+        .data_directory(root.join("webview"))
+        .build();
+    if let Err(reason) = webview {
+        app.dialog()
+            .message(format!("无法启动客户端。\n{}\n{reason}", root.display()))
+            .title("PoE2 Realtime Filter")
+            .kind(tauri_plugin_dialog::MessageDialogKind::Error)
+            .show(move |_| handle.exit(1));
+        return Ok(());
+    }
     let open = tauri::menu::MenuItem::with_id(app, "open", "打开过滤器编辑器", true, None::<&str>)?;
     let exit = tauri::menu::MenuItem::with_id(app, "exit", "退出", true, None::<&str>)?;
     let tray_menu = tauri::menu::Menu::with_items(app, &[&open, &exit])?;
@@ -495,17 +571,20 @@ fn main() {
             local_market,
             refresh_market,
             save_settings,
+            pick_filter_directory,
+            save_filter_directory,
             preview,
             scheme_save,
             scheme_copy,
             scheme_remove,
+            scheme_rename,
+            scheme_uninstall,
             scheme_share,
             scheme_import,
             scheme_auto,
             scheme_install,
             local_sound,
-            export_filter,
-            export_bundle,
+            scheme_download,
             update_status,
             update_download,
             update_install

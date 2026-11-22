@@ -8,44 +8,6 @@ import { ChevronDown } from "lucide-react";
 
 import { cn } from "../../../lib/cn";
 
-export function TabBar<T extends string>({
-  value,
-  onChange,
-  items,
-  trailing,
-  className,
-}: {
-  value: T;
-  onChange: (value: T) => void;
-  items: Array<{ value: T; label: string }>;
-  trailing?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div role="tablist" aria-label="视图切换" className={cn("flex min-w-0 flex-wrap items-center gap-1 rounded border border-line bg-surface p-1.5", className)}>
-      {items.map((item) => {
-        const active = value === item.value;
-        return (
-          <button
-            key={item.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(item.value)}
-            className={cn(
-              "min-h-10 rounded-sm px-3 text-sm transition-colors duration-150 sm:px-4",
-              active ? "bg-gold/15 font-semibold text-gold-bright" : "text-ink-muted hover:bg-surface-3 hover:text-ink",
-            )}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-      {trailing && <div className="ml-auto hidden shrink-0 items-center gap-2 pl-4 pr-2 text-xs text-ink-muted sm:flex">{trailing}</div>}
-    </div>
-  );
-}
-
 export function Disclosure({
   summary,
   children,

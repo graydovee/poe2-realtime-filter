@@ -111,25 +111,6 @@
     background: radial-gradient(ellipse at 50% 0, rgb(55 43 30 / 0.38), transparent 34rem), rgb(var(--color-bg));
   }
 
-  .ui-checkbox {
-    display: inline-grid;
-    place-items: center;
-    flex: 0 0 auto;
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid rgb(var(--color-line-strong));
-    border-radius: 4px;
-    background: rgb(var(--color-surface-3));
-    color: rgb(var(--color-bg));
-  }
-
-  .ui-checkbox[data-state="checked"],
-  .ui-checkbox[data-state="mixed"] {
-    border-color: rgb(var(--color-gold));
-    background: rgb(var(--color-gold));
-  }
-
   .ui-switch {
     --track-width: 40px;
     --thumb-size: 14px;
@@ -551,9 +532,10 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid rg
 .more-menu-popover button:hover { background:rgba(200,164,92,.09); }
 .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px; background:rgba(3,7,11,.76); backdrop-filter:blur(5px); }
 .modal-card { width:min(420px,100%); padding:22px; border:1px solid rgba(200,164,92,.28); border-radius:6px; background:var(--surface-2); box-shadow:0 25px 80px rgba(0,0,0,.5); }
-.modal-card h3 { margin:0 0 10px; font-size:17px; }
-.modal-card p { color:var(--muted); font-size:12px; line-height:1.7; }
-.modal-card label { display:block; margin-top:16px; }
+.modal-card.modal-wide { width:min(1120px,calc(100vw - 2rem)); }
+.modal-card > h3 { margin:0 0 10px; font-size:17px; }
+.modal-card:not(.modal-wide) p { color:var(--muted); font-size:12px; line-height:1.7; }
+.modal-card label:not(:has([role="switch"])) { display:block; margin-top:16px; }
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:20px; }
 .modal-actions button { min-width:76px; }
 .danger-button { color:#ffb3b3 !important; border-color:rgba(255,100,100,.35) !important; }

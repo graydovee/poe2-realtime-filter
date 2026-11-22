@@ -20,14 +20,13 @@ import { SummarySidebar } from "./components/sections/summary-sidebar";
 import type { ItemPickerToggle } from "./components/item-picker";
 import { ConfirmDialog } from "./components/ui/confirm-dialog";
 import { TextInput } from "./components/ui/controls";
-import { TabBar } from "./components/ui/nav";
-import { Button, Panel } from "./components/ui/primitives";
+import { Button } from "./components/ui/primitives";
 
 const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
 
 export default function HomePage() {
   const [market, setMarket] = useState<MarketSnapshot>(FALLBACK_SNAPSHOT);
-  const [view, setView] = useState<"subscriptions" | "editor">("subscriptions");
+  const [view, setView] = useState<"manager" | "editor">("manager");
   const [schemeId, setSchemeId] = useState<string | null>(null);
   const [schemeName, setSchemeName] = useState("");
   const [schemeBusy, setSchemeBusy] = useState(false);
@@ -35,19 +34,22 @@ export default function HomePage() {
   const [saveFeedback, setSaveFeedback] = useState("");
   const [saveError, setSaveError] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [pendingScheme, setPendingScheme] = useState<LocalScheme | null>();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [nameDialog, setNameDialog] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [profile, setProfile] = useState<FilterProfile>(DEFAULT_PROFILE);
   const [customSounds, setCustomSounds] = useState<Record<string, File>>({});
   const [generated, setGenerated] = useState<Generated | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
   const [leagueCatalog, setLeagueCatalog] = useState<LeagueCatalog | null>(null);
   const leaguesLoading = false;
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
   const requestVersion = useRef(0);
-  const leagueChosen = useRef(false);
+  useEffect(() => { window.scrollTo(0, 0); }, [view]);
+
   const selectedMarket: MarketSnapshot = market.league === profile.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
 
   useEffect(() => {
@@ -57,9 +59,6 @@ export default function HomePage() {
       const catalog = await local<LeagueCatalog>("local_catalog");
       if (!active) return;
       setLeagueCatalog(catalog);
-      if (!leagueChosen.current) {
-        setProfile((current) => catalog.defaultLeague === current.league ? current : { ...current, league: catalog.defaultLeague, originalLeague: catalog.defaultLeague });
-      }
     };
     void load().catch(() => {});
     const listener = listen("local-refresh", () => { void load().catch(() => {}); });
@@ -89,7 +88,6 @@ export default function HomePage() {
 
   function selectLeague(league: string) {
     setDirty(true);
-    leagueChosen.current = true;
     requestVersion.current += 1;
     setProfile((current) => ({ ...current, league, originalLeague: league }));
     setMarket({ ...FALLBACK_SNAPSHOT, league });
@@ -98,7 +96,6 @@ export default function HomePage() {
     setBusy(false);
     setError("");
     setMarketError("");
-    setActiveTab("builder");
   }
 
   function update<K extends keyof FilterProfile>(key: K, value: FilterProfile[K]) {
@@ -178,16 +175,6 @@ export default function HomePage() {
     updateRule(id, { effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
   }
 
-  function requestDraft(scheme: LocalScheme | null) {
-    if (scheme && scheme.id === schemeId) {
-      setView("editor");
-    } else if (dirty) {
-      setPendingScheme(scheme);
-    } else {
-      void openDraft(scheme);
-    }
-  }
-
   async function openDraft(scheme: LocalScheme | null) {
     setSchemeBusy(true);
     const soundFiles: Record<string, File> = {};
@@ -206,29 +193,25 @@ export default function HomePage() {
         catch { missing.add(sound.fileName); }
       }));
     }
-    leagueChosen.current = true;
     requestVersion.current += 1;
     setSchemeId(scheme?.id ?? null);
     setSchemeName(scheme?.name ?? "");
-    setProfile(scheme?.profile ?? { ...DEFAULT_PROFILE, league: profile.league, originalLeague: profile.league });
+    const league = leagueCatalog?.defaultLeague ?? DEFAULT_PROFILE.league;
+    setProfile(scheme?.profile ?? { ...structuredClone(DEFAULT_PROFILE), league, originalLeague: league });
     setCustomSounds(soundFiles);
     setGenerated(null);
     setBusy(false);
     setError("");
     setMarketError("");
-    setSaveFeedback("");
     setSaveError(missing.size ? `请在规则中补齐自定义音效：${[...missing].join("、")}` : "");
     setDirty(false);
-    setActiveTab("builder");
     setView("editor");
     setSchemeBusy(false);
   }
 
-  async function saveScheme(asNew = false, install = false) {
+  async function saveScheme(name: string) {
     setSchemeBusy(true);
-    setSaveFeedback("");
     setSaveError("");
-    let saved = false;
     try {
       const uploads: Record<string, string> = {};
       let bytes = 0;
@@ -240,26 +223,46 @@ export default function HomePage() {
         if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
         uploads[sound.fileName] = await fileToBase64(file);
       }
-      const name = schemeName.trim();
-      const id = await local<string>("scheme_save", { edit: { id: asNew ? null : schemeId, name, profile, sounds: uploads } });
-      saved = true;
-      leagueChosen.current = true;
-      setSchemeId(id);
-      setSchemeName(name);
-      setDirty(false);
-      if (install) await local("scheme_install", { id });
-      setSaveFeedback(install ? "过滤器已保存到游戏目录" : "方案已保存，可在订阅管理中查看");
+      await local<string>("scheme_save", { edit: { id: schemeId, name: name.trim(), profile, sounds: uploads } });
+      setNameDialog(false);
+      setSaveFeedback(`「${name.trim()}」已保存`);
+      setSchemeRevision((current) => current + 1);
+      leaveEditor();
     } catch (cause) {
-      setSaveError(saved ? `方案已保存，安装失败：${explain(cause)}` : explain(cause));
+      setSaveError(explain(cause));
     } finally {
-      if (saved) setSchemeRevision((current) => current + 1);
       setSchemeBusy(false);
+    }
+  }
+
+  function closePreview() {
+    requestVersion.current += 1;
+    setBusy(false);
+    setPreviewOpen(false);
+  }
+
+  function leaveEditor() {
+    closePreview();
+    setDirty(false);
+    setConfirmCancel(false);
+    setView("manager");
+  }
+
+  function requestSave() {
+    setSaveError("");
+    if (schemeId) {
+      void saveScheme(schemeName);
+    } else {
+      setNewName("");
+      setNameDialog(true);
     }
   }
 
   async function generate() {
     const version = requestVersion.current;
     const league = profile.league;
+    setPreviewOpen(true);
+    setGenerated(null);
     setBusy(true);
     setError("");
     try {
@@ -267,7 +270,6 @@ export default function HomePage() {
       if (version !== requestVersion.current) return;
       if (payload.market?.league !== league) throw new Error("生成结果与所选赛季不一致");
       setGenerated(payload);
-      setActiveTab("preview");
     } catch (cause) {
       if (version === requestVersion.current) setError(explain(cause));
     } finally {
@@ -275,59 +277,20 @@ export default function HomePage() {
     }
   }
 
-  function downloadFilter() {
-    if (generated) void local("export_filter", { name: generated.fileName, text: generated.filterFile }).catch((error) => setError(explain(error)));
-  }
-
-  async function downloadBundle() {
-    if (!schemeId) { setError("请先保存方案再导出 ZIP"); return; }
-    try { await local("export_bundle", { id: schemeId }); }
-    catch (error) { setError(explain(error)); }
-  }
-
   return (
-    <AppShell
-      title={view === "subscriptions" ? "订阅管理" : "制作过滤器"}
-      navigation={(
-        <nav aria-label="客户端功能" className="flex flex-wrap items-center gap-1">
-          <Button size="sm" variant={view === "subscriptions" ? "primary" : "ghost"} aria-pressed={view === "subscriptions"} disabled={schemeBusy} onClick={() => setView("subscriptions")}>订阅管理</Button>
-          <Button size="sm" variant={view === "editor" ? "primary" : "ghost"} aria-pressed={view === "editor"} disabled={schemeBusy} onClick={() => setView("editor")}>制作过滤器</Button>
-        </nav>
-      )}
-    >
-      <div hidden={view !== "subscriptions"}>
+    <AppShell title={view === "manager" ? "方案管理" : schemeId ? `制作过滤器 · ${schemeName}` : "制作过滤器"}>
+      <div hidden={view !== "manager"}>
         <SchemeManager
           revision={schemeRevision}
+          saveNotice={saveFeedback}
           busy={schemeBusy}
           onBusy={setSchemeBusy}
-          onNew={() => requestDraft(null)}
-          onOpen={requestDraft}
-          onRemove={(id) => {
-            if (id !== schemeId) return;
-            setSchemeId(null);
-            setDirty(true);
-            setSaveError("");
-            setSaveFeedback("原方案已删除，当前草稿可以另行保存");
-          }}
+          onNew={() => void openDraft(null)}
+          onOpen={(scheme) => void openDraft(scheme)}
         />
       </div>
-      <div hidden={view !== "editor"}>
+      {view === "editor" && (
         <fieldset className="flex min-w-0 flex-col gap-4" disabled={schemeBusy}>
-          <Panel title={schemeId ? "编辑本地方案" : "新建本地方案"} action={<Button size="sm" onClick={() => requestDraft(null)}>新建方案</Button>}>
-            <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); void saveScheme(); }}>
-              <label className="max-w-full text-xs text-ink-muted">方案名称
-                <TextInput className="mt-1 w-64 max-w-full" value={schemeName} maxLength={80} onChange={(event) => {
-                  setSchemeName(event.target.value);
-                  setDirty(true);
-                }} />
-              </label>
-              <Button type="submit" size="sm" variant="primary" disabled={!schemeName.trim()}>保存方案</Button>
-              {schemeId && <Button size="sm" disabled={!schemeName.trim()} onClick={() => void saveScheme(true)}>另存为</Button>}
-              <Button size="sm" disabled={!schemeName.trim()} onClick={() => void saveScheme(false, true)}>保存并安装到游戏</Button>
-            </form>
-            {saveError ? <p role="alert" className="mt-3 text-sm text-ember">{saveError}</p>
-              : saveFeedback && <p role="status" className="mt-3 text-sm text-ink">{saveFeedback}</p>}
-          </Panel>
           <SeasonSection
             profile={profile}
             leagueCatalog={leagueCatalog}
@@ -338,71 +301,72 @@ export default function HomePage() {
             onLeagueChange={selectLeague}
             onRefresh={() => void refreshMarket()}
           />
-
-          <TabBar
-            value={activeTab}
-            onChange={setActiveTab}
-            items={[
-              { value: "builder", label: "配置过滤器" },
-              { value: "preview", label: "预览与导出" },
-            ]}
-            trailing={<span className="text-xs">价格单位 D / C / E</span>}
-          />
-
-          {activeTab === "builder" ? (
-            <div className="grid min-w-0 gap-4 pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(15.5rem,17.5rem)]">
-              <div className="flex min-w-0 flex-col gap-4">
-                <BasicFilterSection
-                  profile={profile}
-                  onStrictnessChange={(level: Strictness) => update("strictness", level)}
-                  onStyleChange={(style: FilterStyle) => update("style", style)}
-                  onLocaleChange={(locale: Locale) => update("locale", locale)}
-                />
-                <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
-                <RulesSection
-                  profile={profile}
-                  market={selectedMarket}
-                  customSounds={customSounds}
-                  onRuleChange={updateRule}
-                  onRemoveRule={removeRule}
-                  onAddRule={addRule}
-                  onMoveRule={moveRule}
-                  onSound={setRuleSound}
-                />
-              </div>
-
-              <SummarySidebar
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(15.5rem,17.5rem)]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <BasicFilterSection
                 profile={profile}
-                busy={busy}
-                disabled={marketLoading || leaguesLoading}
-                error={error}
-                onGenerate={() => void generate()}
+                onStrictnessChange={(level: Strictness) => update("strictness", level)}
+                onStyleChange={(style: FilterStyle) => update("style", style)}
+                onLocaleChange={(locale: Locale) => update("locale", locale)}
+              />
+              <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
+              <RulesSection
+                profile={profile}
+                market={selectedMarket}
+                customSounds={customSounds}
+                onRuleChange={updateRule}
+                onRemoveRule={removeRule}
+                onAddRule={addRule}
+                onMoveRule={moveRule}
+                onSound={setRuleSound}
               />
             </div>
-          ) : (
-            <div className="pt-2">
-              {error && <p role="alert" className="mb-2 text-sm text-ember">{error}</p>}
-              <PreviewView
-                generated={generated}
-                onGenerate={() => void generate()}
-                onDownload={downloadFilter}
-                onBundle={downloadBundle}
-                busy={busy}
-              />
-            </div>
-          )}
+            <SummarySidebar
+              profile={profile}
+              saving={schemeBusy}
+              previewing={busy}
+              error={nameDialog ? "" : saveError}
+              onSave={requestSave}
+              onPreview={() => void generate()}
+              onCancel={() => dirty ? setConfirmCancel(true) : leaveEditor()}
+            />
+          </div>
         </fieldset>
-      </div>
-      {pendingScheme !== undefined && <ConfirmDialog title="放弃未保存的修改？" onCancel={() => setPendingScheme(undefined)}>
-        <p>{pendingScheme ? `打开「${pendingScheme.name}」会替换当前草稿。` : "新建方案会替换当前草稿。"}</p>
-        <div className="modal-actions">
-          <Button size="sm" onClick={() => setPendingScheme(undefined)}>保留草稿</Button>
-          <Button size="sm" variant="danger" onClick={() => {
-            setPendingScheme(undefined);
-            void openDraft(pendingScheme);
-          }}>放弃修改</Button>
-        </div>
-      </ConfirmDialog>}
+      )}
+      {previewOpen && (
+        <ConfirmDialog title="预览过滤器" className="modal-wide" onCancel={closePreview}>
+          {busy && <p role="status">正在生成预览…</p>}
+          {error && <div role="alert" className="my-3 text-sm text-ember">{error}</div>}
+          {generated && <PreviewView generated={generated} />}
+          <div className="modal-actions"><Button onClick={closePreview}>关闭预览</Button></div>
+        </ConfirmDialog>
+      )}
+      {nameDialog && (
+        <ConfirmDialog title="保存新方案" busy={schemeBusy} onCancel={() => { setNameDialog(false); setSaveError(""); }}>
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            if (newName.trim() && !schemeBusy) void saveScheme(newName);
+          }}>
+            <label className="text-sm text-ink">方案名称
+              <TextInput className="mt-1" required value={newName} maxLength={80} disabled={schemeBusy} onChange={(event) => setNewName(event.target.value)} />
+            </label>
+            {saveError && <div role="alert" className="mt-2 text-sm text-ember">{saveError}</div>}
+            <div className="modal-actions">
+              <Button size="sm" disabled={schemeBusy} onClick={() => { setNameDialog(false); setSaveError(""); }}>取消</Button>
+              <Button type="submit" size="sm" variant="primary" disabled={schemeBusy || !newName.trim()}>{schemeBusy ? "保存中…" : "保存方案"}</Button>
+            </div>
+          </form>
+        </ConfirmDialog>
+      )}
+      {confirmCancel && (
+        <ConfirmDialog title="放弃未保存的修改？" onCancel={() => setConfirmCancel(false)}>
+          <p>返回方案管理后，本次未保存的修改将丢失。</p>
+          <div className="modal-actions">
+            <Button size="sm" onClick={() => setConfirmCancel(false)}>继续编辑</Button>
+            <Button size="sm" variant="danger" onClick={leaveEditor}>放弃修改</Button>
+          </div>
+        </ConfirmDialog>
+      )}
     </AppShell>
   );
 }

@@ -19,7 +19,7 @@ import type {
 import { cn } from "../../lib/cn";
 import { ItemPicker, type ItemPickerToggle } from "./item-picker";
 import { SoundPreviewButton } from "./sound-preview";
-import { Checkbox, FileInput, SearchInput, Select, Switch, TextInput } from "./ui/controls";
+import { FileInput, SearchInput, Select, Switch, TextInput } from "./ui/controls";
 import { Disclosure } from "./ui/nav";
 import { Button, Field } from "./ui/primitives";
 
@@ -298,7 +298,7 @@ export function RuleEditor({
           value={rule.name}
           onChange={(event) => onChange({ name: event.target.value })}
         />
-        <Checkbox checked={rule.enabled} onCheckedChange={(enabled) => onChange({ enabled })} label="启用规则" />
+        <Switch checked={rule.enabled} onCheckedChange={(enabled) => onChange({ enabled })} label="启用规则" />
         <Switch checked={rule.hidden} onCheckedChange={(hidden) => onChange({ hidden })} label="隐藏物品" />
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" aria-label="上移规则" disabled={index === 0} onClick={() => onMove(-1)}>

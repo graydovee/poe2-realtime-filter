@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, ChevronRight, Minus, SearchX } from "lucide-react";
+import { ChevronRight, SearchX } from "lucide-react";
 
 import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, searchCatalog } from "../../lib/catalog";
 import { cn } from "../../lib/cn";
@@ -23,15 +23,6 @@ function selectionOf(items: ItemDefinition[], selected: Set<string>) {
   let count = 0;
   for (const item of items) if (selected.has(item.id)) count += 1;
   return { count, total: items.length, all: items.length > 0 && count === items.length, partial: count > 0 && count < items.length };
-}
-
-function SelectionMark({ state }: { state: "off" | "on" | "mixed" }) {
-  return (
-    <span aria-hidden="true" className="ui-checkbox" data-state={state === "on" ? "checked" : state}>
-      {state === "mixed" && <Minus className="size-3.5" strokeWidth={3} />}
-      {state === "on" && <Check className="size-3.5" strokeWidth={3} />}
-    </span>
-  );
 }
 
 export function ItemPicker({
@@ -150,13 +141,12 @@ export function ItemPicker({
                     </button>
                     <button
                       type="button"
-                      role="checkbox"
-                      aria-checked={state.all ? true : state.partial ? "mixed" : false}
-                      aria-label={(state.all ? "取消本类：" : "选择本类：") + name}
+                      aria-pressed={state.all ? true : state.partial ? "mixed" : false}
+                      aria-label={`选择分类 ${name}`}
                       onClick={() => toggle(items, !state.all, name, child.path.join("/"))}
-                      className="grid w-9 shrink-0 place-items-center border-l border-line/70 transition hover:bg-gold/10 focus-visible:-outline-offset-2"
+                      className={cn("shrink-0 border-l border-line/70 px-2 text-xs transition hover:bg-gold/10 focus-visible:-outline-offset-2", state.all || state.partial ? "text-gold-bright" : "text-ink-muted")}
                     >
-                      <SelectionMark state={state.all ? "on" : state.partial ? "mixed" : "off"} />
+                      {state.all ? "已选" : state.partial ? "部分" : "全选"}
                     </button>
                   </div>
                 );
@@ -170,22 +160,19 @@ export function ItemPicker({
                 {current.items.map((item) => {
                   const checked = selected.has(item.id);
                   return (
-                    <label
+                    <button
                       key={item.id}
+                      type="button"
+                      aria-pressed={checked}
+                      onClick={() => toggle([item], !checked, item.localeNames[locale] || item.name, item.id)}
                       className={cn(
-                        "flex cursor-pointer items-center gap-3 border-b border-line/60 px-3.5 py-2.5 transition last:border-b-0 hover:bg-surface-3/60",
-                        checked && "bg-gold/[0.05]",
+                        "flex w-full items-center gap-3 border-b border-line/60 px-3.5 py-2.5 text-left transition last:border-b-0 hover:bg-surface-3/60 focus-visible:-outline-offset-2",
+                        checked && "bg-gold/[0.08]",
                       )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        className="peer sr-only"
-                        onChange={(event) =>
-                          toggle([item], event.target.checked, item.localeNames[locale] || item.name, item.id)
-                        }
-                      />
-                      <SelectionMark state={checked ? "on" : "off"} />
+                      <span className={cn("shrink-0 rounded-sm border px-1.5 py-0.5 text-xs", checked ? "border-gold/50 text-gold-bright" : "border-line text-ink-muted")} aria-hidden="true">
+                        {checked ? "已选" : "选择"}
+                      </span>
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <b className="truncate text-[11px] font-medium leading-tight text-ink">{item.localeNames[locale]}</b>
                         <small className="truncate text-xs leading-tight text-ink-muted">{item.name}</small>
@@ -193,7 +180,7 @@ export function ItemPicker({
                       <em className="shrink-0 text-xs not-italic text-ink-muted">
                         {item.ambiguous ? "沿用原始规则" : checked ? "已选中" : ""}
                       </em>
-                    </label>
+                    </button>
                   );
                 })}
               </div>

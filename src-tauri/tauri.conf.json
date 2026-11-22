@@ -12,6 +12,7 @@
                 "windows":  [
                                 {
                                     "label":  "main",
+                                    "create":  false,
                                     "title":  "PoE2 Realtime Filter",
                                     "width":  1280,
                                     "height":  900,
@@ -36,6 +37,7 @@
                                      "../vendor/neversink/":  "neversink/"
                                  },
                    "windows":  {
+                                   "nsis":  { "installMode":  "currentUser" },
                                    "webviewInstallMode":  {
                                                               "type":  "offlineInstaller"
                                                           }
@@ -53,5 +55,5 @@
                                                 }
                                 }
                 },
-    "version":  "0.5.1"
+    "version":  "0.5.2"
 }
