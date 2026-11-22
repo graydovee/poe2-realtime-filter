@@ -1,3 +1,4 @@
+import { DEFAULT_EFFECT_ITEMS } from "./baseline-effects";
 import { ITEM_CATALOG, STYLE_LABELS } from "./data";
 import { CURRENCY_ANCHORS } from "./pricing";
 import { normalizeProfile } from "./profile";
@@ -21,6 +22,7 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  ids.add(rule.id);
  if(typeof rule.name!=='string'||!rule.name.trim()||rule.name.length>100||/[\r\n]/.test(rule.name))throw new Error('规则名称需要1–100个字符');
  if(typeof rule.enabled!=='boolean'||typeof rule.hidden!=='boolean')throw new Error('无效规则');
+ if(rule.followBaseline!==undefined&&(typeof rule.followBaseline!=='boolean'||!Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS,rule.id)))throw new Error('无效的基础特效跟随设置');
  if(rule.autoRange!==undefined&&typeof rule.autoRange!=='boolean')throw new Error('无效规则');
  if(rule.effectPresetId!==undefined&&(typeof rule.effectPresetId!=='string'||rule.effectPresetId.length>60||!/^[a-zA-Z0-9_-]+$/.test(rule.effectPresetId)))throw new Error('无效特效预设');
  if(!rule.target||typeof rule.target!=='object')throw new Error('规则缺少适用物品');
@@ -53,6 +55,11 @@ function validateRule(rule:FilterRule,ids:Set<string>){
 export function validateProfile(input:unknown):FilterProfile {
  const p=normalizeProfile(input);
  if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new Error('无效的基础过滤器');
+ const base=p.baseFilter;
+ const name=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=260&&!/[\x00-\x1f]/.test(value);
+ const path=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=32767&&!/[\x00-\x1f]/.test(value);
+ if(base!==undefined&&(!base||!name(base.name)||!(base.kind==='local'?path(base.path):base.kind==='downloaded'&&name(base.source)&&name(base.version)&&path(base.entry))))throw new Error('无效的基础过滤器来源');
+ if(p.baseFilterHint!==undefined&&!name(p.baseFilterHint))throw new Error('无效的基础过滤器名称');
  if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new Error('无效赛季');
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');
  const ids=new Set<string>();

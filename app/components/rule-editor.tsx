@@ -3,9 +3,11 @@
 import { useId, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
 
+import { DEFAULT_EFFECT_ITEMS, type InheritedStyle } from "../../lib/baseline-effects";
 import { EFFECT_PRESETS, effectPresetsFor } from "../../lib/data";
 import { formatPrice, toExalted } from "../../lib/pricing";
 import type {
+  BaseFilter,
   Currency,
   EffectPreset,
   FilterRule,
@@ -101,7 +103,7 @@ function pickEffects(preset: EffectPreset): RuleEffects {
   };
 }
 
-function AppearancePreview({ effects, name, file }: { effects: RuleEffects; name: string; file?: File }) {
+function AppearancePreview({ effects, name, file, base }: { effects: RuleEffects; name: string; file?: File; base?: BaseFilter }) {
   const { color: iconColor, shape } = iconParts(effects.icon);
   const [beamColor] = (effects.beam ?? "").split(" ");
   const beam = colorValues[beamColor] ?? "transparent";
@@ -113,7 +115,7 @@ function AppearancePreview({ effects, name, file }: { effects: RuleEffects; name
           <span className="font-mono text-xs uppercase tracking-[0.16em] text-gold">实时预览</span>
           <div className="flex items-center gap-3">
             <span className="text-xs text-ink-muted">改任意字段都会立刻更新</span>
-            <SoundPreviewButton sound={effects.sound} file={file} />
+            <SoundPreviewButton sound={effects.sound} file={file} base={base} />
           </div>
         </div>
         <div className="loot-scene border border-line/70">
@@ -230,6 +232,8 @@ export function RuleEditor({
   total,
   locale,
   style,
+  base,
+  inherited,
   market,
   customFile,
   onChange,
@@ -242,6 +246,8 @@ export function RuleEditor({
   total: number;
   locale: Locale;
   style: string;
+  base?: BaseFilter;
+  inherited?: InheritedStyle;
   market: MarketSnapshot;
   customFile?: File;
   onChange: (patch: Partial<FilterRule>) => void;
@@ -249,7 +255,11 @@ export function RuleEditor({
   onMove: (delta: number) => void;
   onSound: (file: File | undefined) => void;
 }) {
-  const presets = useMemo(() => effectPresetsFor(style), [style]);
+  const presets = useMemo(() => effectPresetsFor(style).map((preset) => (
+    preset.sound && preset.sound.type !== "builtin" && preset.id !== rule.effectPresetId ? { ...preset, sound: undefined } : preset
+  )), [style, rule.effectPresetId]);
+  const canFollow = Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, rule.id);
+  const shownEffects = rule.followBaseline ? inherited?.effects ?? {} : rule.effects;
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [query, setQuery] = useState("");
   const font = rule.effects.font ?? {};
@@ -262,10 +272,10 @@ export function RuleEditor({
   const priceConditionLocked = priceConditionOn && !itemConditionOn;
   const selected = presets.find((preset) => preset.id === rule.effectPresetId);
   const filtered = query.trim() ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(query.trim())) : presets;
-  const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "neversink" ? "neversink:" + rule.effects.sound.fileName : "builtin:" + rule.effects.sound.id;
+  const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "builtin" ? "builtin:" + rule.effects.sound.id : "base:" + rule.effects.sound.fileName;
 
   function applyPreset(preset: EffectPreset) {
-    onChange({ effectPresetId: preset.id, effects: pickEffects(preset) });
+    onChange({ effectPresetId: preset.id, effects: pickEffects(preset), ...(canFollow ? { followBaseline: false } : {}) });
   }
 
   function editEffects(patch: Partial<RuleEffects>) {
@@ -274,7 +284,7 @@ export function RuleEditor({
       const value = next[key];
       if (value === undefined || value === "" || (key === "font" && (!value || Object.keys(value).length === 0))) delete next[key];
     }
-    onChange({ effectPresetId: undefined, effects: next });
+    onChange({ effectPresetId: undefined, effects: next, ...(canFollow ? { followBaseline: false } : {}) });
   }
 
   function editFont(patch: Partial<RuleFont>) {
@@ -397,6 +407,12 @@ export function RuleEditor({
       </div>
 
       <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
+        {canFollow && <div className="rounded-sm border border-line bg-surface-2 p-3">
+          <Switch checked={Boolean(rule.followBaseline)} onCheckedChange={(followBaseline) => onChange({ followBaseline })} label="跟随基础过滤器" />
+          {rule.followBaseline && <p className="mt-2 text-xs text-ink-muted">
+            {!base ? "选择基础过滤器后自动读取特效。" : inherited?.warning ?? (inherited ? describeEffects(inherited.effects) : "基础特效尚未读取")}
+          </p>}
+        </div>}
         <div className="rounded-sm border border-line bg-surface-2 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
@@ -428,7 +444,7 @@ export function RuleEditor({
         </div>
 
         <div>
-          <AppearancePreview effects={rule.effects} name={rule.name || "示例物品"} file={customFile} />
+          <AppearancePreview effects={shownEffects} name={rule.name || "示例物品"} file={customFile} base={base} />
         </div>
 
         <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="border-t border-line pt-1">
@@ -478,14 +494,15 @@ export function RuleEditor({
                     else if (value.startsWith("builtin:")) {
                       const id = Number(value.slice(8));
                       editEffects({ sound: { type: "builtin", id, volume: rule.effects.sound?.type === "builtin" && rule.effects.sound.id === id ? rule.effects.sound.volume : 300 } });
-                    } else editEffects({ sound: { type: "neversink", fileName: value.slice(10) } });
+                    } else editEffects({ sound: { type: "neversink", fileName: value.slice(5) } });
                   }}
                   options={[
                     { value: NONE, label: "沿用基础" },
-                    ...EFFECT_PRESETS.sounds.map((sound) => ({
-                      value: sound.type === "builtin" ? "builtin:" + sound.id : "neversink:" + sound.fileName,
-                      label: sound.type === "builtin" ? "内置音效 " + sound.id + " · 音量 " + sound.volume : "模板音效 · " + sound.fileName,
-                    })),
+                    ...EFFECT_PRESETS.sounds.flatMap((sound) => sound.type === "builtin" ? [{
+                      value: "builtin:" + sound.id,
+                      label: "内置音效 " + sound.id + " · 音量 " + sound.volume,
+                    }] : []),
+                    ...(soundValue.startsWith("base:") ? [{ value: soundValue, label: "基础过滤器音效 · " + soundValue.slice(5) }] : []),
                     { value: CUSTOM_SOUND, label: "自定义上传…" },
                   ]}
                 />

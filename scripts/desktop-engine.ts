@@ -1,4 +1,5 @@
-import { baselineFileFor, generateFilter } from "../lib/filter-engine";
+import { generateFilter } from "../lib/filter-engine";
+import { inspectBaseStyles } from "../lib/baseline-effects";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
@@ -36,12 +37,12 @@ const api = {
   catalog,
   snapshot,
   validate: validateProfile,
-  baseline: (input: unknown) => baselineFileFor(validateProfile(input)),
+  baseStyles: (input: string) => inspectBaseStyles(input),
   requiresMarket: (input: unknown) => validateProfile(input).rules.some((rule) => rule.enabled && rule.target.priceEnabled !== false && Boolean(rule.target.range)),
-  generate: ({ profile, baseline, market }: { profile: unknown; baseline: string; market?: MarketSnapshot }) => {
+  generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string; baselineName: string; market?: MarketSnapshot }) => {
     const valid = validateProfile(profile);
     const quote = market?.league === valid.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: valid.league };
-    return { ...generateFilter(valid, baseline, quote, { includeMarketTimestamp: false }), market: quote };
+    return { ...generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName, distinguishCustom: true }), market: quote };
   },
 };
 

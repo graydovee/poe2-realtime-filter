@@ -33,9 +33,6 @@
                                 "icons/icon.png",
                                 "icons/icon.ico"
                             ],
-                   "resources":  {
-                                     "../vendor/neversink/":  "neversink/"
-                                 },
                    "windows":  {
                                    "nsis":  { "installMode":  "currentUser" },
                                    "webviewInstallMode":  {

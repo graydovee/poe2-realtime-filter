@@ -25,6 +25,8 @@ export function normalizeProfile(input: unknown): FilterProfile {
   });
   return {
     ...DEFAULT_PROFILE,
+    baseFilter: raw.baseFilter,
+    baseFilterHint: raw.baseFilterHint,
     strictness: raw.strictness ?? DEFAULT_PROFILE.strictness,
     style: raw.style ?? DEFAULT_PROFILE.style,
     locale: raw.locale ?? DEFAULT_PROFILE.locale,

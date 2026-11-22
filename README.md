@@ -1,20 +1,20 @@
 # PoE2 Realtime Filter
 
-Windows x64 单机过滤器客户端，提供本地方案管理与过滤器制作。内置 NeverSink 基础过滤器和物品目录，从 poe.ninja 获取赛季行情。可以离线编辑、保存、分享和预览本地方案。
+Windows x64 单机过滤器客户端，提供本地方案管理与过滤器制作。从 poe.ninja 获取赛季行情，支持本地基础过滤器和第三方过滤器下载。可以离线编辑、保存和分享方案，选好基础过滤器后也可离线预览。
 
 [下载 Windows 安装包](https://github.com/graydovee/poe2-realtime-filter/releases/latest)
 
 ## 使用
 
 1. 在「我的方案」新建方案，或粘贴 `POE2F1.` 分享码导入。自定义音效缺失时，可在规则编辑器里补齐。
-2. 在制作页调整赛季、严格度、外观和规则，点击「预览」检查结果，再保存方案。回到「我的方案」点击「安装到游戏」，然后在 PoE2 里选择同名过滤器。
+2. 在制作页扫描游戏目录、手动选取 `.filter`，或通过「下载过滤器」选择 NeverSink。下载的版本保存在本地，可离线使用。调整赛季和规则后，点击「预览」检查结果，再保存方案。回到「我的方案」点击「安装到游戏」，然后在 PoE2 里选择同名过滤器。
 3. 从「更多」可以重命名、下载含音效的 ZIP、复制分享码或删除方案。卸载只移除游戏过滤器，保留方案。删除方案时默认保留游戏文件。
 4. 已安装方案默认每 30 分钟刷新。关闭窗口后托盘会继续运行，右键托盘图标可彻底退出。行情暂不可用时保留上次成功安装的过滤器。
 5. 版本号旁出现「更新」时可以下载新版，签名验证通过后选择「安装并重启」。旧版 v0.4.x 用户首次请手动安装。
 
 本地方案、设置和缓存存放在客户端安装目录的 `data` 子目录。从 v0.5.1 或更早版本更新时，客户端从新的方案库开始，原用户目录数据留在原处。过滤器默认写入 Windows 文档目录下的 `My Games\Path of Exile 2`。可在「过滤器目录」修改新安装位置，已安装的过滤器继续使用各自的原目录。
 
-未知物品沿用 NeverSink 基础规则。可以将物品加入跳过名单，避免被自定义规则覆盖。
+未知物品沿用所选基础过滤器的规则。可以将物品加入跳过名单，避免被自定义规则覆盖。
 
 ## 开发与发布
 
@@ -70,7 +70,7 @@ node scripts/validate-data.mjs           # 校验分组词条、展示顺序与�
 
 ### 特效预设集合
 
-规则编辑器里的「完整特效预设」来自 vendored 基线的实测值，由脚本抽取、离线生成：
+四个默认价格档从所选基础过滤器读取对应通货的特效。关闭「跟随基础过滤器」可手动修改。手动预设的数据由开发脚本生成：
 
 ```bash
 node scripts/extract-neversink-effects.mjs
@@ -79,6 +79,6 @@ node scripts/extract-neversink-effects.mjs
 - 产物一 `data/neversink-effects.json`：按视觉风格分组的外观预设，一个预设 = 光柱 + 地图图标 + 字体（字号 + 三色）+ 音效，default / aura / cobalt / customsounds / darkmode / mythic / vaal / zen 分别是 104 / 99 / 96 / 104 / 101 / 61 / 99 / 87 种。
 - 产物二 `data/default-rules.json`：4 条默认价格规则，`effectPresetId` 指向前者里的一个预设，`effects` 与预设完全一致（取自 default 风格 2-SEMI-STRICT 里对应通货的原始规则）。
 - 选择预设后四项一起填好，仍可逐项改；改完规则会标记为「自定义」，生成器只读具体值，不依赖预设数据。
-- 规则卡片上有「播放音效」按钮：模板音效直接播放 `vendor/neversink` 里的同一个 mp3；内置音效（`PlayAlertSound 1–16`）播放 `public/sounds/alert-sound-N.ogg`（从游戏 `FMOD/Desktop/Four_ItemFilter.bank` 导出，见 [public/sounds/README.md](public/sounds/README.md)），缺失时按钮置灰。
+- 规则卡片上有「播放音效」按钮：基础过滤器的自定义音效从所选来源读取；内置音效（`PlayAlertSound 1–16`）播放 `public/sounds/alert-sound-N.ogg`（从游戏 `FMOD/Desktop/Four_ItemFilter.bank` 导出，见 [public/sounds/README.md](public/sounds/README.md)），缺失时按钮置灰。
 
 wiki 侧的分类与三语对照方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill。

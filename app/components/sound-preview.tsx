@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Square, Volume2 } from "lucide-react";
 
 import { readSound } from "../../lib/desktop";
-import type { PresetSound } from "../../lib/types";
+import type { BaseFilter, PresetSound } from "../../lib/types";
 import { Button } from "./ui/primitives";
 
 /** 游戏内置音效的本地副本命名：public/sounds/alert-sound-1.mp3（也支持 ogg/wav）。 */
@@ -22,7 +22,7 @@ async function hasBuiltinFile(id: number) {
   return undefined;
 }
 
-export function SoundPreviewButton({ sound, file, className }: { sound?: PresetSound; file?: File; className?: string }) {
+export function SoundPreviewButton({ sound, file, base, className }: { sound?: PresetSound; file?: File; base?: BaseFilter; className?: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -73,9 +73,9 @@ export function SoundPreviewButton({ sound, file, className }: { sound?: PresetS
       const url = URL.createObjectURL(file);
       urlRef.current = url;
       source = url;
-    } else if (sound.type === "neversink") {
+    } else if ((sound.type === "neversink" || sound.type === "baseline") && base) {
       try {
-        source = URL.createObjectURL(await readSound(sound.fileName));
+        source = URL.createObjectURL(await readSound(sound.fileName, undefined, base));
         urlRef.current = source;
       } catch { return; }
     }

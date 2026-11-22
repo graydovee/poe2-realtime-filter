@@ -5,8 +5,9 @@ import { explain, fileToBase64, isDesktop, local, readSound, type LocalScheme } 
 import { useEffect, useRef, useState } from "react";
 
 import { FALLBACK_SNAPSHOT } from "../lib/data";
-import type { FilterProfile, FilterRule, FilterStyle, LeagueCatalog, Locale, MarketSnapshot, Strictness } from "../lib/types";
+import type { FilterProfile, FilterRule, LeagueCatalog, Locale, MarketSnapshot } from "../lib/types";
 
+import type { InheritedStyle } from "../lib/baseline-effects";
 import { DEFAULT_PROFILE } from "../lib/default-profile";
 
 import { AppShell } from "./components/app-shell";
@@ -39,6 +40,8 @@ export default function HomePage() {
   const [newName, setNewName] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [profile, setProfile] = useState<FilterProfile>(DEFAULT_PROFILE);
+  const [baseStyles, setBaseStyles] = useState<Record<string, InheritedStyle>>({});
+  const [baseStylesError, setBaseStylesError] = useState("");
   const [customSounds, setCustomSounds] = useState<Record<string, File>>({});
   const [generated, setGenerated] = useState<Generated | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,6 +52,18 @@ export default function HomePage() {
   const [marketError, setMarketError] = useState("");
   const requestVersion = useRef(0);
   useEffect(() => { window.scrollTo(0, 0); }, [view]);
+
+  const base = profile.baseFilter;
+  useEffect(() => {
+    setBaseStyles({});
+    setBaseStylesError("");
+    if (view !== "editor" || !base) return;
+    let current = true;
+    void local<Record<string, InheritedStyle>>("base_styles", { base })
+      .then((styles) => { if (current) setBaseStyles(styles); })
+      .catch((error) => { if (current) setBaseStylesError(explain(error)); });
+    return () => { current = false; };
+  }, [view, base]);
 
   const selectedMarket: MarketSnapshot = market.league === profile.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
 
@@ -172,7 +187,7 @@ export default function HomePage() {
   function setRuleSound(id: string, file: File | undefined) {
     if (!file) return;
     setCustomSounds((current) => ({ ...current, [id]: file }));
-    updateRule(id, { effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
+    updateRule(id, { followBaseline: profile.rules.find((rule) => rule.id === id)?.followBaseline === undefined ? undefined : false, effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
   }
 
   async function openDraft(scheme: LocalScheme | null) {
@@ -186,7 +201,7 @@ export default function HomePage() {
         if (sound?.type !== "custom") return;
         let file = reads.get(sound.fileName);
         if (!file) {
-          file = readSound(sound.fileName, scheme.id, true);
+          file = readSound(sound.fileName, scheme.id);
           reads.set(sound.fileName, file);
         }
         try { soundFiles[rule.id] = await file; }
@@ -197,7 +212,10 @@ export default function HomePage() {
     setSchemeId(scheme?.id ?? null);
     setSchemeName(scheme?.name ?? "");
     const league = leagueCatalog?.defaultLeague ?? DEFAULT_PROFILE.league;
-    setProfile(scheme?.profile ?? { ...structuredClone(DEFAULT_PROFILE), league, originalLeague: league });
+    setProfile(scheme?.profile ?? {
+      ...structuredClone(DEFAULT_PROFILE), league, originalLeague: league,
+      rules: DEFAULT_PROFILE.rules.map((rule) => ({ ...rule, effects: {}, effectPresetId: undefined, followBaseline: true })),
+    });
     setCustomSounds(soundFiles);
     setGenerated(null);
     setBusy(false);
@@ -278,7 +296,7 @@ export default function HomePage() {
   }
 
   return (
-    <AppShell title={view === "manager" ? "方案管理" : schemeId ? `制作过滤器 · ${schemeName}` : "制作过滤器"}>
+    <AppShell title={view === "manager" ? "方案管理" : schemeId ? `编辑过滤器：${schemeName}` : "制作过滤器"}>
       <div hidden={view !== "manager"}>
         <SchemeManager
           revision={schemeRevision}
@@ -305,15 +323,16 @@ export default function HomePage() {
             <div className="flex min-w-0 flex-col gap-4">
               <BasicFilterSection
                 profile={profile}
-                onStrictnessChange={(level: Strictness) => update("strictness", level)}
-                onStyleChange={(style: FilterStyle) => update("style", style)}
+                onBaseChange={(base) => update("baseFilter", base)}
                 onLocaleChange={(locale: Locale) => update("locale", locale)}
               />
+              {baseStylesError && <p role="alert" className="text-sm text-ember">{baseStylesError}</p>}
               <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
               <RulesSection
                 profile={profile}
                 market={selectedMarket}
                 customSounds={customSounds}
+                baseStyles={baseStyles}
                 onRuleChange={updateRule}
                 onRemoveRule={removeRule}
                 onAddRule={addRule}

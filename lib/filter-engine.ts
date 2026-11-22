@@ -1,3 +1,4 @@
+import { inspectBaseStyles } from "./baseline-effects";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
 import { resolveAutoRanges, toExalted } from "./pricing";
 import type {
@@ -52,12 +53,12 @@ export function matcherLines(item: ItemDefinition): string[] {
   return lines;
 }
 
-function soundLine(sound: PresetSound): string {
-  return sound.type === "builtin" ? "\tPlayAlertSound " + sound.id + " " + sound.volume : "\tCustomAlertSound " + quote(sound.fileName) + " 300";
+function soundLine(sound: PresetSound, distinguishCustom: boolean): string {
+  return sound.type === "builtin" ? "\tPlayAlertSound " + sound.id + " " + sound.volume : "\tCustomAlertSound " + quote((distinguishCustom && sound.type === "custom" ? "@poe2rf-custom/" : "") + sound.fileName) + " 300";
 }
 
 /** 只输出规则里真正填写的动作；留空 = 交给基础过滤器。 */
-function effectLines(rule: FilterRule): string[] {
+function effectLines(rule: FilterRule, distinguishCustom: boolean): string[] {
   const lines: string[] = [];
   const { beam, icon, font, sound } = rule.effects;
   if (beam) lines.push("\tPlayEffect " + beam);
@@ -68,13 +69,13 @@ function effectLines(rule: FilterRule): string[] {
     if (font.borderColor) lines.push("\tSetBorderColor " + font.borderColor);
     if (font.backgroundColor) lines.push("\tSetBackgroundColor " + font.backgroundColor);
   }
-  if (sound) lines.push(soundLine(sound));
+  if (sound) lines.push(soundLine(sound, distinguishCustom));
   return lines;
 }
 
-function ruleBlock(rule: FilterRule, item: ItemDefinition): string {
+function ruleBlock(rule: FilterRule, item: ItemDefinition, actions: string[]): string {
   const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.name + " / " + item.name;
-  return [head, ...matcherLines(item), ...effectLines(rule)].join("\n");
+  return [head, ...matcherLines(item), ...actions].join("\n");
 }
 
 function withinRange(exaltedValue: number | undefined, range: PriceRange | undefined, snapshot: MarketSnapshot): boolean {
@@ -128,7 +129,7 @@ function validateSafety(
     .map((entry) => entry.item.name);
   const exclusionViolations = hidden.filter((entry) => skipped.has(entry.item.id)).map((entry) => entry.item.name);
   return {
-    sourceVersion: "NeverSink PoE2 vendored union + PoE2 client catalog",
+    sourceVersion: "PoE2 client catalog",
     baselineFile,
     catalogSize: ITEM_CATALOG.length,
     coveredItems: baseTypes.size + classes.size,
@@ -142,8 +143,8 @@ function validateSafety(
   };
 }
 
-export function generateFilter(profile: FilterProfile, baseline: string, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean } = {}): GeneratedBundle {
-  const baselineFile = baselineFileFor(profile);
+export function generateFilter(profile: FilterProfile, baseline: string, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean; baselineName?: string; distinguishCustom?: boolean } = {}): GeneratedBundle {
+  const baselineFile = options.baselineName ?? baselineFileFor(profile);
   const league = profile.league ?? "Standard";
   const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot)
     ? inputSnapshot
@@ -157,7 +158,11 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
   const matched = new Set<string>();
   const applied = new Map<string, { rule: FilterRule; count: number }>();
-  const warnings: string[] = [];
+  const inherited = rawRules.some((rule) => rule.enabled && rule.followBaseline) ? inspectBaseStyles(baseline) : {};
+  const warnings = rawRules.flatMap((rule) => {
+    const warning = rule.enabled && rule.followBaseline ? inherited[rule.id]?.warning : undefined;
+    return warning ? [warning] : [];
+  });
   const soundFiles = new Set<string>();
   let unpriced = 0;
   let ambiguous = 0;
@@ -172,10 +177,10 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
     for (const rule of rules) {
       if (!rule.enabled) continue;
       if (!matches(rule, item, exaltedValue, snapshot)) continue;
-      overrides.push(ruleBlock(rule, item));
+      overrides.push(ruleBlock(rule, item, rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false)));
       matched.add(item.id);
       if (rule.hidden) hidden.push({ item, exaltedValue });
-      if (rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
+      if (!rule.followBaseline && rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
       const current = applied.get(rule.id);
       applied.set(rule.id, { rule, count: (current?.count ?? 0) + 1 });
       break;
@@ -187,10 +192,10 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
   const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id)).map((rule) => rule.name);
   if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
-    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，其余物品沿用 NeverSink 原始规则。");
+    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，其余物品沿用基础过滤器规则。");
   }
   if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
-  if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用 NeverSink 原始规则，避免误覆盖其他物品。");
+  if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用基础过滤器规则，避免误覆盖其他物品。");
   if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
 
   const safetyReport = validateSafety(baselineFile, baseline, hidden, skipped, warnings, snapshot.rates?.divineToExalted);
@@ -198,10 +203,10 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
     "# poe2-filter generated overlay",
     "# Base: " + baselineFile,
     "# League: " + league,
-    "# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness],
+    ...(!options.baselineName ? ["# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness]] : []),
     "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
     "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
-    "# Safety: 未配置的动作交给 NeverSink 基线；隐藏规则会让安全检查失败。",
+    "# Safety: 未配置的动作交给基础过滤器；隐藏规则会让安全检查失败。",
     "",
   ].join("\n");
   const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
@@ -209,7 +214,7 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
   return {
     filterFile,
     baselineFile,
-    fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + BASELINE_NAMES[profile.strictness].toLowerCase() + ".filter",
+    fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + (options.baselineName ? "" : "-" + BASELINE_NAMES[profile.strictness].toLowerCase()) + ".filter",
     soundFiles: [...soundFiles],
     appliedRules: [...applied.values()].map(({ rule, count }) => ({ ruleId: rule.id, ruleName: rule.name, itemCount: count })),
     safetyReport: { ...safetyReport, unpricedItems: unpriced, ambiguousItems: ambiguous },

@@ -78,6 +78,7 @@ export type PriceRange = {
 export type PresetSound =
   | { type: "builtin"; id: number; volume: number; fileName?: never }
   | { type: "neversink"; fileName: string }
+  | { type: "baseline"; fileName: string }
   | { type: "custom"; fileName: string };
 
 /** 规则适用物品：物品集合与价格区间可单独启用或同时启用，同时启用时取交集。 */
@@ -111,13 +112,20 @@ export type FilterRule = {
   enabled: boolean;
   hidden: boolean;
   autoRange?: boolean;
+  followBaseline?: boolean;
   /** 选中的完整特效预设 id（仅用于回显，生成器只读 effects）。 */
   effectPresetId?: string;
   target: RuleTarget;
   effects: RuleEffects;
 };
 
+export type BaseFilter =
+  | { kind: "local"; path: string; name: string }
+  | { kind: "downloaded"; source: string; version: string; entry: string; name: string };
+
 export type FilterProfile = {
+  baseFilter?: BaseFilter;
+  baseFilterHint?: string;
   schemaVersion: 2;
   league: string;
   originalLeague?: string;

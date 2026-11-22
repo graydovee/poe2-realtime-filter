@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import type { FilterProfile } from "./types";
+import type { BaseFilter, FilterProfile } from "./types";
 
 export type LocalScheme = {
   id: string;
@@ -32,8 +32,8 @@ export async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export async function readSound(name: string, id?: string, custom = false): Promise<File> {
-  const encoded = await invoke<string>("local_sound", { id: id ?? null, name, custom });
+export async function readSound(name: string, id?: string, base?: BaseFilter): Promise<File> {
+  const encoded = await invoke<string>("local_sound", { id: id ?? null, name, base: base ?? null });
   const bytes = Uint8Array.from(atob(encoded), (byte) => byte.charCodeAt(0));
   const ext = name.split(".").at(-1)?.toLowerCase();
   const type = ext === "mp3" ? "audio/mpeg" : ext === "wav" ? "audio/wav" : "audio/ogg";

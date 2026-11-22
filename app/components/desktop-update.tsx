@@ -5,7 +5,11 @@ import { useEffect, useState } from "react";
 import { explain, isDesktop, local } from "../../lib/desktop";
 import { Button } from "./ui/primitives";
 
-type Update = { phase: string; version?: string; error?: string };
+type Update = { phase: string; version?: string; error?: string; receivedBytes?: number; totalBytes?: number };
+
+function size(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.floor(bytes / 1024)} KB`;
+}
 
 export function DesktopUpdate() {
   const [update, setUpdate] = useState<Update>();
@@ -26,11 +30,18 @@ export function DesktopUpdate() {
 
   if (!update) return null;
   const ready = update.phase === "ready";
-  const working = ["downloading", "installing"].includes(update.phase);
+  const working = ["downloading", "verifying", "installing"].includes(update.phase);
+  const received = update.receivedBytes ?? 0;
+  const total = update.totalBytes || undefined;
+  const percent = total ? Math.min(100, Math.floor(received / total * 100)) : undefined;
   return <div className="flex flex-wrap items-center gap-2">
     {(ready || working || update.phase === "available") && <Button variant="primary" size="sm" disabled={working} onClick={() => void act()} title={update.version}>
-      {ready ? "安装并重启" : update.phase === "downloading" ? "正在下载…" : update.phase === "installing" ? "正在安装…" : "更新"}
+      {ready ? "安装并重启" : update.phase === "downloading" ? "正在下载…" : update.phase === "verifying" ? "正在校验…" : update.phase === "installing" ? "正在安装…" : "更新"}
     </Button>}
+    {update.phase === "downloading" && <div className="grid gap-1 font-mono text-xs text-ink-muted">
+      <progress aria-label="更新下载进度" className="h-1.5 w-full min-w-24 accent-gold" value={total ? received : undefined} max={total} />
+      <span>{size(received)}{total ? ` / ${size(total)} · ${percent}%` : ""}</span>
+    </div>}
     {update.error && <span className="max-w-sm text-xs text-ink-muted" role="status" title={update.error}>
       {update.phase === "error" ? "无法检查更新" : update.error}
     </span>}

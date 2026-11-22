@@ -1,4 +1,5 @@
 use crate::{
+    base_filter::{self, BaseFilter, Baseline},
     engine::{self, Result},
     market,
 };
@@ -94,7 +95,6 @@ pub struct Edit {
 
 pub struct Store {
     root: PathBuf,
-    templates: PathBuf,
     pub default_game: PathBuf,
 }
 
@@ -166,7 +166,7 @@ pub fn display_directory(path: &Path) -> String {
     text.into_owned()
 }
 
-fn valid_windows_name(name: &str) -> bool {
+pub(crate) fn valid_windows_name(name: &str) -> bool {
     !name.is_empty()
         && !name.ends_with('.')
         && !name.ends_with(' ')
@@ -231,10 +231,99 @@ fn valid_audio(name: &str) -> bool {
 
 fn audio_pattern() -> &'static Regex {
     static RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r#"(?m)^(\s*CustomAlertSound(?:Optional)?\s+")([^"\r\n]+)(")"#).unwrap()
+        Regex::new(
+            r##"^([ \t]*)(CustomAlertSound(?:Optional)?)[ \t]+(?:"([^"\r\n]*)"|([^\s"#]+))(.*)$"##,
+        )
+        .unwrap()
     });
     &RE
 }
+
+fn expand_filter(
+    path: &Path,
+    text: &str,
+    cache_root: Option<&Path>,
+    parents: &mut Vec<PathBuf>,
+    expanded: &mut String,
+) -> Result<()> {
+    static IMPORT: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r##"^Import[ \t]+"([^"\r\n]+)"(?:[ \t]+(Optional))?[ \t]*(?:#.*)?$"##).unwrap()
+    });
+    let canonical = path
+        .canonicalize()
+        .map_err(|error| format!("无法读取过滤器「{}」：{error}", path.display()))?;
+    if parents.len() >= 12 || parents.contains(&canonical) {
+        return Err(format!(
+            "过滤器依赖嵌套过深或循环引用「{}」",
+            display_directory(&canonical)
+        ));
+    }
+    let nested = !parents.is_empty();
+    parents.push(canonical.clone());
+    let directory = canonical.parent().ok_or("无法确定过滤器所在目录")?;
+    for line in text.split_inclusive('\n') {
+        if line.split_whitespace().next() == Some("Import") {
+            let captures = IMPORT
+                .captures(line.trim())
+                .ok_or_else(|| format!("无法解析过滤器依赖「{}」", line.trim()))?;
+            let reference = &captures[1];
+            let imported = match directory.join(reference).canonicalize() {
+                Ok(path) => path,
+                Err(error) if error.kind() == ErrorKind::NotFound && captures.get(2).is_some() => {
+                    continue
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "无法读取「{}」引用的过滤器「{reference}」：{error}",
+                        display_directory(path)
+                    ))
+                }
+            };
+            if cache_root.is_some_and(|root| !imported.starts_with(root)) {
+                return Err(format!("过滤器依赖「{reference}」超出下载目录"));
+            }
+            let content = base_filter::read_filter(&imported)?;
+            expand_filter(&imported, &content, cache_root, parents, expanded)?;
+            if !expanded.ends_with('\n') {
+                expanded.push('\n');
+            }
+        } else if nested {
+            let trimmed = line.trim_end_matches(['\r', '\n']);
+            let reference = audio_pattern()
+                .captures(trimmed)
+                .and_then(|captures| captures.get(3).or_else(|| captures.get(4)));
+            if let Some(reference) = reference {
+                let sound = Path::new(reference.as_str());
+                let relative = directory.join(sound);
+                if !sound.is_absolute() && base_filter::audio_name(sound) && relative.is_file() {
+                    let absolute = display_directory(&relative);
+                    expanded.push_str(&line[..reference.start()]);
+                    if !line[..reference.start()].ends_with('"') {
+                        expanded.push('"');
+                    }
+                    expanded.push_str(&absolute);
+                    if !line[reference.end()..].starts_with('"') {
+                        expanded.push('"');
+                    }
+                    expanded.push_str(&line[reference.end()..]);
+                } else {
+                    expanded.push_str(line);
+                }
+            } else {
+                expanded.push_str(line);
+            }
+        } else {
+            expanded.push_str(line);
+        }
+        if expanded.len() > 16 * 1024 * 1024 {
+            return Err("基础过滤器及其依赖合计超过 16 MB".into());
+        }
+    }
+    parents.pop();
+    Ok(())
+}
+
+const CUSTOM_SOUND_PREFIX: &str = "@poe2rf-custom/";
 
 fn sound_names(profile: &Value) -> BTreeSet<String> {
     profile["rules"]
@@ -256,10 +345,9 @@ fn paths_same(left: &str, right: &str) -> bool {
 }
 
 impl Store {
-    pub fn new(root: PathBuf, templates: PathBuf, game: PathBuf) -> Self {
+    pub fn new(root: PathBuf, game: PathBuf) -> Self {
         Self {
             root,
-            templates,
             default_game: game,
         }
     }
@@ -452,9 +540,17 @@ impl Store {
     }
 
     pub fn share(scheme: &Scheme) -> Result<String> {
+        let mut profile = scheme.profile.clone();
+        if let Some(fields) = profile.as_object_mut() {
+            if let Some(base) = fields.remove("baseFilter") {
+                if let Some(name) = base["name"].as_str() {
+                    fields.insert("baseFilterHint".into(), json!(name));
+                }
+            }
+        }
         let bytes = serde_json::to_vec(&Share {
             name: scheme.name.clone(),
-            profile: scheme.profile.clone(),
+            profile,
         })
         .map_err(|e| e.to_string())?;
         if bytes.len() > SHARE_MAX {
@@ -482,7 +578,11 @@ impl Store {
         if bytes.len() > SHARE_MAX {
             return Err("分享码过大".into());
         }
-        let share: Share = serde_json::from_slice(&bytes).map_err(|_| "分享码内容无效")?;
+        let mut share: Share = serde_json::from_slice(&bytes).map_err(|_| "分享码内容无效")?;
+        // A share code may describe a baseline but never authorize reading a local path.
+        if let Some(fields) = share.profile.as_object_mut() {
+            fields.remove("baseFilter");
+        }
         self.add(
             library,
             name_override.as_deref().unwrap_or(&share.name),
@@ -494,7 +594,7 @@ impl Store {
     pub fn missing(&self, scheme: &Scheme) -> Vec<String> {
         sound_names(&scheme.profile)
             .into_iter()
-            .filter(|name| self.audio(Some(scheme), name, true).is_err())
+            .filter(|name| self.audio(Some(scheme), name).is_err())
             .collect()
     }
 
@@ -526,72 +626,215 @@ impl Store {
         Ok(())
     }
 
-    pub fn audio(&self, scheme: Option<&Scheme>, name: &str, custom: bool) -> Result<Vec<u8>> {
+    pub fn audio(&self, scheme: Option<&Scheme>, name: &str) -> Result<Vec<u8>> {
         if !valid_audio(name) {
             return Err("无效音效文件名".into());
         }
-        let bytes = if custom {
-            let hash = scheme
-                .and_then(|item| item.sounds.get(name))
-                .ok_or_else(|| format!("缺少自定义音效「{name}」"))?;
-            if hash.len() != 64 || !hash.bytes().all(|c| c.is_ascii_hexdigit()) {
-                return Err("无效音效记录".into());
-            }
-            let bytes = fs::read(self.root.join("sounds").join(hash))
-                .map_err(|_| format!("缺少自定义音效「{name}」"))?;
-            if digest(&bytes) != *hash {
-                return Err("自定义音效校验失败".into());
-            }
-            bytes
-        } else {
-            fs::read(self.templates.join("(STYLE) CUSTOMSOUNDS").join(name))
-                .map_err(|_| format!("缺少 NeverSink 音效「{name}」"))?
-        };
-        if bytes.is_empty() || bytes.len() > AUDIO_MAX {
-            return Err("音效文件大小无效".into());
+        let hash = scheme
+            .and_then(|item| item.sounds.get(name))
+            .ok_or_else(|| format!("缺少自定义音效「{name}」"))?;
+        if hash.len() != 64 || !hash.bytes().all(|c| c.is_ascii_hexdigit()) {
+            return Err("无效音效记录".into());
+        }
+        let bytes = base_filter::read_limited(&self.root.join("sounds").join(hash), AUDIO_MAX)
+            .map_err(|error| format!("无法读取自定义音效「{name}」：{error}"))?;
+        if bytes.is_empty() || digest(&bytes) != *hash {
+            return Err(format!("自定义音效「{name}」校验失败"));
         }
         Ok(bytes)
     }
 
-    pub fn generate(&self, profile: Value, market: Option<Value>) -> Result<Value> {
-        let file: String = engine::call("baseline", &profile)?;
-        let baseline = fs::read_to_string(self.templates.join(file))
-            .map_err(|e| format!("无法读取 NeverSink 基础过滤器: {e}"))?;
+    pub fn base_directory(&self, library: &Library) -> PathBuf {
+        library
+            .settings
+            .filter_directory
+            .clone()
+            .unwrap_or_else(|| self.default_game.clone())
+    }
+
+    pub fn source_cache(&self, source: &str) -> Result<Vec<BaseFilter>> {
+        base_filter::cached_source(&self.root, source)
+    }
+
+    pub fn source_download(&self, source: &str) -> Result<Vec<BaseFilter>> {
+        base_filter::download(&self.root, source)
+    }
+
+    fn baseline(&self, profile: &Value) -> Result<Baseline> {
+        if profile["baseFilter"].is_null() {
+            return Err("请先选择基础过滤器".into());
+        }
+        let base: BaseFilter = serde_json::from_value(profile["baseFilter"].clone())
+            .map_err(|_| "基础过滤器来源无效，请重新选择")?;
+        let mut baseline = base.load(&self.root)?;
+        let mut expanded = String::new();
+        expand_filter(
+            &baseline.path,
+            &baseline.text,
+            baseline.cache_root.as_deref(),
+            &mut Vec::new(),
+            &mut expanded,
+        )?;
+        baseline.text = expanded;
+        Ok(baseline)
+    }
+
+    pub fn base_styles(&self, base: BaseFilter) -> Result<Value> {
+        let baseline = self.baseline(&json!({"baseFilter": base}))?;
+        engine::call("baseStyles", json!(baseline.text))
+    }
+
+    pub fn base_audio(&self, baseline: &Baseline, name: &str, game: &Path) -> Result<Vec<u8>> {
+        let reference = Path::new(name);
+        if !base_filter::audio_name(reference) || name.starts_with("@poe2rf-custom/") {
+            return Err(format!("基础过滤器引用了无效音效「{name}」"));
+        }
+        let parent = baseline.path.parent().ok_or("无法确定基础过滤器目录")?;
+        let mut candidates = vec![parent.join(reference)];
+        if baseline.cache_root.is_none() && !reference.is_absolute() {
+            candidates.push(game.join(reference));
+        }
+        for path in candidates {
+            let absolute = match path.canonicalize() {
+                Ok(path) => path,
+                Err(error) if error.kind() == ErrorKind::NotFound => continue,
+                Err(error) => return Err(format!("无法读取基础过滤器音效「{name}」：{error}")),
+            };
+            if baseline
+                .cache_root
+                .as_ref()
+                .is_some_and(|root| !absolute.starts_with(root))
+            {
+                return Err(format!("音效「{name}」超出下载过滤器的目录"));
+            }
+            let bytes = base_filter::read_limited(&absolute, AUDIO_MAX)
+                .map_err(|error| format!("无法读取基础过滤器音效「{name}」：{error}"))?;
+            if bytes.is_empty() {
+                return Err(format!("基础过滤器音效「{name}」为空"));
+            }
+            return Ok(bytes);
+        }
+        Err(format!(
+            "缺少基础过滤器「{}」引用的音效「{name}」",
+            baseline.name
+        ))
+    }
+
+    pub fn preview_base_audio(&self, base: BaseFilter, name: &str) -> Result<Vec<u8>> {
+        let baseline = self.baseline(&json!({"baseFilter": base}))?;
+        self.base_audio(&baseline, name, &self.base_directory(&self.load()?))
+    }
+
+    fn generate(
+        &self,
+        profile: &Value,
+        baseline: &Baseline,
+        market: Option<Value>,
+    ) -> Result<Value> {
         engine::call(
             "generate",
-            json!({ "profile": profile, "baseline": baseline, "market": market }),
+            json!({ "profile": profile, "baseline": baseline.text, "baselineName": baseline.name, "market": market }),
         )
     }
 
-    pub fn bundle(
-        &self,
-        scheme: &Scheme,
-        result: &Value,
-    ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
-        if result["safetyReport"]["passed"] != true {
-            return Err("规则未通过安全检查，请先查看预览报告".into());
-        }
+    pub fn preview(&self, profile: Value, market: Option<Value>) -> Result<Value> {
+        let baseline = self.baseline(&profile)?;
+        let mut result = self.generate(&profile, &baseline, market)?;
         let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
-        let mut names = BTreeMap::new();
+        let (text, _) = self.prepare_sounds(text, &baseline, None)?;
+        result["filterFile"] = json!(text);
+        Ok(result)
+    }
+
+    fn prepare_sounds(
+        &self,
+        text: &str,
+        baseline: &Baseline,
+        scheme: Option<&Scheme>,
+    ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
+        let overlay = text
+            .strip_suffix(&baseline.text)
+            .ok_or("生成结果缺少基础过滤器正文")?;
+        let game = match scheme.and_then(|scheme| scheme.installed.as_ref()) {
+            Some(installed) => installed.directory.clone(),
+            None => self.base_directory(&self.load()?),
+        };
+        let mut names = BTreeMap::<(&str, bool, bool), Option<String>>::new();
         let mut assets = BTreeMap::new();
-        let custom_names = sound_names(&scheme.profile);
-        for capture in audio_pattern().captures_iter(text) {
-            let name = &capture[2];
-            if names.contains_key(name) {
-                continue;
+        let mut total = 0;
+        let mut output = String::with_capacity(text.len());
+        for (part, is_overlay) in [(overlay, true), (baseline.text.as_str(), false)] {
+            for line in part.split_inclusive('\n') {
+                let trimmed = line.trim_end_matches(['\r', '\n']);
+                let end = &line[trimmed.len()..];
+                let command = trimmed.split_whitespace().next();
+                if !matches!(
+                    command,
+                    Some("CustomAlertSound" | "CustomAlertSoundOptional")
+                ) {
+                    output.push_str(line);
+                    continue;
+                }
+                let captures = audio_pattern()
+                    .captures(trimmed)
+                    .ok_or_else(|| format!("无法读取基础过滤器音效指令「{trimmed}」"))?;
+                let name = captures
+                    .get(3)
+                    .or_else(|| captures.get(4))
+                    .unwrap()
+                    .as_str();
+                if name.eq_ignore_ascii_case("None") {
+                    output.push_str(line);
+                    continue;
+                }
+                let custom = is_overlay && name.starts_with(CUSTOM_SOUND_PREFIX);
+                let name = if custom {
+                    &name[CUSTOM_SOUND_PREFIX.len()..]
+                } else {
+                    name
+                };
+                let optional = &captures[2] == "CustomAlertSoundOptional";
+                let key = (name, custom, optional);
+                if !names.contains_key(&key) {
+                    let target = if custom && scheme.is_none() {
+                        Some(name.to_owned()) // Draft uploads are checked when saving and installing.
+                    } else {
+                        match if custom {
+                            self.audio(scheme, name)
+                        } else {
+                            self.base_audio(baseline, name, &game)
+                        } {
+                            Ok(bytes) => {
+                                let extension = Path::new(name)
+                                    .extension()
+                                    .ok_or("无效音效文件名")?
+                                    .to_string_lossy()
+                                    .to_ascii_lowercase();
+                                let target = format!("poe2rf-{}.{extension}", digest(&bytes));
+                                if !assets.contains_key(&target) {
+                                    total += bytes.len();
+                                    if total > AUDIO_TOTAL_MAX {
+                                        return Err("过滤器所需音效合计超过 32 MB".into());
+                                    }
+                                    assets.insert(target.clone(), bytes);
+                                }
+                                Some(target)
+                            }
+                            Err(_) if optional => None,
+                            Err(error) => return Err(error),
+                        }
+                    };
+                    names.insert(key, target);
+                }
+                if let Some(target) = &names[&key] {
+                    output.push_str(&format!(
+                        "{}{} \"{}\"{}{}",
+                        &captures[1], &captures[2], target, &captures[5], end
+                    ));
+                }
             }
-            let content = self.audio(Some(scheme), name, custom_names.contains(name))?;
-            let ext = name.rsplit_once('.').unwrap().1.to_ascii_lowercase();
-            let target = format!("poe2rf-{}.{ext}", digest(&content));
-            assets.insert(target.clone(), content);
-            names.insert(name.to_owned(), target);
         }
-        let text = audio_pattern()
-            .replace_all(text, |c: &regex::Captures| {
-                format!("{}{}{}", &c[1], names.get(&c[2]).unwrap(), &c[3])
-            })
-            .into_owned();
-        Ok((text, assets))
+        Ok((output, assets))
     }
 
     pub fn prepare_filter(
@@ -599,13 +842,18 @@ impl Store {
         scheme: &Scheme,
         market: Option<Value>,
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
-        let result = self.generate(scheme.profile.clone(), market)?;
+        let baseline = self.baseline(&scheme.profile)?;
+        let result = self.generate(&scheme.profile, &baseline, market)?;
         if engine::call::<bool>("requiresMarket", &scheme.profile)?
             && result["market"]["rates"].is_null()
         {
             return Err("等待当前赛季的有效行情".into());
         }
-        self.bundle(scheme, &result)
+        if result["safetyReport"]["passed"] != true {
+            return Err("规则未通过安全检查，请先查看预览报告".into());
+        }
+        let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
+        self.prepare_sounds(text, &baseline, Some(scheme))
     }
 
     fn filter_path(directory: &Path, name: &str) -> Result<PathBuf> {
@@ -727,16 +975,16 @@ fn move_file(from: &Path, to: &Path) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn profile() -> Value {
-        json!({"schemaVersion":2,"locale":"cn","league":"Standard","strictness":2,"style":"default","rules":[],"skippedItemIds":[]})
+    fn profile(store: &Store) -> Value {
+        let source = store.root.join("fixture.filter");
+        fs::create_dir_all(&store.root).unwrap();
+        fs::write(&source, "Show\n\tSetFontSize 31\n").unwrap();
+        let base = BaseFilter::from_file(&source).unwrap();
+        json!({"schemaVersion":2,"locale":"cn","league":"Standard","baseFilter":base,"rules":[],"skippedItemIds":[]})
     }
 
     fn fixture(temp: &Path) -> Store {
-        Store::new(
-            temp.join("local"),
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../vendor/neversink"),
-            temp.join("game"),
-        )
+        Store::new(temp.join("local"), temp.join("game"))
     }
 
     #[test]
@@ -745,7 +993,7 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "终极打宝", profile(), BTreeMap::new())
+            .add(&mut library, "终极打宝", profile(&store), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -765,10 +1013,10 @@ mod tests {
             .import(&mut library, &code, Some("离线副本".into()))
             .unwrap();
         assert_ne!(id, copy);
-        assert_eq!(
-            Store::get(&library, &copy).unwrap().profile,
-            Store::get(&library, &id).unwrap().profile
-        );
+        let mut expected = Store::get(&library, &id).unwrap().profile.clone();
+        expected.as_object_mut().unwrap().remove("baseFilter");
+        expected["baseFilterHint"] = json!("fixture.filter");
+        assert_eq!(Store::get(&library, &copy).unwrap().profile, expected);
         assert!(store.import(&mut library, "POE2F2.AAAAA", None).is_err());
         assert!(store.import(&mut library, "POE2F1.$$$", None).is_err());
         let renamed = store.default_game.join("新名字.filter");
@@ -782,6 +1030,8 @@ mod tests {
         assert!(renamed.exists());
         store.remove(&mut library, &id, false).unwrap();
         assert!(renamed.exists());
+        Store::get_mut(&mut library, &copy).unwrap().profile["baseFilter"] =
+            profile(&store)["baseFilter"].clone();
         store
             .install(Store::get_mut(&mut library, &copy).unwrap(), None, None)
             .unwrap();
@@ -795,7 +1045,7 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "原目录", profile(), BTreeMap::new())
+            .add(&mut library, "原目录", profile(&store), BTreeMap::new())
             .unwrap();
         let original = store.default_game.join("原目录.filter");
         store
@@ -824,7 +1074,7 @@ mod tests {
         let edit = Edit {
             id: Some(id.clone()),
             name: "草稿旧名称".into(),
-            profile: profile(),
+            profile: profile(&store),
             sounds: BTreeMap::new(),
         };
         store.save(&mut library, edit).unwrap();
@@ -868,7 +1118,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
-        let mut input = profile();
+        let mut input = profile(&store);
         input["rules"] = json!([{"id":"sound","name":"音效","enabled":true,"hidden":false,"target":{"itemIds":["divine-orb"]},"effects":{"sound":{"type":"custom","fileName":"trade.ogg"}}}]);
         let contents = b"archive fixture";
         let uploaded = BTreeMap::from([(
@@ -905,7 +1155,7 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "基本", profile(), BTreeMap::new())
+            .add(&mut library, "基本", profile(&store), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -932,7 +1182,92 @@ mod tests {
         assert!(store
             .install(copy, None, None)
             .unwrap_err()
+            .contains("请先选择基础过滤器"));
+        copy.profile["baseFilter"] = profile(&store)["baseFilter"].clone();
+        assert!(store
+            .install(copy, None, None)
+            .unwrap_err()
             .contains("缺少自定义音效"));
         assert_eq!(fs::read(&path).unwrap(), expected);
+    }
+
+    #[test]
+    fn live_baseline_refresh_bundles_audio_and_preserves_files_on_dependency_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let input = profile(&store);
+        let source = store.root.join("fixture.filter");
+        let music = store.root.join("a b.ogg");
+        let rule = "Show\n\tCustomAlertSound \"a b.ogg\" 200\n\tCustomAlertSoundOptional missing.wav 100\n";
+        fs::write(&source, rule).unwrap();
+        fs::write(&music, b"filter sound").unwrap();
+        let id = store
+            .add(&mut library, "本地依赖测试", input, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        store.install(scheme, None, None).unwrap();
+        let installed = store.default_game.join("本地依赖测试.filter");
+        let original = fs::read_to_string(&installed).unwrap();
+        assert!(original.contains(&format!("poe2rf-{}.ogg", digest(b"filter sound"))));
+        assert!(!original.contains("missing.wav"));
+        assert!(base_filter::scan(&store.default_game).unwrap().is_empty());
+        assert!(BaseFilter::from_file(&installed)
+            .unwrap_err()
+            .contains("不能将"));
+        fs::write(&source, format!("{rule}\tSetFontSize 40\n")).unwrap();
+        store.install(scheme, None, None).unwrap();
+        let refreshed = fs::read_to_string(&installed).unwrap();
+        assert!(refreshed.contains("SetFontSize 40"));
+        fs::remove_file(music).unwrap();
+        assert!(store
+            .prepare_filter(scheme, None)
+            .unwrap_err()
+            .contains("a b.ogg"));
+        assert!(store
+            .install(scheme, None, None)
+            .unwrap_err()
+            .contains("a b.ogg"));
+        assert_eq!(fs::read_to_string(&installed).unwrap(), refreshed);
+        fs::remove_file(source).unwrap();
+        assert!(store
+            .install(scheme, None, None)
+            .unwrap_err()
+            .contains("重新选择"));
+        assert_eq!(fs::read_to_string(&installed).unwrap(), refreshed);
+    }
+
+    #[test]
+    fn expands_local_filter_imports_in_order_with_relative_sounds() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let input = profile(&store);
+        let source = store.root.join("fixture.filter");
+        let nested = store.root.join("sub");
+        fs::create_dir(&nested).unwrap();
+        fs::write(
+            &source,
+            "Import \"sub/child.filter\"\nImport \"missing.filter\" Optional\nShow\n",
+        )
+        .unwrap();
+        fs::write(nested.join("child.filter"), "Show\n BaseType == \"Exalted Orb\"\n SetFontSize 44\n CustomAlertSound \"sound.ogg\" 200").unwrap();
+        fs::write(nested.join("sound.ogg"), b"nested audio").unwrap();
+        let output = store.preview(input.clone(), None).unwrap();
+        assert!(output["filterFile"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("poe2rf-{}.ogg", digest(b"nested audio"))));
+        assert!(!output["filterFile"].as_str().unwrap().contains("Import "));
+        let base = serde_json::from_value(input["baseFilter"].clone()).unwrap();
+        assert_eq!(
+            store.base_styles(base).unwrap()["default-exalted"]["effects"]["font"]["fontSize"],
+            44
+        );
+        fs::write(
+            nested.join("child.filter"),
+            "Import \"../fixture.filter\"\n",
+        )
+        .unwrap();
+        assert!(store.preview(input, None).unwrap_err().contains("循环引用"));
     }
 }

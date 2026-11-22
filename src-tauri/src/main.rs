@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod base_filter;
 mod engine;
 mod market;
 mod store;
 
+use base_filter::BaseFilter;
 use engine::Result;
 use serde_json::{json, Value};
 use std::{
@@ -32,11 +34,13 @@ struct UpdateStatus {
     bytes: Option<Vec<u8>>,
     error: Option<String>,
     phase: &'static str,
+    received_bytes: u64,
+    total_bytes: Option<u64>,
 }
 
 impl UpdateStatus {
     fn view(&self) -> Value {
-        json!({"phase": self.phase, "error": self.error, "version": self.offer.as_ref().map(|u| &u.version)})
+        json!({"phase": self.phase, "error": self.error, "receivedBytes": self.received_bytes, "totalBytes": self.total_bytes, "version": self.offer.as_ref().map(|u| &u.version)})
     }
 }
 
@@ -213,13 +217,69 @@ async fn save_filter_directory(app: tauri::AppHandle, directory: Option<String>)
 }
 
 #[tauri::command]
+async fn scan_base_filters(app: tauri::AppHandle) -> Result<Vec<BaseFilter>> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let library = state.store.load()?;
+        base_filter::scan(&state.store.base_directory(&library))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn pick_base_filter(app: tauri::AppHandle) -> Result<Option<BaseFilter>> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let directory = state.store.base_directory(&state.store.load()?);
+        let mut dialog = app
+            .dialog()
+            .file()
+            .set_title("选择基础过滤器")
+            .add_filter("PoE2 过滤器", &["filter"]);
+        if directory.is_dir() {
+            dialog = dialog.set_directory(directory);
+        }
+        dialog
+            .blocking_pick_file()
+            .map(|file| {
+                let path = file.into_path().map_err(|error| error.to_string())?;
+                BaseFilter::from_file(&path)
+            })
+            .transpose()
+    })
+    .await
+}
+
+#[tauri::command]
+async fn source_filters(
+    app: tauri::AppHandle,
+    source: String,
+    cached_only: bool,
+) -> Result<Vec<BaseFilter>> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        if cached_only {
+            state.store.source_cache(&source)
+        } else {
+            state.store.source_download(&source)
+        }
+    })
+    .await
+}
+
+#[tauri::command]
+async fn base_styles(app: tauri::AppHandle, base: BaseFilter) -> Result<Value> {
+    on_worker(move || app.state::<Desktop>().store.base_styles(base)).await
+}
+
+#[tauri::command]
 async fn preview(app: tauri::AppHandle, profile: Value) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
         let snapshot = profile["league"]
             .as_str()
             .and_then(|league| state.market.snapshot(league));
-        state.store.generate(profile, snapshot)
+        state.store.preview(profile, snapshot)
     })
     .await
 }
@@ -318,7 +378,7 @@ fn local_sound(
     state: State<'_, Desktop>,
     id: Option<String>,
     name: String,
-    custom: bool,
+    base: Option<BaseFilter>,
 ) -> Result<String> {
     use base64::Engine;
     let library = state.store.load()?;
@@ -326,7 +386,12 @@ fn local_sound(
         .as_deref()
         .map(|id| Store::get(&library, id))
         .transpose()?;
-    Ok(base64::engine::general_purpose::STANDARD.encode(state.store.audio(scheme, &name, custom)?))
+    let data = if let Some(base) = base {
+        state.store.preview_base_audio(base, &name)?
+    } else {
+        state.store.audio(scheme, &name)?
+    };
+    Ok(base64::engine::general_purpose::STANDARD.encode(data))
 }
 
 #[tauri::command]
@@ -400,10 +465,35 @@ async fn update_download(app: tauri::AppHandle) -> Result<Value> {
         let offer = update.offer.clone().ok_or("没有可下载的更新")?;
         update.phase = "downloading";
         update.error = None;
+        update.received_bytes = 0;
+        update.total_bytes = None;
         let _ = app.emit("app-update", update.view());
         offer
     };
-    let result = offer.download(|_, _| {}, || {}).await;
+    let mut last_emit = None;
+    let result = offer
+        .download(
+            |chunk, total| {
+                if let Ok(mut update) = state.update.lock() {
+                    update.received_bytes = update.received_bytes.saturating_add(chunk as u64);
+                    update.total_bytes = total;
+                    let now = std::time::Instant::now();
+                    if last_emit
+                        .is_none_or(|last| now.duration_since(last) >= Duration::from_millis(120))
+                    {
+                        last_emit = Some(now);
+                        let _ = app.emit("app-update", update.view());
+                    }
+                }
+            },
+            || {
+                if let Ok(mut update) = state.update.lock() {
+                    update.phase = "verifying";
+                    let _ = app.emit("app-update", update.view());
+                }
+            },
+        )
+        .await;
     let mut update = state.update.lock().map_err(|e| e.to_string())?;
     match result {
         Ok(bytes) => {
@@ -415,6 +505,7 @@ async fn update_download(app: tauri::AppHandle) -> Result<Value> {
             update.phase = "available";
         }
     }
+    let _ = app.emit("app-update", update.view());
     Ok(update.view())
 }
 
@@ -474,15 +565,9 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         .document_dir()?
         .join("My Games")
         .join("Path of Exile 2");
-    let packaged = app.path().resource_dir()?.join("neversink");
-    let templates = if cfg!(debug_assertions) && !packaged.is_dir() {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../vendor/neversink")
-    } else {
-        packaged
-    };
     let (schedule, signal) = mpsc::channel();
     app.manage(Desktop {
-        store: Store::new(root.clone(), templates, game),
+        store: Store::new(root.clone(), game),
         market: market::Market::new(root.join("market")).map_err(std::io::Error::other)?,
         changes: Mutex::new(()),
         refresh: Mutex::new(()),
@@ -573,6 +658,10 @@ fn main() {
             save_settings,
             pick_filter_directory,
             save_filter_directory,
+            scan_base_filters,
+            pick_base_filter,
+            source_filters,
+            base_styles,
             preview,
             scheme_save,
             scheme_copy,
@@ -591,4 +680,95 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("PoE2 Realtime Filter startup failed");
+}
+
+#[cfg(all(test, windows, debug_assertions))]
+mod updater_tests {
+    use super::*;
+    use std::{
+        cell::Cell,
+        io::{BufRead, BufReader, Write},
+        net::TcpListener,
+    };
+
+    #[test]
+    fn updater_download_reports_progress_and_rejects_invalid_signature() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = format!("http://{}", listener.local_addr().unwrap());
+        let fixture_url = format!("{address}/fixture");
+        let manifest = json!({
+            "version": "9.9.9",
+            "url": fixture_url,
+            "signature": "aW52YWxpZCBzaWduYXR1cmU="
+        })
+        .to_string();
+        let server = std::thread::spawn(move || {
+            let mut requests = [
+                (manifest.len(), manifest.as_bytes()),
+                (262_144, &[42; 65_536]),
+            ]
+            .into_iter()
+            .enumerate();
+            for (index, (length, body)) in &mut requests {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let headers = BufReader::new(&stream)
+                    .lines()
+                    .map_while(std::result::Result::ok)
+                    .take_while(|line| !line.is_empty())
+                    .count();
+                assert!(headers > 0);
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n"
+                )
+                .unwrap();
+                for _ in 0..if index == 0 { 1 } else { 4 } {
+                    stream.write_all(body).unwrap();
+                }
+            }
+        });
+        let app = tauri::Builder::<tauri::Wry>::default()
+            .any_thread()
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .build(tauri::generate_context!())
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            let offer = app
+                .updater_builder()
+                .endpoints(vec![format!("{address}/latest.json").parse().unwrap()])
+                .unwrap()
+                .timeout(Duration::from_secs(5))
+                .build()
+                .unwrap()
+                .check()
+                .await
+                .unwrap()
+                .unwrap();
+            let received = Cell::new(0);
+            let chunks = Cell::new(0);
+            let complete = Cell::new(false);
+            let result = offer
+                .download(
+                    |chunk, length| {
+                        assert_eq!(length, Some(262_144));
+                        received.set(received.get() + chunk);
+                        chunks.set(chunks.get() + 1);
+                    },
+                    || complete.set(true),
+                )
+                .await;
+            assert!(chunks.get() > 1);
+            assert_eq!(received.get(), 262_144);
+            assert!(complete.get());
+            assert!(
+                matches!(result, Err(tauri_plugin_updater::Error::Minisign(_))),
+                "{:?}",
+                result.err()
+            );
+        });
+        server.join().unwrap();
+    }
 }

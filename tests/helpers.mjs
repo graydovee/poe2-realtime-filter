@@ -27,6 +27,8 @@ const core = require(path.join(output, "lib/filter-engine.js"));
 export const engine = { ...core, generateFilter: (profile, snapshot, options) =>
   core.generateFilter(profile, readFileSync(path.join("vendor/neversink", core.baselineFileFor(profile)), "utf8"), snapshot, options)
 };
+export const baseStyles = require(path.join(output, "lib/baseline-effects.js")).inspectBaseStyles;
+export const generateOnBase = core.generateFilter;
 export const pricing = require(path.join(output, "lib/pricing.js"));
 export const data = require(path.join(output, "lib/data.js"));
 export const DEFAULT_PROFILE = require(path.join(output, "lib/default-profile.js")).DEFAULT_PROFILE;
