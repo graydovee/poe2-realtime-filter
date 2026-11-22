@@ -13,6 +13,7 @@ execFileSync(
     "lib/filter-engine.ts",
     "lib/catalog.ts",
     "lib/default-profile.ts",
+    "worker/tencent-market.ts",
     "--outDir", output,
     "--module", "commonjs",
     "--target", "es2021",
@@ -69,3 +70,5 @@ export const makeRule = (overrides = {}) => ({
   target: { itemIds: [] },
   ...overrides,
 });
+
+export const tencent = require(path.join(output, "worker/tencent-market.js"));

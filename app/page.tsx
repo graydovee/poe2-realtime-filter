@@ -5,7 +5,7 @@ import { explain, fileToBase64, isDesktop, local, readSound, type LocalScheme } 
 import { useEffect, useRef, useState } from "react";
 
 import { FALLBACK_SNAPSHOT } from "../lib/data";
-import type { FilterProfile, FilterRule, LeagueCatalog, Locale, MarketSnapshot } from "../lib/types";
+import type { FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot } from "../lib/types";
 
 import type { InheritedStyle } from "../lib/baseline-effects";
 import { DEFAULT_PROFILE } from "../lib/default-profile";
@@ -66,38 +66,40 @@ export default function HomePage() {
     return () => { current = false; };
   }, [view, base]);
 
-  const selectedMarket: MarketSnapshot = market.league === profile.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
+  const server = profile.server ?? "international";
+  const matchingMarket = (market.server ?? "international") === server && market.league === profile.league;
+  const selectedMarket: MarketSnapshot = matchingMarket && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: profile.league };
 
   useEffect(() => {
     if (!isDesktop()) return;
     let active = true;
     const load = async () => {
-      const catalog = await local<LeagueCatalog>("local_catalog");
+      const catalog = await local<LeagueCatalog>("local_catalog", { server });
       if (!active) return;
       setLeagueCatalog(catalog);
     };
     void load().catch(() => {});
     const listener = listen("local-refresh", () => { void load().catch(() => {}); });
     return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
-  }, []);
+  }, [server]);
 
   useEffect(() => {
     if (!isDesktop()) return;
     let active = true;
     const league = profile.league;
     const load = async () => {
-      const cached = await local<MarketSnapshot | null>("local_market", { league });
+      const cached = await local<MarketSnapshot | null>("local_market", { league, server });
       if (active) setMarket(cached ?? { ...FALLBACK_SNAPSHOT, league });
     };
     void load().catch(() => {});
     const listener = listen("local-refresh", () => { void load().catch(() => {}); });
     return () => { active = false; void listener.then((unlisten) => unlisten()).catch(() => {}); };
-  }, [profile.league]);
+  }, [profile.league, server]);
 
   async function refreshMarket() {
     setMarketLoading(true);
     setMarketError("");
-    try { await local("refresh_market", { league: profile.league }); }
+    try { await local("refresh_market", { server, league: profile.league || null }); }
     catch (error) { setMarketError(explain(error)); }
     finally { setMarketLoading(false); }
   }
@@ -191,7 +193,7 @@ export default function HomePage() {
     updateRule(id, { followBaseline: profile.rules.find((rule) => rule.id === id)?.followBaseline === undefined ? undefined : false, effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
   }
 
-  async function openDraft(scheme: LocalScheme | null) {
+  async function openDraft(scheme: LocalScheme | null, target: GameServer) {
     setSchemeBusy(true);
     const soundFiles: Record<string, File> = {};
     const missing = new Set<string>();
@@ -213,9 +215,11 @@ export default function HomePage() {
     baseFilterChanged.current = false;
     setSchemeId(scheme?.id ?? null);
     setSchemeName(scheme?.name ?? "");
-    const league = leagueCatalog?.defaultLeague ?? DEFAULT_PROFILE.league;
-    setProfile(scheme?.profile ?? {
-      ...structuredClone(DEFAULT_PROFILE), league, originalLeague: league,
+    const catalog = await local<LeagueCatalog>("local_catalog", { server: target }).catch(() => null);
+    setLeagueCatalog(catalog);
+    const league = catalog?.defaultLeague ?? (target === "international" ? DEFAULT_PROFILE.league : "");
+    setProfile(scheme ? { ...scheme.profile, server: target } : {
+      ...structuredClone(DEFAULT_PROFILE), server: target, league, originalLeague: league,
       rules: DEFAULT_PROFILE.rules.map((rule) => ({ ...rule, effects: {}, effectPresetId: undefined, followBaseline: true })),
     });
     setCustomSounds(soundFiles);
@@ -305,8 +309,8 @@ export default function HomePage() {
           saveNotice={saveFeedback}
           busy={schemeBusy}
           onBusy={setSchemeBusy}
-          onNew={() => void openDraft(null)}
-          onOpen={(scheme) => void openDraft(scheme)}
+          onNew={(server) => void openDraft(null, server)}
+          onOpen={(scheme, server) => void openDraft(scheme, server)}
         />
       </div>
       {view === "editor" && (
@@ -317,7 +321,7 @@ export default function HomePage() {
             leaguesLoading={leaguesLoading}
             marketLoading={marketLoading}
             marketError={marketError}
-            selectedMarket={market.league === profile.league ? market : selectedMarket}
+            selectedMarket={matchingMarket ? market : selectedMarket}
             onLeagueChange={selectLeague}
             onRefresh={() => void refreshMarket()}
           />
@@ -330,7 +334,6 @@ export default function HomePage() {
                   setDirty(true);
                   setProfile((current) => ({ ...current, baseFilter, baseFilterHint: undefined }));
                 }}
-                onLocaleChange={(locale: Locale) => update("locale", locale)}
               />
               {baseStylesError && <p role="alert" className="text-sm text-ember">{baseStylesError}</p>}
               {base && <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />}

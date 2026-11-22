@@ -42,7 +42,31 @@ pub struct Scheme {
     sounds: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Server {
+    #[default]
+    International,
+    Tencent,
+}
+
+impl Server {
+    pub const ALL: [Self; 2] = [Self::International, Self::Tencent];
+
+    pub fn from_profile(profile: &Value) -> Self {
+        if profile["server"] == "tencent" {
+            Self::Tencent
+        } else {
+            Self::International
+        }
+    }
+}
+
 impl Scheme {
+    pub fn server(&self) -> Server {
+        Server::from_profile(&self.profile)
+    }
+
     pub fn league(&self) -> &str {
         self.profile["league"].as_str().unwrap_or("Standard")
     }
@@ -60,17 +84,61 @@ pub struct Settings {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Library {
     pub settings: Settings,
+    #[serde(default)]
+    pub tencent_settings: RefreshSettings,
+    #[serde(default)]
+    pub server: Server,
     pub schemes: Vec<Scheme>,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshSettings {
+    pub interval_minutes: u32,
+    pub paused: bool,
+}
+
+impl Default for RefreshSettings {
+    fn default() -> Self {
+        Self {
+            interval_minutes: 120,
+            paused: false,
+        }
+    }
+}
+
+impl Library {
+    pub fn refresh(&self, server: Server) -> RefreshSettings {
+        match server {
+            Server::Tencent => self.tencent_settings,
+            Server::International => RefreshSettings {
+                interval_minutes: self.settings.interval_minutes,
+                paused: self.settings.paused,
+            },
+        }
+    }
+
+    pub fn set_refresh(&mut self, server: Server, settings: RefreshSettings) {
+        match server {
+            Server::Tencent => self.tencent_settings = settings,
+            Server::International => {
+                self.settings.interval_minutes = settings.interval_minutes;
+                self.settings.paused = settings.paused;
+            }
+        }
+    }
 }
 
 impl Default for Library {
     fn default() -> Self {
         Self {
             settings: Settings {
-                interval_minutes: 30,
+                interval_minutes: RefreshSettings::default().interval_minutes,
                 paused: false,
                 filter_directory: None,
             },
+            tencent_settings: RefreshSettings::default(),
+            server: Server::default(),
             schemes: vec![],
         }
     }
@@ -381,7 +449,7 @@ impl Store {
             sounds: BTreeMap::new(),
         };
         self.store_sounds(&mut scheme, sounds)?;
-        self.check_unique(library, &scheme.name, None)?;
+        self.check_unique(library, scheme.server(), &scheme.name, None)?;
         library.schemes.push(scheme);
         self.persist(library)?;
         Ok(id)
@@ -401,7 +469,10 @@ impl Store {
                     format!(" {number}")
                 }
             );
-            if self.check_unique(library, &candidate, None).is_ok() {
+            if self
+                .check_unique(library, scheme.server(), &candidate, None)
+                .is_ok()
+            {
                 scheme.name = candidate;
                 break;
             }
@@ -432,12 +503,18 @@ impl Store {
             .ok_or_else(|| "方案不存在".into())
     }
 
-    fn check_unique(&self, library: &Library, name: &str, id: Option<&str>) -> Result<()> {
-        if library
-            .schemes
-            .iter()
-            .any(|scheme| Some(scheme.id.as_str()) != id && paths_same(&scheme.name, name))
-        {
+    fn check_unique(
+        &self,
+        library: &Library,
+        server: Server,
+        name: &str,
+        id: Option<&str>,
+    ) -> Result<()> {
+        if library.schemes.iter().any(|scheme| {
+            scheme.server() == server
+                && Some(scheme.id.as_str()) != id
+                && paths_same(&scheme.name, name)
+        }) {
             return Err("已有同名方案，请选择其他名称".into());
         }
         Ok(())
@@ -449,6 +526,9 @@ impl Store {
         };
         let scheme = Self::get_mut(library, &id)?;
         let mut profile = edit.profile;
+        if let Some(fields) = profile.as_object_mut() {
+            fields.insert("server".into(), json!(scheme.server()));
+        }
         if edit.base_filter_changed == Some(false) {
             if let (Some(draft), Some(current)) =
                 (profile.as_object_mut(), scheme.profile.as_object())
@@ -477,7 +557,11 @@ impl Store {
 
     pub fn rename(&self, library: &mut Library, id: &str, raw_name: &str) -> Result<()> {
         let name = scheme_name(raw_name)?;
-        self.check_unique(library, &name, Some(id))?;
+        let scheme = Self::get(library, id)?;
+        self.check_unique(library, scheme.server(), &name, Some(id))?;
+        if scheme.installed.is_some() {
+            self.check_install_target(library, scheme, &name)?;
+        }
         let scheme = Self::get_mut(library, id)?;
         if name == scheme.name {
             return Ok(());
@@ -489,6 +573,9 @@ impl Store {
                 let next = format!("{name}.filter");
                 let from = Self::filter_path(&installed.directory, &installed.name)?;
                 let to = Self::filter_path(&installed.directory, &next)?;
+                if !paths_same(&installed.name, &next) && to.exists() {
+                    return Err("游戏目录已有同名过滤器，请改用其他方案名".into());
+                }
                 move_file(&from, &to)?;
                 renamed = Some((from, to));
                 installed.name = next;
@@ -540,7 +627,7 @@ impl Store {
         let scheme = Self::get_mut(library, id)?;
         let removed = Self::remove_installed(scheme.installed.as_ref())?;
         scheme.installed = None;
-        scheme.status = "过滤器已卸载".into();
+        scheme.status.clear();
         self.persist_removal(library, removed)
     }
 
@@ -564,6 +651,7 @@ impl Store {
                 }
             }
         }
+        profile["server"] = json!(scheme.server());
         share_code::encode(&Share {
             name: scheme.name.clone(),
             profile,
@@ -576,7 +664,16 @@ impl Store {
         code: &str,
         name_override: Option<String>,
     ) -> Result<String> {
-        let mut share = share_code::decode(code)?;
+        let share = share_code::decode(code)?;
+        self.import_decoded(library, share, name_override)
+    }
+
+    pub fn import_decoded(
+        &self,
+        library: &mut Library,
+        mut share: Share,
+        name_override: Option<String>,
+    ) -> Result<String> {
         // A share code may describe a baseline but never authorize reading a local path.
         if let Some(fields) = share.profile.as_object_mut() {
             fields.remove("baseFilter");
@@ -924,10 +1021,8 @@ impl Store {
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         let baseline = self.baseline(&scheme.profile)?;
         let result = self.generate(&scheme.profile, baseline.as_ref(), market)?;
-        if engine::call::<bool>("requiresMarket", &scheme.profile)?
-            && result["market"]["rates"].is_null()
-        {
-            return Err("等待当前赛季的有效行情".into());
+        if let Some(reason) = result["marketIssue"].as_str() {
+            return Err(reason.into());
         }
         if result["safetyReport"]["passed"] != true {
             return Err("规则未通过安全检查，请先查看预览报告".into());
@@ -961,6 +1056,39 @@ impl Store {
             Ok(_) => Err("游戏目录中的过滤器已被外部修改，已保留该文件".into()),
             Err(e) => Err(format!("{}: {e}", path.display())),
         }
+    }
+
+    pub fn check_install_target(
+        &self,
+        library: &Library,
+        scheme: &Scheme,
+        name: &str,
+    ) -> Result<()> {
+        let directory = scheme
+            .installed
+            .as_ref()
+            .map(|item| item.directory.clone())
+            .unwrap_or_else(|| self.base_directory(library));
+        let normalize = |path: &Path| path.canonicalize().unwrap_or_else(|_| path.to_owned());
+        let directory = normalize(&directory);
+        let filename = format!("{name}.filter");
+        if library
+            .schemes
+            .iter()
+            .filter(|other| other.id != scheme.id)
+            .any(|other| {
+                other.installed.as_ref().is_some_and(|installed| {
+                    paths_same(&installed.name, &filename)
+                        && paths_same(
+                            &display_directory(&normalize(&installed.directory)),
+                            &display_directory(&directory),
+                        )
+                })
+            })
+        {
+            return Err("游戏目录已有同名过滤器，请改用其他方案名".into());
+        }
+        Ok(())
     }
 
     pub fn install(
@@ -1009,12 +1137,7 @@ impl Store {
             name,
             sha256: digest(filter.as_bytes()),
         });
-        scheme.status = if unchanged {
-            "过滤器内容无变化"
-        } else {
-            "过滤器已写入游戏目录"
-        }
-        .into();
+        scheme.status.clear();
         Ok(())
     }
 }
@@ -1068,6 +1191,84 @@ mod tests {
     }
 
     #[test]
+    fn legacy_library_and_cross_server_file_ownership() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library: Library = serde_json::from_value(json!({
+            "settings":{"intervalMinutes":37,"paused":true,"filterDirectory":null},
+            "schemes":[]
+        }))
+        .unwrap();
+        assert_eq!(library.server, Server::International);
+        assert_eq!(library.refresh(Server::International).interval_minutes, 37);
+        assert_eq!(library.refresh(Server::Tencent).interval_minutes, 120);
+        assert!(!library.refresh(Server::Tencent).paused);
+        let static_profile =
+            json!({"schemaVersion":2,"league":"Standard","rules":[],"skippedItemIds":[]});
+        let international = store
+            .add(
+                &mut library,
+                "Shared",
+                static_profile.clone(),
+                BTreeMap::new(),
+            )
+            .unwrap();
+        let mut tencent = static_profile;
+        tencent["server"] = json!("tencent");
+        tencent["league"] = json!("0.5.5");
+        let same_name = store
+            .add(&mut library, "Shared", tencent.clone(), BTreeMap::new())
+            .unwrap();
+        assert!(store
+            .add(&mut library, "Shared", tencent, BTreeMap::new())
+            .is_err());
+        assert_eq!(
+            Store::get(&library, &international).unwrap().server(),
+            Server::International
+        );
+        assert_eq!(
+            Store::get(&library, &same_name).unwrap().server(),
+            Server::Tencent
+        );
+        store
+            .install(
+                Store::get_mut(&mut library, &international).unwrap(),
+                None,
+                None,
+            )
+            .unwrap();
+        let path = store.default_game.join("Shared.filter");
+        let bytes = fs::read(&path).unwrap();
+        let other = Store::get(&library, &same_name).unwrap();
+        assert!(store
+            .check_install_target(&library, other, &other.name)
+            .is_err());
+        assert!(store
+            .install(
+                Store::get_mut(&mut library, &same_name).unwrap(),
+                None,
+                None
+            )
+            .is_err());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        store.rename(&mut library, &same_name, "Tencent").unwrap();
+        store
+            .install(
+                Store::get_mut(&mut library, &same_name).unwrap(),
+                None,
+                None,
+            )
+            .unwrap();
+        assert!(store.rename(&mut library, &same_name, "Shared").is_err());
+        store.uninstall(&mut library, &same_name).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert!(Store::get(&library, &international)
+            .unwrap()
+            .status
+            .is_empty());
+    }
+
+    #[test]
     fn offline_install_restart_rename_delete_and_share() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
@@ -1096,6 +1297,7 @@ mod tests {
         let mut expected = Store::get(&library, &id).unwrap().profile.clone();
         expected.as_object_mut().unwrap().remove("baseFilter");
         expected["baseFilterHint"] = json!("fixture.filter");
+        expected["server"] = json!("international");
         assert_eq!(Store::get(&library, &copy).unwrap().profile, expected);
         let library_path = store.root.join("library.json");
         let saved = fs::read(&library_path).unwrap();

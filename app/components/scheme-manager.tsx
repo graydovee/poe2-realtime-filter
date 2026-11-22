@@ -2,8 +2,9 @@
 
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { displayDirectory, explain, isDesktop, local, type Library, type LocalScheme } from "../../lib/desktop";
-import { Switch, TextInput } from "./ui/controls";
+import { explain, isDesktop, local, SERVER_LABELS, type Library, type LocalScheme } from "../../lib/desktop";
+import type { GameServer, LeagueCatalog } from "../../lib/types";
+import { Select, Switch, TextInput } from "./ui/controls";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { Badge, Button, Panel } from "./ui/primitives";
 
@@ -12,9 +13,19 @@ type Props = {
   saveNotice: string;
   busy: boolean;
   onBusy: (busy: boolean) => void;
-  onOpen: (scheme: LocalScheme) => void;
-  onNew: () => void;
+  onOpen: (scheme: LocalScheme, server: GameServer) => void;
+  onNew: (server: GameServer) => void;
 };
+
+type ShareDetails = { server: GameServer; name: string; league: string | null; hasServer: boolean; catalog: LeagueCatalog };
+
+const formerSuccessStatuses = new Set(["过滤器已写入游戏目录", "过滤器内容无变化", "过滤器已卸载", "请先选择基础过滤器"]);
+
+function schemeIssue(status: string) {
+  if (formerSuccessStatuses.has(status)) return "";
+  // The detailed file-operation error is shown when users perform an action.
+  return status.replace(/(?:[a-z]:[\\/]|\\\\)[^\r\n]+/gi, "请检查游戏过滤器目录和文件权限");
+}
 
 type DownloadOffer = { source: string; label: string };
 
@@ -34,6 +45,8 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
   const [directoryError, setDirectoryError] = useState("");
   const [shareCode, setShareCode] = useState("");
   const [importName, setImportName] = useState("");
+  const [importTarget, setImportTarget] = useState<ShareDetails>();
+  const [importLeague, setImportLeague] = useState("");
   const [shareOutput, setShareOutput] = useState("");
   const [expandedMenu, setExpandedMenu] = useState<string>();
   const [dialog, setDialog] = useState<SchemeDialog>();
@@ -107,7 +120,8 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
   }
 
   async function updateSettings(intervalMinutes: number, paused: boolean) {
-    await local("save_settings", { intervalMinutes, paused });
+    if (!library) return;
+    await local("save_settings", { server: library.server, intervalMinutes, paused });
     setFeedback("刷新设置已保存");
   }
 
@@ -139,8 +153,18 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
   function install(scheme: LocalScheme) {
     void run(async () => {
       await local("scheme_install", { id: scheme.id });
-      setFeedback(scheme.installed ? `「${scheme.name}」已完成重新生成` : `「${scheme.name}」已安装到游戏目录`);
     });
+  }
+
+  async function importShare(server: GameServer, league?: string) {
+    const { missing } = await local<{ missing: string[] }>("scheme_import", {
+      code: shareCode, name: importName.trim() || null, server, league: league || null,
+    });
+    setShareCode("");
+    setImportName("");
+    setImportTarget(undefined);
+    setInterval(undefined);
+    setFeedback(missing.length ? `已导入方案。请打开编辑补齐自定义音效：${missing.join("、")}` : "方案已导入到下方列表");
   }
 
   const byLeague = new Map<string, LocalScheme[]>();
@@ -155,16 +179,45 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
 
   return (
     <div className="grid min-w-0 gap-4">
+      <Panel title="游戏服务器">
+        <Select value={library?.server ?? "international"} ariaLabel="游戏服务器" disabled={busy || !library}
+          className="max-w-xs" options={Object.entries(SERVER_LABELS).map(([value, label]) => ({ value, label }))}
+          onValueChange={(server) => void run(async () => {
+            await local("select_server", { server });
+            setInterval(undefined);
+          })} />
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-ink-muted">高级设置</summary>
+          <p className="mb-3 mt-2 text-xs text-ink-muted">两服共用过滤器目录。此设置用于新安装。</p>
+          <form className="flex min-w-0 flex-wrap items-end gap-2" onSubmit={(event) => {
+            event.preventDefault();
+            saveDirectory(directoryValue);
+          }}>
+            <label className="min-w-[min(100%,18rem)] flex-1 text-xs text-ink-muted">新安装目录
+              <TextInput className="mt-1" value={directoryValue} disabled={!library || busy} aria-invalid={Boolean(directoryError)} aria-describedby={directoryError ? "filter-directory-error" : undefined} onChange={(event) => { setDirectory(event.target.value); setDirectoryError(""); }} />
+            </label>
+            <Button size="sm" disabled={!library || busy} onClick={() => void run(async () => {
+              const picked = await local<string | null>("pick_filter_directory", { current: directoryValue });
+              if (picked) { setDirectory(picked); setDirectoryError(""); }
+            })}>浏览</Button>
+            <Button type="submit" size="sm" variant="primary" disabled={!library || busy || !directoryValue.trim() || directoryValue === effectiveDirectory}>保存目录</Button>
+            <Button size="sm" disabled={busy || !library || (!library.customDirectory && directory === undefined)} onClick={() => saveDirectory(null)}>恢复默认</Button>
+          </form>
+          {directoryError && <p id="filter-directory-error" role="alert" className="mt-3 break-words text-sm text-ember">{directoryError}</p>}
+        </details>
+      </Panel>
+
       <Panel title="导入分享码">
         <form className="grid gap-3" onSubmit={(event) => {
           event.preventDefault();
           void run(async () => {
-            const { missing } = await local<{ missing: string[] }>("scheme_import", { code: shareCode, name: importName.trim() || null });
-            setShareCode("");
-            setImportName("");
-            setFeedback(missing.length
-              ? `已导入方案。请打开编辑补齐自定义音效：${missing.join("、")}`
-              : "方案已导入到下方列表");
+            if (!library) return;
+            const target = await local<ShareDetails>("inspect_share", { code: shareCode, server: library.server });
+            const matching = target.catalog.leagues.some((season) => season.id === target.league);
+            if (target.server !== library.server || (!target.hasServer && !matching)) {
+              setImportLeague(!target.hasServer ? target.catalog.defaultLeague : "");
+              setImportTarget(target);
+            } else await importShare(target.server);
           });
         }}>
           <textarea aria-label="分享码" className="min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1404096} onChange={(event) => setShareCode(event.target.value)} />
@@ -178,11 +231,11 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
       </Panel>
 
       <div aria-live="polite" className="empty:hidden">
-        {error && !dialog ? <p className="rounded border border-ember/45 bg-surface px-4 py-3 text-sm text-ember" role="alert">{error}</p>
+        {error && !dialog && !importTarget ? <p className="rounded border border-ember/45 bg-surface px-4 py-3 text-sm text-ember" role="alert">{error}</p>
           : feedback && <p className="rounded border border-line bg-surface px-4 py-3 text-sm text-ink" role="status">{feedback}</p>}
       </div>
 
-      <Panel title="我的方案" action={<Button size="sm" variant="primary" disabled={busy || !library} onClick={onNew}>新建方案</Button>}>
+      <Panel title="我的方案" action={<Button size="sm" variant="primary" disabled={busy || !library} onClick={() => library && onNew(library.server)}>新建方案</Button>}>
         {!library && !error && <p className="text-sm text-ink-muted">正在读取本地方案…</p>}
         {library && !library.schemes.length && <p className="text-sm text-ink-muted">新建方案，或粘贴分享码导入。</p>}
         {shareOutput && (
@@ -196,10 +249,10 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         {[...byLeague].map(([league, schemes]) => (
           <section key={league} className="mb-5 last:mb-0" aria-label={league}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-ink">{league}</h3>
+              <h3 className="text-sm font-semibold text-ink">{league || "待选赛季"}</h3>
               <Button size="sm" disabled={busy} onClick={() => void run(async () => {
-                await local("refresh_market", { league });
-                setFeedback(`${league} 行情已刷新。过滤器更新结果见方案状态。`);
+                await local("refresh_market", { server: library?.server, league: league || null });
+                setFeedback("行情已刷新");
               })}>刷新行情</Button>
             </div>
             <ul className="grid gap-2">
@@ -210,7 +263,6 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
                       <strong className="min-w-0 break-words text-sm text-ink">{scheme.name}</strong>
                       <Badge tone={scheme.installed ? "sage" : "muted"}>{scheme.installed ? "已安装" : "未安装"}</Badge>
                     </div>
-                    {scheme.installed && <p className="mt-1 truncate text-xs text-ink-muted" title={displayDirectory(scheme.installed.directory)}>{displayDirectory(scheme.installed.directory)}</p>}
                     {!scheme.profile.baseFilter && scheme.profile.baseFilterHint ? (
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <p className="break-words text-xs text-ember">未能匹配基础过滤器「{scheme.profile.baseFilterHint}」。</p>
@@ -228,15 +280,15 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
                             })}>从 {offer.label} 下载</button>
                         )) : <p className="text-xs text-ink-muted">可在编辑页选择或清除基础过滤器。</p>}
                       </div>
-                    ) : scheme.status && scheme.status !== "请先选择基础过滤器" && (
-                      <p className="mt-1 break-words text-xs text-ink-muted">{scheme.status}</p>
+                    ) : schemeIssue(scheme.status) && (
+                      <p className="mt-1 break-words text-xs text-ink-muted">{schemeIssue(scheme.status)}</p>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {scheme.installed && <Switch label="自动刷新" checked={scheme.autoRefresh} disabled={busy} onCheckedChange={(enabled) => {
                       void run(() => local("scheme_auto", { id: scheme.id, enabled }));
                     }} />}
-                    <Button size="sm" disabled={busy} onClick={() => onOpen(scheme)}>编辑</Button>
+                    <Button size="sm" disabled={busy} onClick={() => library && onOpen(scheme, library.server)}>编辑</Button>
                     {scheme.installed
                       ? <Button size="sm" disabled={busy} onClick={() => openDialog("uninstall", scheme)}>卸载过滤器</Button>
                       : <Button size="sm" variant="primary" disabled={busy} onClick={() => install(scheme)}>安装到游戏</Button>}
@@ -284,24 +336,6 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         ))}
       </Panel>
 
-      <Panel title="过滤器目录" description="此设置用于新安装。已安装方案继续使用各自的原目录。">
-        <form className="flex min-w-0 flex-wrap items-end gap-2" onSubmit={(event) => {
-          event.preventDefault();
-          saveDirectory(directoryValue);
-        }}>
-          <label className="min-w-[min(100%,18rem)] flex-1 text-xs text-ink-muted">新安装目录
-            <TextInput className="mt-1" value={directoryValue} disabled={!library || busy} aria-invalid={Boolean(directoryError)} aria-describedby={directoryError ? "filter-directory-error" : undefined} onChange={(event) => { setDirectory(event.target.value); setDirectoryError(""); }} />
-          </label>
-          <Button size="sm" disabled={!library || busy} onClick={() => void run(async () => {
-            const picked = await local<string | null>("pick_filter_directory", { current: directoryValue });
-            if (picked) { setDirectory(picked); setDirectoryError(""); }
-          })}>浏览</Button>
-          <Button type="submit" size="sm" variant="primary" disabled={!library || busy || !directoryValue.trim() || directoryValue === effectiveDirectory}>保存目录</Button>
-          <Button size="sm" disabled={busy || !library || (!library.settings.filterDirectory && directory === undefined)} onClick={() => saveDirectory(null)}>恢复默认</Button>
-        </form>
-        {directoryError && <p id="filter-directory-error" role="alert" className="mt-3 break-words text-sm text-ember">{directoryError}</p>}
-      </Panel>
-
       <Panel title="刷新设置" description="托盘会定时检查下载的基础过滤器和行情。已安装且开启自动刷新的方案会自动更新游戏里的过滤器。">
         <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => {
           event.preventDefault();
@@ -320,6 +354,19 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         </form>
       </Panel>
 
+      {importTarget && (
+        <ConfirmDialog title={`导入到${SERVER_LABELS[importTarget.server]}`} busy={busy} onCancel={() => setImportTarget(undefined)}>
+          <p className="mb-3 text-sm">{importName.trim() || importTarget.name}</p>
+          {!importTarget.hasServer && importTarget.catalog.leagues.length > 0 ? <Select ariaLabel="导入赛季" value={importLeague} onValueChange={setImportLeague}
+            options={importTarget.catalog.leagues.map(({ id, label }) => ({ value: id, label }))} />
+            : <p className="text-xs text-ink-muted">{importTarget.league ? `赛季：${importTarget.league}` : "待选赛季"}</p>}
+          {error && <p role="alert" className="mt-3 text-sm text-ember">{error}</p>}
+          <div className="modal-actions">
+            <Button disabled={busy} onClick={() => setImportTarget(undefined)}>取消</Button>
+            <Button disabled={busy} variant="primary" onClick={() => void run(() => importShare(importTarget.server, importLeague))}>导入方案</Button>
+          </div>
+        </ConfirmDialog>
+      )}
       {dialog && (
         <ConfirmDialog
           title={dialog.kind === "rename" ? "重命名方案" : dialog.kind === "uninstall" ? `卸载「${dialog.scheme.name}」的过滤器？` : `删除「${dialog.scheme.name}」？`}

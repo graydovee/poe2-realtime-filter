@@ -38,10 +38,10 @@ export function SeasonSection({
           .map((option) => ({ value: option.id, label: option.label })),
       }))
     : undefined;
-  if (leagueGroups && !leagueCatalog?.leagues.some((option) => option.id === profile.league)) {
+  if (profile.league && leagueGroups && !leagueCatalog?.leagues.some((option) => option.id === profile.league)) {
     leagueGroups.unshift({ label: "方案原有赛季", options: [{ value: profile.league, label: profile.league }] });
   }
-  const leagueOptions = leagueCatalog ? undefined : [{ value: profile.league, label: profile.league }];
+  const leagueOptions = leagueCatalog || !profile.league ? undefined : [{ value: profile.league, label: profile.league }];
 
   return (
     <Panel className="p-4 sm:p-5">
@@ -62,6 +62,7 @@ export function SeasonSection({
                 options={leagueOptions}
                 disabled={loading}
                 ariaLabel="选择赛季"
+                placeholder="等待赛季列表"
               />
             </div>
             <Button size="sm" disabled={loading} onClick={onRefresh}>刷新行情</Button>

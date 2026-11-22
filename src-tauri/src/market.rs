@@ -1,4 +1,7 @@
-use crate::engine::{self, Result};
+use crate::{
+    engine::{self, Result},
+    store::Server,
+};
 use rayon::prelude::*;
 use reqwest::{blocking::Client, header, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -13,6 +16,8 @@ use std::{
 
 const INDEX: &str = "https://poe.ninja/poe2/api/data/index-state";
 const EXCHANGE: &str = "https://poe.ninja/poe2/api/economy/exchange/current/overview";
+const TENCENT_INDEX: &str = "https://poecurrency.top/api/season_list";
+const TENCENT_SUMMARY: &str = "https://poecurrency.top/api/summary";
 const MAX_RESPONSE: u64 = 8 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -30,13 +35,14 @@ struct SnapshotCache {
 
 pub struct Market {
     root: PathBuf,
+    server: Server,
     client: Client,
     network: Mutex<()>,
     workers: rayon::ThreadPool,
 }
 
 impl Market {
-    pub fn new(root: PathBuf) -> Result<Self> {
+    pub fn new(root: PathBuf, server: Server) -> Result<Self> {
         let client = Client::builder()
             .user_agent(concat!("poe2-realtime-filter/", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(12))
@@ -49,6 +55,7 @@ impl Market {
             .map_err(|e| e.to_string())?;
         Ok(Self {
             root,
+            server,
             client,
             network: Mutex::new(()),
             workers,
@@ -74,16 +81,21 @@ impl Market {
                 request = request.header(header::IF_MODIFIED_SINCE, modified);
             }
         }
+        let source = if self.server == Server::Tencent {
+            "poecurrency.top"
+        } else {
+            "poe.ninja"
+        };
         let response = request
             .send()
-            .map_err(|e| format!("poe.ninja 请求失败 ({e})"))?;
+            .map_err(|e| format!("{source} 请求失败 ({e})"))?;
         if response.status() == StatusCode::NOT_MODIFIED {
             return previous
                 .cloned()
                 .ok_or_else(|| "没有可复用的行情缓存".into());
         }
         if response.status() != StatusCode::OK {
-            return Err(format!("poe.ninja HTTP {}", response.status()));
+            return Err(format!("{source} HTTP {}", response.status()));
         }
         let get_header = |key| {
             response
@@ -124,18 +136,68 @@ impl Market {
         if refresh {
             let _network = self.network.lock().map_err(|e| e.to_string())?;
             let cached = read_json::<(QuoteResponse, Value)>(&path);
-            let response = self.request(INDEX, &[], cached.as_ref().map(|it| &it.0))?;
-            let catalog = engine::call("catalog", &response.body)?;
+            let (endpoint, query, parser) = match self.server {
+                Server::International => (INDEX, &[][..], "catalog"),
+                Server::Tencent => (TENCENT_INDEX, &[("version", "poe2")][..], "tencentCatalog"),
+            };
+            let response = self.request(endpoint, query, cached.as_ref().map(|it| &it.0))?;
+            let catalog = engine::call(parser, &response.body)?;
             write_json(&path, &(&response, &catalog))?;
             return Ok(catalog);
         }
-        Ok(read_json::<(QuoteResponse, Value)>(&path).map(|it| it.1).unwrap_or_else(|| json!({
+        let cached = read_json::<(QuoteResponse, Value)>(&path).map(|it| it.1);
+        if self.server == Server::Tencent {
+            return Ok(cached.unwrap_or_else(|| json!({ "leagues": [], "defaultLeague": "", "capturedAt":"1970-01-01T00:00:00Z", "expiresAt":"1970-01-01T00:00:00Z" })));
+        }
+        Ok(cached.unwrap_or_else(|| json!({
             "leagues": [{"id":"Standard","label":"Standard","hardcore":false,"permanent":true}, {"id":"Hardcore","label":"Hardcore","hardcore":true,"permanent":true}],
             "defaultLeague": "Standard", "capturedAt":"1970-01-01T00:00:00Z", "expiresAt":"1970-01-01T00:00:00Z"
         })))
     }
 
-    pub fn refresh(&self, league: &str, minutes: u32) -> Result<Value> {
+    fn refresh_tencent(&self, league: &str, minutes: u32, catalog: &Value) -> Result<Value> {
+        if !catalog["leagues"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|item| item["id"] == league))
+        {
+            return Err("国服赛季列表中找不到所选赛季".into());
+        }
+        let current = catalog["defaultLeague"] == league;
+        let mut query = vec![("version", "2")];
+        if !current {
+            query.push(("season", league));
+        }
+        let path = self.snapshot_path(league);
+        let response = {
+            let _network = self.network.lock().map_err(|e| e.to_string())?;
+            let previous: Option<SnapshotCache> = read_json(&path);
+            self.request(
+                TENCENT_SUMMARY,
+                &query,
+                previous
+                    .as_ref()
+                    .and_then(|cache| cache.responses.get("summary")),
+            )?
+        };
+        if current && self.catalog(true)?["defaultLeague"] != league {
+            return Err("国服当前赛季已变化，请重新选择赛季".into());
+        }
+        let snapshot = engine::call(
+            "tencentSnapshot",
+            json!({"league":league, "body":response.body, "lifetime": u64::from(minutes) * 120_000}),
+        )?;
+        let cache = SnapshotCache {
+            responses: HashMap::from([("summary".into(), response)]),
+            snapshot,
+        };
+        write_json(&path, &cache)?;
+        Ok(cache.snapshot)
+    }
+
+    pub fn refresh(&self, league: &str, minutes: u32, catalog: &Result<Value>) -> Result<Value> {
+        if self.server == Server::Tencent {
+            return self.refresh_tencent(league, minutes, catalog.as_ref().map_err(Clone::clone)?);
+        }
         let _network = self.network.lock().map_err(|e| e.to_string())?;
         let path = self.snapshot_path(league);
         let previous: Option<SnapshotCache> = read_json(&path);
@@ -218,7 +280,7 @@ mod tests {
             }
         });
         let dir = tempfile::tempdir().unwrap();
-        let market = Market::new(dir.path().to_path_buf()).unwrap();
+        let market = Market::new(dir.path().to_path_buf(), Server::International).unwrap();
         let response = market.request(&url, &[], None).unwrap();
         let reused = market.request(&url, &[], Some(&response)).unwrap();
         assert_eq!(response.etag, reused.etag);

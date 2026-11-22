@@ -1,3 +1,4 @@
+export type GameServer = "international" | "tencent";
 export type Locale = "cn" | "tw" | "us";
 export type Strictness = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type FilterStyle = "default" | "aura" | "cobalt" | "darkmode" | "mythic" | "vaal" | "zen" | "customsounds";
@@ -56,6 +57,7 @@ export type LeagueOption = { id: string; label: string; hardcore: boolean; perma
 export type LeagueCatalog = { leagues: LeagueOption[]; defaultLeague: string; capturedAt: string; expiresAt: string };
 
 export type MarketSnapshot = {
+  server?: GameServer;
   league: string;
   capturedAt: string;
   expiresAt: string;
@@ -125,6 +127,7 @@ export type BaseFilter =
   | { kind: "downloaded"; source: string; version: string; entry: string; name: string };
 
 export type FilterProfile = {
+  server?: GameServer;
   baseFilter?: BaseFilter;
   baseFilterHint?: string;
   schemaVersion: 2;

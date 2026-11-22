@@ -26,7 +26,7 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
         <main id="main">{children}</main>
 
         <footer className="mt-8 border-t border-line pt-4 text-xs text-ink-muted">
-          行情 poe.ninja
+          行情来源 · poe.ninja / poecurrency.top
         </footer>
       </div>
     </div>

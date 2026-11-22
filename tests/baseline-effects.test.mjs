@@ -57,8 +57,8 @@ test('four real NeverSink currency styles can be determined', () => {
 test('changing the base updates inherited rules but keeps manual effects', () => {
   const profile = { ...DEFAULT_PROFILE, rules: DEFAULT_PROFILE.rules.map(rule => ({ ...rule, followBaseline: rule.id !== 'default-divine', effects: { font: { fontSize: 19 } } })) };
   const generate = baseline => generateOnBase(profile, baseline, snapshot, { baselineName: 'Test.filter' });
-  const exalted = rule => blockFor(rule.filterFile, '# poe2-filter rule: 崇高石');
+  const exalted = rule => blockFor(rule.filterFile, '# poe2-filter rule: default-exalted');
   assert.match(exalted(generate(text)), /SetFontSize 42/);
   assert.match(exalted(generate(text.replace('SetFontSize 42', 'SetFontSize 44'))), /SetFontSize 44/);
-  assert.match(blockFor(generate(text).filterFile, '# poe2-filter rule: 神圣石'), /SetFontSize 19/);
+  assert.match(blockFor(generate(text).filterFile, '# poe2-filter rule: default-divine'), /SetFontSize 19/);
 });

@@ -14,7 +14,7 @@ const MAX_JSON: usize = 1024 * 1024;
 const MAX_PAYLOAD: usize = MAX_JSON + 4096;
 const MAX_HEADER: usize = 128;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Share {
     pub name: String,
@@ -32,6 +32,8 @@ struct Header {
 enum Codec {
     BrotliJson,
     Poe2,
+    ServerBrotliJson,
+    ServerPoe2,
 }
 
 impl Codec {
@@ -39,19 +41,20 @@ impl Codec {
         match (header.alg.as_str(), header.p) {
             ("br", 1) => Ok(Self::BrotliJson),
             ("poe2", 1) => Ok(Self::Poe2),
+            ("br", 2) => Ok(Self::ServerBrotliJson),
+            ("poe2", 2) => Ok(Self::ServerPoe2),
             _ => Err("不支持的分享码算法或参数档位，请升级客户端".into()),
         }
     }
 
     fn header(self) -> Header {
-        let alg = match self {
-            Self::BrotliJson => "br",
-            Self::Poe2 => "poe2",
+        let (alg, p) = match self {
+            Self::BrotliJson => ("br", 1),
+            Self::Poe2 => ("poe2", 1),
+            Self::ServerBrotliJson => ("br", 2),
+            Self::ServerPoe2 => ("poe2", 2),
         };
-        Header {
-            alg: alg.into(),
-            p: 1,
-        }
+        Header { alg: alg.into(), p }
     }
 }
 
@@ -60,11 +63,35 @@ pub fn encode(share: &Share) -> Result<String> {
     if json.len() > MAX_JSON {
         return Err("方案过大，无法生成分享码".into());
     }
-    let generic = encode_payload(Codec::BrotliJson, &json)?;
-    let Some(packed) = poe2::pack(share).filter(|bytes| bytes.len() <= MAX_JSON) else {
+    let server = share.profile.get("server").map(server_byte).transpose()?;
+    let generic = encode_payload(
+        if server.is_some() {
+            Codec::ServerBrotliJson
+        } else {
+            Codec::BrotliJson
+        },
+        &json,
+    )?;
+    let (codec, packed) = match server {
+        Some(server) => {
+            let mut core = share.clone();
+            core.profile
+                .as_object_mut()
+                .ok_or("无效方案内容")?
+                .remove("server");
+            let bytes = poe2::pack(&core).map(|packed| {
+                let mut bytes = vec![server];
+                bytes.extend(packed);
+                bytes
+            });
+            (Codec::ServerPoe2, bytes)
+        }
+        None => (Codec::Poe2, poe2::pack(share)),
+    };
+    let Some(packed) = packed.filter(|bytes| bytes.len() <= MAX_JSON) else {
         return Ok(generic);
     };
-    let specialized = encode_payload(Codec::Poe2, &packed)?;
+    let specialized = encode_payload(codec, &packed)?;
     Ok(if specialized.len() <= generic.len() {
         specialized
     } else {
@@ -111,12 +138,39 @@ pub fn decode(code: &str) -> Result<Share> {
             let bytes = inflate(&decode_base64(payload, MAX_PAYLOAD)?)?;
             match codec {
                 Codec::BrotliJson => parse_json(&bytes),
+                Codec::ServerBrotliJson => {
+                    let share = parse_json(&bytes)?;
+                    server_byte(&share.profile["server"])?;
+                    Ok(share)
+                }
+                Codec::ServerPoe2 => {
+                    let (&server, packed) = bytes.split_first().ok_or("分享码缺少游戏服务器")?;
+                    let server = match server {
+                        0 => "international",
+                        1 => "tencent",
+                        _ => return Err("分享码的游戏服务器无效".into()),
+                    };
+                    let mut share = poe2::unpack(packed).ok_or("PoE2 分享码结构无效或过大")?;
+                    share.profile["server"] = Value::String(server.into());
+                    if serde_json::to_vec(&share).map_err(|e| e.to_string())?.len() > MAX_JSON {
+                        return Err("分享码解压后过大".into());
+                    }
+                    Ok(share)
+                }
                 Codec::Poe2 => {
                     poe2::unpack(&bytes).ok_or_else(|| "PoE2 分享码结构无效或过大".into())
                 }
             }
         }
         _ => Err("分享码格式无效".into()),
+    }
+}
+
+fn server_byte(value: &Value) -> Result<u8> {
+    match value.as_str() {
+        Some("international") => Ok(0),
+        Some("tencent") => Ok(1),
+        _ => Err("分享码的游戏服务器无效".into()),
     }
 }
 
@@ -202,6 +256,22 @@ mod tests {
     }
 
     #[test]
+    fn share_server_and_raw_league_round_trip_in_both_codecs() {
+        let mut share = decode(LEGACY).unwrap();
+        assert!(share.profile.get("server").is_none());
+        share.profile["server"] = json!("tencent");
+        share.profile["league"] = json!("RunesofAldur");
+        let compact = encode(&share).unwrap();
+        assert!(compact.starts_with("POE2F1.eyJhbGciOiJwb2UyIiwicCI6Mn0."));
+        assert_eq!(decode(&compact).unwrap(), share);
+        share.profile["newField"] = json!(true);
+        let generic = encode(&share).unwrap();
+        assert!(generic.starts_with("POE2F1.eyJhbGciOiJiciIsInAiOjJ9."));
+        assert_eq!(decode(&generic).unwrap(), share);
+        assert!(decode(&encode_payload(Codec::ServerPoe2, &[2]).unwrap()).is_err());
+    }
+
+    #[test]
     fn uses_brotli_json_if_the_profile_cannot_be_packed() {
         let mut share = decode(LEGACY).unwrap();
         share.profile["skippedItemIds"] = json!(["possible-future-item"]);
@@ -235,7 +305,7 @@ mod tests {
                 "分享码协议头无效"
             );
         }
-        for header in [r#"{"alg":"zip","p":1}"#, r#"{"alg":"poe2","p":2}"#] {
+        for header in [r#"{"alg":"zip","p":1}"#, r#"{"alg":"poe2","p":3}"#] {
             assert!(decode(&code_with_header(header))
                 .unwrap_err()
                 .contains("升级客户端"));

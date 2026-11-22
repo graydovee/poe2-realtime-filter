@@ -65,7 +65,7 @@ export function validateProfile(input:unknown):FilterProfile {
   if (!validLocation || !name(base.name)) throw new Error('无效的基础过滤器来源');
  }
  if(p.baseFilterHint!==undefined&&!name(p.baseFilterHint))throw new Error('无效的基础过滤器名称');
- if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new Error('无效赛季');
+ if (p.server !== 'tencent' && (!p.league || !p.originalLeague))throw new Error('无效赛季');
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');
  const ids=new Set<string>();
  for(const rule of p.rules)validateRule(rule,ids);

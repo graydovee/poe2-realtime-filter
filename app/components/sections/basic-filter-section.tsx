@@ -2,11 +2,10 @@
 
 import { Download, FileSearch, FolderOpen } from "lucide-react";
 import { useState } from "react";
-import { LOCALE_LABELS } from "../../../lib/data";
 import { displayDirectory, explain, local } from "../../../lib/desktop";
-import type { BaseFilter, FilterProfile, Locale } from "../../../lib/types";
-import { Alert, Button, Field, Panel } from "../ui/primitives";
-import { Select, Switch } from "../ui/controls";
+import type { BaseFilter, FilterProfile } from "../../../lib/types";
+import { Alert, Button, Panel } from "../ui/primitives";
+import { Switch } from "../ui/controls";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 
 const sources = [{ id: "neversink", name: "NeverSink" }] as const;
@@ -21,10 +20,9 @@ function locationLabel(base: BaseFilter) {
   }
 }
 
-export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
+export function BasicFilterSection({ profile, onBaseChange }: {
   profile: FilterProfile;
   onBaseChange: (base?: BaseFilter) => void;
-  onLocaleChange: (locale: Locale) => void;
 }) {
   const [picker, setPicker] = useState<Picker>();
   const [options, setOptions] = useState<BaseFilter[]>([]);
@@ -105,10 +103,6 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
             }}>清除基础过滤器</Button>}
           </div>
         </div>
-        <Field label="客户端语言">
-          <Select value={profile.locale} onValueChange={(value) => onLocaleChange(value as Locale)}
-            options={Object.entries(LOCALE_LABELS).map(([value, label]) => ({ value, label }))} ariaLabel="选择客户端语言" />
-        </Field>
       </div>
       {!picker && error && <div className="mt-3"><Alert tone="ember">{error}</Alert></div>}
       {picker && (
@@ -133,7 +127,9 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
                 {visibleOptions.map((option) => <Button key={locationLabel(option)}
                   size="sm" className="base-filter-option" onClick={() => choose(option)}>
                   <span className="min-w-0 break-words">{option.name}</span>
-                  <span className="min-w-0 break-all text-xs text-ink-muted">{locationLabel(option)}</span>
+                  {picker.kind === "scan"
+                    ? option.kind === "subscribed" && <span className="text-xs text-ink-muted">{option.source === "online" ? "国际服订阅" : "WeGame 订阅"}</span>
+                    : <span className="min-w-0 break-all text-xs text-ink-muted">{locationLabel(option)}</span>}
                 </Button>)}
               </div>}
             </div>

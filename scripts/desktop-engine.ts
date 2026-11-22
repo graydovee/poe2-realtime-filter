@@ -1,3 +1,5 @@
+import { currencyPriceTiers, toExalted } from "../lib/pricing";
+import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
 import { inspectBaseStyles } from "../lib/baseline-effects";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
@@ -36,13 +38,43 @@ const api = {
   types: () => NINJA_TYPES,
   catalog,
   snapshot,
+  tencentCatalog,
+  tencentSnapshot: (input: Parameters<typeof tencentSnapshot>[0]) => tencentSnapshot(input, ITEM_CATALOG),
   validate: validateProfile,
   baseStyles: (input: string) => inspectBaseStyles(input),
   requiresMarket: (input: unknown) => validateProfile(input).rules.some((rule) => rule.enabled && rule.target.priceEnabled !== false && Boolean(rule.target.range)),
   generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string | null; baselineName: string | null; market?: MarketSnapshot }) => {
     const valid = validateProfile(profile);
-    const quote = market?.league === valid.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: valid.league };
-    return { ...generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName: baselineName ?? undefined, distinguishCustom: true }), market: quote };
+    const server = valid.server ?? "international";
+    const quote = market?.league === valid.league && (market.server ?? "international") === server && Date.parse(market.expiresAt) >= Date.now()
+      ? market : { ...FALLBACK_SNAPSHOT, server, league: valid.league };
+    if (server === "tencent") {
+      const cutoff = Date.now() - 86400000;
+      quote.prices = Object.fromEntries(Object.entries(quote.prices).filter(([, price]) => Date.parse(price.capturedAt) > cutoff));
+    }
+    const priceRules = valid.rules.filter((rule) => rule.enabled && rule.target.priceEnabled !== false && rule.target.range);
+    let marketIssue: string | undefined;
+    if (priceRules.length && !quote.rates) marketIssue = "等待当前服务器和赛季的有效行情";
+    else if (priceRules.some((rule) => rule.autoRange) && currencyPriceTiers(quote).length !== 4) {
+      marketIssue = "价格档所需的锚点通货行情不完整";
+    } else {
+      for (const rule of priceRules) {
+        const bounds = [rule.target.range?.min, rule.target.range?.max];
+        if (bounds.some((point) => point && toExalted(point, quote.rates, quote.prices) === undefined)) {
+          marketIssue = `「${rule.name}」缺少价格区间所需的报价`;
+          break;
+        }
+        const missing = rule.target.itemEnabled !== false && rule.target.itemIds.find((id) =>
+          !valid.skippedItemIds.includes(id) && ITEM_CATALOG.some((item) => item.id === id && item.priceable && !item.ambiguous) && !quote.prices[id]);
+        if (missing) {
+          marketIssue = `「${rule.name}」缺少 ${ITEM_CATALOG.find((item) => item.id === missing)?.name ?? missing} 的有效报价`;
+          break;
+        }
+      }
+    }
+    const bundle = generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName: baselineName ?? undefined, distinguishCustom: true });
+    if (marketIssue) bundle.safetyReport.warnings.push(marketIssue);
+    return { ...bundle, market: quote, marketIssue };
   },
 };
 

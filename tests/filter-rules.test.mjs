@@ -15,10 +15,10 @@ test("默认 4 条价格规则复刻基础过滤器里四枚通货的特效", ()
   assert.equal(generated.appliedRules.length, 4);
   const baseline = readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8");
   const expectations = [
-    ["崇高石价格档", "Exalted Orb", ["\tPlayEffect White", "\tMinimapIcon 1 Yellow Circle", "\tSetFontSize 42", "\tPlayAlertSound 2 300"]],
-    ["混沌石价格档", "Chaos Orb", ["\tPlayEffect Yellow", "\tPlayAlertSound 2 300"]],
-    ["剥离石价格档", "Orb of Annulment", ["\tPlayEffect Red", "\tMinimapIcon 0 Red Circle", "\tSetFontSize 45", "\tPlayAlertSound 1 300"]],
-    ["神圣石价格档", "Divine Orb", ["\tPlayEffect Red", "\tMinimapIcon 0 Red Star", "\tPlayAlertSound 6 300"]],
+    ["default-exalted", "Exalted Orb", ["\tPlayEffect White", "\tMinimapIcon 1 Yellow Circle", "\tSetFontSize 42", "\tPlayAlertSound 2 300"]],
+    ["default-chaos", "Chaos Orb", ["\tPlayEffect Yellow", "\tPlayAlertSound 2 300"]],
+    ["default-annulment", "Orb of Annulment", ["\tPlayEffect Red", "\tMinimapIcon 0 Red Circle", "\tSetFontSize 45", "\tPlayAlertSound 1 300"]],
+    ["default-divine", "Divine Orb", ["\tPlayEffect Red", "\tMinimapIcon 0 Red Star", "\tPlayAlertSound 6 300"]],
   ];
   for (const [ruleName, itemName, lines] of expectations) {
     const baselineBlock = baseline.split(/(?=^(?:Show|Hide)\b)/m).find((block) => /^\s*BaseType == /m.test(block) && block.includes('"' + itemName + '"'));
@@ -34,7 +34,7 @@ test("默认 4 条价格规则复刻基础过滤器里四枚通货的特效", ()
 
 test("没有填写的特效不生成动作，避免凭空出现的音效", () => {
   const generated = generateFilter(profile({ rules: [makeRule({ target: { itemIds: ["divine-orb"] } })] }), snapshot);
-  const block = blockFor(generated.filterFile, "# poe2-filter rule: 测试规则 / Divine Orb");
+  const block = blockFor(generated.filterFile, "# poe2-filter rule: rule-test / Divine Orb");
   assert.ok(block, "规则块缺失");
   assert.ok(block.includes('BaseType == "Divine Orb"'));
   for (const action of ["PlayAlertSound", "CustomAlertSound", "MinimapIcon", "PlayEffect", "SetFontSize"]) {
@@ -128,7 +128,7 @@ test("隐藏是规则选项，隐藏块仍可带特效", () => {
     profile({ rules: [makeRule({ hidden: true, target: { itemIds: ["scroll-of-wisdom"] }, effects: { sound: { type: "builtin", id: 6, volume: 300 }, beam: "White" } })] }),
     snapshot,
   );
-  const block = blockFor(generated.filterFile, "Hide # poe2-filter rule: 测试规则 / Scroll of Wisdom");
+  const block = blockFor(generated.filterFile, "Hide # poe2-filter rule: rule-test / Scroll of Wisdom");
   assert.ok(block, "隐藏块缺失");
   assert.ok(block.includes("PlayAlertSound 6 300"));
   assert.ok(block.includes("PlayEffect White"));

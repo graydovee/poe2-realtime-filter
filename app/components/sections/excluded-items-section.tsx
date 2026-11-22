@@ -1,6 +1,6 @@
 "use client";
 
-import type { FilterProfile, Locale } from "../../../lib/types";
+import type { FilterProfile } from "../../../lib/types";
 import { ItemPicker, type ItemPickerToggle } from "../item-picker";
 import { Panel } from "../ui/primitives";
 
@@ -28,7 +28,7 @@ export function ExcludedItemsSection({
       </div>
 
       <ItemPicker
-        locale={profile.locale as Locale}
+        locale="cn"
         entries={profile.skippedItemIds.length ? [{ id: "skipped-items", label: "跳过名单", itemIds: profile.skippedItemIds }] : []}
         onToggle={onToggleItems}
         onRemoveEntry={onClear}

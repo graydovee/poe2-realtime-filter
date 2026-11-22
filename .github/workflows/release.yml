@@ -67,5 +67,5 @@ jobs:
               signature = $signature
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
-          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes 'Windows x64 installer. If WebView2 is missing, setup downloads it from Microsoft. Refreshing poe.ninja prices requires an internet connection.'
+          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes '支持腾讯服 POE2 和国际服 POE2。按服务器查看方案和行情，两服可共用基础过滤器。简化方案列表和游戏内过滤器选择界面。Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

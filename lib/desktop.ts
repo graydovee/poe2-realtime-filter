@@ -1,5 +1,5 @@
 ﻿import { invoke } from "@tauri-apps/api/core";
-import type { BaseFilter, FilterProfile } from "./types";
+import type { BaseFilter, FilterProfile, GameServer } from "./types";
 
 export type LocalScheme = {
   id: string;
@@ -10,8 +10,9 @@ export type LocalScheme = {
   status: string;
 };
 
-export type Settings = { intervalMinutes: number; paused: boolean; filterDirectory: string | null };
-export type Library = { settings: Settings; schemes: LocalScheme[]; filterDirectory: string };
+export type Settings = { intervalMinutes: number; paused: boolean };
+export type Library = { server: GameServer; settings: Settings; schemes: LocalScheme[]; filterDirectory: string; customDirectory: boolean };
+export const SERVER_LABELS: Record<GameServer, string> = { international: "国际服 POE2", tencent: "腾讯服 POE2" };
 export function displayDirectory(path: string): string {
   if (path.startsWith("\\\\?\\UNC\\")) return "\\\\" + path.slice(8);
   if (/^\\\\\?\\[A-Za-z]:/.test(path)) return path.slice(4);

@@ -72,7 +72,7 @@ export function RulesSection({
             rule={rule}
             index={index}
             total={profile.rules.length}
-            locale={profile.locale}
+            locale="cn"
             style={profile.style}
             base={profile.baseFilter}
             inherited={baseStyles[rule.id]}

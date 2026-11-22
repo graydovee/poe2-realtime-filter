@@ -15,17 +15,17 @@ use std::{
     sync::{mpsc, Mutex},
     time::Duration,
 };
-use store::{display_directory, writable_directory, Edit, Store};
+use store::{display_directory, writable_directory, Edit, RefreshSettings, Server, Store};
 use tauri::{tray::TrayIconBuilder, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 struct Desktop {
     store: Store,
-    market: market::Market,
+    markets: BTreeMap<Server, market::Market>,
     changes: Mutex<()>,
-    refresh: Mutex<()>,
-    schedule: mpsc::Sender<()>,
+    refresh: BTreeMap<Server, Mutex<()>>,
+    schedule: BTreeMap<Server, mpsc::Sender<()>>,
     update: Mutex<UpdateStatus>,
 }
 
@@ -46,13 +46,21 @@ impl UpdateStatus {
 }
 
 impl Desktop {
-    fn refresh_base_filters(&self) -> Result<()> {
+    fn market(&self, server: Server) -> &market::Market {
+        &self.markets[&server]
+    }
+
+    fn refresh_base_filters(&self, server: Server) -> Result<()> {
         let library = self.store.load()?;
-        if library.settings.paused {
+        if library.refresh(server).paused {
             return Ok(());
         }
         let mut sources = BTreeMap::<String, BTreeSet<String>>::new();
-        for scheme in &library.schemes {
+        for scheme in library
+            .schemes
+            .iter()
+            .filter(|scheme| scheme.server() == server)
+        {
             if let Some(BaseFilter::Downloaded {
                 source, version, ..
             }) = Store::downloaded_base(scheme)
@@ -68,11 +76,15 @@ impl Desktop {
             }
             let _guard = self.changes.lock().map_err(|error| error.to_string())?;
             let mut current = self.store.load()?;
-            if current.settings.paused {
+            if current.refresh(server).paused {
                 break;
             }
             let mut changed = false;
-            for scheme in &mut current.schemes {
+            for scheme in current
+                .schemes
+                .iter_mut()
+                .filter(|scheme| scheme.server() == server)
+            {
                 let Some(BaseFilter::Downloaded {
                     source: selected,
                     version,
@@ -94,7 +106,7 @@ impl Desktop {
                         Some(base) => {
                             let install = scheme.installed.is_some() && scheme.auto_refresh;
                             let snapshot = install
-                                .then(|| self.market.snapshot(scheme.league()))
+                                .then(|| self.market(server).snapshot(scheme.league()))
                                 .flatten();
                             self.store
                                 .set_downloaded_base(scheme, &base, install, snapshot)
@@ -119,21 +131,30 @@ impl Desktop {
         Ok(())
     }
 
-    fn refresh_leagues(&self, extra_league: Option<String>) -> Result<()> {
-        let _running = self.refresh.lock().map_err(|e| e.to_string())?;
+    fn refresh_leagues(
+        &self,
+        server: Server,
+        manual: bool,
+        extra_league: Option<String>,
+    ) -> Result<()> {
+        let _running = self.refresh[&server].lock().map_err(|e| e.to_string())?;
         let library = self.store.load()?;
-        let manual = extra_league.is_some();
-        if library.settings.paused && !manual {
+        let settings = library.refresh(server);
+        if settings.paused && !manual {
             return Ok(());
         }
-        let catalog = self.market.catalog(true);
+        let market = self.market(server);
+        let catalog = market.catalog(true);
         let mut leagues: BTreeSet<_> = library
             .schemes
             .iter()
             .filter(|s| {
-                s.installed.is_some()
+                s.server() == server
+                    && s.installed.is_some()
                     && s.auto_refresh
-                    && (!manual || Some(s.league()) == extra_league.as_deref())
+                    && extra_league
+                        .as_deref()
+                        .is_none_or(|league| s.league() == league)
             })
             .map(|s| s.league().to_owned())
             .collect();
@@ -141,43 +162,47 @@ impl Desktop {
             leagues.insert(league);
         }
         if leagues.is_empty() {
+            let data = catalog.as_ref().map_err(Clone::clone)?;
             leagues.insert(
-                catalog
-                    .as_ref()
-                    .ok()
-                    .and_then(|data| data["defaultLeague"].as_str())
-                    .unwrap_or("Standard")
-                    .to_string(),
+                data["defaultLeague"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .ok_or("暂未获取到赛季")?
+                    .to_owned(),
             );
         }
         let mut error = None;
         for league in leagues {
-            let outcome = self
-                .market
-                .refresh(&league, library.settings.interval_minutes);
+            let outcome = market.refresh(&league, settings.interval_minutes, &catalog);
             let _guard = self.changes.lock().map_err(|e| e.to_string())?;
             let mut current = self.store.load()?;
-            let can_install = !current.settings.paused || manual;
+            let can_install = !current.refresh(server).paused || manual;
             let mut changed = false;
             for scheme in &mut current.schemes {
-                if scheme.league() != league
+                if scheme.server() != server
+                    || scheme.league() != league
                     || scheme.installed.is_none()
                     || !scheme.auto_refresh
                     || !can_install
                 {
                     continue;
                 }
-                match &outcome {
-                    Ok(snapshot) => {
-                        if let Err(reason) =
-                            self.store.install(scheme, Some(snapshot.clone()), None)
-                        {
-                            scheme.status = reason;
-                        }
+                let previous_status = scheme.status.clone();
+                let install = match &outcome {
+                    Ok(snapshot) => self.store.install(scheme, Some(snapshot.clone()), None),
+                    Err(reason)
+                        if engine::call::<bool>("requiresMarket", &scheme.profile)
+                            .unwrap_or(true) =>
+                    {
+                        Err(reason.clone())
                     }
-                    Err(reason) => scheme.status = format!("刷新失败，已保留过滤器 · {reason}"),
+                    Err(_) => self.store.install(scheme, None, None),
+                };
+                changed |= install.is_ok();
+                if let Err(reason) = install {
+                    scheme.status = format!("刷新失败，已保留过滤器 · {reason}");
                 }
-                changed = true;
+                changed |= scheme.status != previous_status;
             }
             if changed {
                 self.store.persist(&current)?;
@@ -202,20 +227,30 @@ fn library(state: State<'_, Desktop>) -> Result<Value> {
         .as_deref()
         .unwrap_or(&state.store.default_game);
     Ok(json!({
-        "settings": library.settings,
-        "schemes": library.schemes,
+        "server": library.server,
+        "settings": library.refresh(library.server),
+        "schemes": library.schemes.iter().filter(|scheme| scheme.server() == library.server).collect::<Vec<_>>(),
         "filterDirectory": display_directory(effective),
+        "customDirectory": library.settings.filter_directory.is_some(),
     }))
 }
 
 #[tauri::command]
-fn local_catalog(state: State<'_, Desktop>) -> Result<Value> {
-    state.market.catalog(false)
+fn local_catalog(state: State<'_, Desktop>, server: Server) -> Result<Value> {
+    state.market(server).catalog(false)
 }
 
 #[tauri::command]
-fn local_market(state: State<'_, Desktop>, league: String) -> Option<Value> {
-    state.market.snapshot(&league)
+fn select_server(state: State<'_, Desktop>, server: Server) -> Result<()> {
+    let _guard = state.changes.lock().map_err(|e| e.to_string())?;
+    let mut library = state.store.load()?;
+    library.server = server;
+    state.store.persist(&library)
+}
+
+#[tauri::command]
+fn local_market(state: State<'_, Desktop>, server: Server, league: String) -> Option<Value> {
+    state.market(server).snapshot(&league)
 }
 
 async fn on_worker<T: Send + 'static>(
@@ -227,12 +262,18 @@ async fn on_worker<T: Send + 'static>(
 }
 
 #[tauri::command]
-async fn refresh_market(app: tauri::AppHandle, league: String) -> Result<()> {
-    if league.trim().is_empty() || league.len() > 480 || league.chars().any(char::is_control) {
+async fn refresh_market(
+    app: tauri::AppHandle,
+    server: Server,
+    league: Option<String>,
+) -> Result<()> {
+    if league.as_ref().is_some_and(|id| {
+        id.trim().is_empty() || id.len() > 480 || id.chars().any(char::is_control)
+    }) {
         return Err("无效赛季".into());
     }
     on_worker(move || {
-        let outcome = app.state::<Desktop>().refresh_leagues(Some(league));
+        let outcome = app.state::<Desktop>().refresh_leagues(server, true, league);
         let _ = app.emit("local-refresh", outcome.as_ref().err());
         outcome
     })
@@ -240,16 +281,26 @@ async fn refresh_market(app: tauri::AppHandle, league: String) -> Result<()> {
 }
 
 #[tauri::command]
-fn save_settings(state: State<'_, Desktop>, interval_minutes: u32, paused: bool) -> Result<()> {
+fn save_settings(
+    state: State<'_, Desktop>,
+    server: Server,
+    interval_minutes: u32,
+    paused: bool,
+) -> Result<()> {
     if !(1..=1440).contains(&interval_minutes) {
         return Err("刷新间隔应在 1–1440 分钟之间".into());
     }
     let _guard = state.changes.lock().map_err(|e| e.to_string())?;
     let mut library = state.store.load()?;
-    library.settings.interval_minutes = interval_minutes;
-    library.settings.paused = paused;
+    library.set_refresh(
+        server,
+        RefreshSettings {
+            interval_minutes,
+            paused,
+        },
+    );
     state.store.persist(&library)?;
-    let _ = state.schedule.send(());
+    let _ = state.schedule[&server].send(());
     Ok(())
 }
 
@@ -387,9 +438,11 @@ async fn base_styles(app: tauri::AppHandle, base: BaseFilter) -> Result<Value> {
 async fn preview(app: tauri::AppHandle, profile: Value) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
-        let snapshot = profile["league"]
-            .as_str()
-            .and_then(|league| state.market.snapshot(league));
+        let snapshot = profile["league"].as_str().and_then(|league| {
+            state
+                .market(Server::from_profile(&profile))
+                .snapshot(league)
+        });
         state.store.preview(profile, snapshot)
     })
     .await
@@ -449,12 +502,51 @@ async fn scheme_share(app: tauri::AppHandle, id: String) -> Result<String> {
 }
 
 #[tauri::command]
-async fn scheme_import(app: tauri::AppHandle, code: String, name: Option<String>) -> Result<Value> {
+async fn inspect_share(app: tauri::AppHandle, code: String, server: Server) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
+        let share = share_code::decode(&code)?;
+        let target = share.profile.get("server").map(|value| serde_json::from_value::<Server>(value.clone()))
+            .transpose().map_err(|_| "分享码的游戏服务器无效")?.unwrap_or(server);
+        Ok(json!({"server":target, "name":share.name, "league": share.profile["league"], "hasServer": share.profile.get("server").is_some(), "catalog":state.market(target).catalog(false)?}))
+    }).await
+}
+
+#[tauri::command]
+async fn scheme_import(
+    app: tauri::AppHandle,
+    code: String,
+    server: Server,
+    league: Option<String>,
+    name: Option<String>,
+) -> Result<Value> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let mut share = share_code::decode(&code)?;
+        let fields = share.profile.as_object_mut().ok_or("无效的方案内容")?;
+        if let Some(target) = fields.get("server") {
+            if target != &json!(server) {
+                return Err("分享码与目标服务器不一致".into());
+            }
+        }
+        if let Some(league) = league {
+            let catalog = state.market(server).catalog(false)?;
+            if !catalog["leagues"]
+                .as_array()
+                .is_some_and(|entries| entries.iter().any(|entry| entry["id"] == league))
+            {
+                return Err("请选择目标服务器上的赛季".into());
+            }
+            fields.insert("league".into(), json!(league));
+        }
+        fields.insert("server".into(), json!(server));
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
         let mut library = state.store.load()?;
-        let id = state.store.import(&mut library, &code, name)?;
+        let id = state.store.import_decoded(&mut library, share, name)?;
+        if library.server != server {
+            library.server = server;
+            state.store.persist(&library)?;
+        }
         let missing = state.store.missing(Store::get(&library, &id)?);
         Ok(json!({ "id": id, "missing": missing }))
     })
@@ -476,8 +568,12 @@ async fn scheme_install(app: tauri::AppHandle, id: String) -> Result<()> {
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
         let mut library = state.store.load()?;
         let directory = library.settings.filter_directory.clone();
+        let target = Store::get(&library, &id)?;
+        state
+            .store
+            .check_install_target(&library, target, &target.name)?;
         let scheme = Store::get_mut(&mut library, &id)?;
-        let snapshot = state.market.snapshot(scheme.league());
+        let snapshot = state.market(scheme.server()).snapshot(scheme.league());
         let result = state.store.install(scheme, snapshot, directory.as_deref());
         if let Err(reason) = &result {
             scheme.status = reason.to_owned();
@@ -515,7 +611,7 @@ async fn scheme_download(app: tauri::AppHandle, id: String) -> Result<bool> {
         let state = app.state::<Desktop>();
         let library = state.store.load()?;
         let scheme = Store::get(&library, &id)?;
-        let snapshot = state.market.snapshot(scheme.league());
+        let snapshot = state.market(scheme.server()).snapshot(scheme.league());
         let (text, sounds) = state.store.prepare_filter(scheme, snapshot)?;
         let Some(file) = app
             .dialog()
@@ -680,12 +776,32 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         .document_dir()?
         .join("My Games")
         .join("Path of Exile 2");
-    let (schedule, signal) = mpsc::channel();
+    let mut schedule = BTreeMap::new();
+    let mut signals = Vec::new();
+    for server in Server::ALL {
+        let (sender, receiver) = mpsc::channel();
+        schedule.insert(server, sender);
+        signals.push((server, receiver));
+    }
     app.manage(Desktop {
         store: Store::new(root.clone(), game),
-        market: market::Market::new(root.join("market")).map_err(std::io::Error::other)?,
+        markets: BTreeMap::from([
+            (
+                Server::International,
+                market::Market::new(root.join("market"), Server::International)
+                    .map_err(std::io::Error::other)?,
+            ),
+            (
+                Server::Tencent,
+                market::Market::new(root.join("market-tencent"), Server::Tencent)
+                    .map_err(std::io::Error::other)?,
+            ),
+        ]),
         changes: Mutex::new(()),
-        refresh: Mutex::new(()),
+        refresh: Server::ALL
+            .into_iter()
+            .map(|server| (server, Mutex::new(())))
+            .collect(),
         schedule,
         update: Mutex::new(UpdateStatus {
             phase: "checking",
@@ -730,25 +846,31 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
-    std::thread::spawn(move || loop {
-        let state = handle.state::<Desktop>();
-        let refresh = state.refresh_leagues(None);
-        let base_refresh = state.refresh_base_filters();
-        let refresh = refresh.and(base_refresh);
-        let _ = handle.emit("local-refresh", refresh.as_ref().err());
-        let minutes = state
-            .store
-            .load()
-            .map(|library| library.settings.interval_minutes)
-            .unwrap_or(30)
-            .clamp(1, 1440);
-        if matches!(
-            signal.recv_timeout(Duration::from_secs(u64::from(minutes) * 60)),
-            Err(mpsc::RecvTimeoutError::Disconnected)
-        ) {
-            break;
-        }
-    });
+    for (server, signal) in signals {
+        let handle = handle.clone();
+        std::thread::spawn(move || loop {
+            let state = handle.state::<Desktop>();
+            let refresh = state.refresh_leagues(server, false, None);
+            let base_refresh = state.refresh_base_filters(server);
+            let outcome = refresh.and(base_refresh);
+            let _ = handle.emit(
+                "local-refresh",
+                json!({ "server": server, "error": outcome.err() }),
+            );
+            let minutes = state
+                .store
+                .load()
+                .map(|library| library.refresh(server).interval_minutes)
+                .unwrap_or(120)
+                .clamp(1, 1440);
+            if matches!(
+                signal.recv_timeout(Duration::from_secs(u64::from(minutes) * 60)),
+                Err(mpsc::RecvTimeoutError::Disconnected)
+            ) {
+                break;
+            }
+        });
+    }
     tauri::async_runtime::spawn(check_update(app.handle().clone()));
     Ok(())
 }
@@ -770,6 +892,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             library,
             local_catalog,
+            select_server,
             local_market,
             refresh_market,
             save_settings,
@@ -788,6 +911,7 @@ fn main() {
             scheme_rename,
             scheme_uninstall,
             scheme_share,
+            inspect_share,
             scheme_import,
             scheme_auto,
             scheme_install,

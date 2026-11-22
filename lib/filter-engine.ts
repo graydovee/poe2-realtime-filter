@@ -1,5 +1,5 @@
 import { inspectBaseStyles } from "./baseline-effects";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG, STRICTNESS_LABELS } from "./data";
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "./data";
 import { resolveAutoRanges, toExalted } from "./pricing";
 import type {
   FilterProfile,
@@ -74,7 +74,7 @@ function effectLines(rule: FilterRule, distinguishCustom: boolean): string[] {
 }
 
 function ruleBlock(rule: FilterRule, item: ItemDefinition, actions: string[]): string {
-  const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.name + " / " + item.name;
+  const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.id + " / " + item.name;
   return [head, ...matcherLines(item), ...actions].join("\n");
 }
 
@@ -196,7 +196,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id)).map((rule) => rule.name);
   if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
-    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
+    warnings.push("当前赛季缺少有效报价或汇率，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
   }
   if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项" + defaultDisplay + "。");
@@ -205,12 +205,12 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
-    standalone ? "# Mode: custom rules" : "# Base: " + baselineFile,
-    "# League: " + league,
-    ...(!standalone && !options.baselineName ? ["# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness]] : []),
+    standalone ? "# Mode: custom rules" : "# Mode: overlay",
+    ...(/^[ -~]+$/.test(league) ? ["# League: " + league] : []),
+    ...(!standalone && !options.baselineName ? ["# Strictness: " + profile.strictness] : []),
     "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
     "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
-    standalone ? "# Unmatched items: game defaults" : "# Safety: 未配置的动作交给基础过滤器；隐藏规则会让安全检查失败。",
+    standalone ? "# Unmatched items: game defaults" : "# Safety: Unspecified actions are handled by the base filter.",
     "",
   ].join("\n");
   const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + (baseline ?? "Show\n");

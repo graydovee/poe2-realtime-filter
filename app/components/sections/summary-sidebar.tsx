@@ -3,7 +3,6 @@
 import { Fragment } from "react";
 import { ArrowRight } from "lucide-react";
 
-import { LOCALE_LABELS } from "../../../lib/data";
 import type { FilterProfile } from "../../../lib/types";
 import { Alert, Button, Panel } from "../ui/primitives";
 
@@ -28,7 +27,6 @@ export function SummarySidebar({
   const rows: Array<[string, string]> = [
     ["赛季", profile.league],
     ["基础过滤器", profile.baseFilter?.name ?? (profile.baseFilterHint ? "待选择" : "仅自定义规则")],
-    ["客户端语言", LOCALE_LABELS[profile.locale]],
     ["自定义规则", rules.length + " 条（启用 " + rules.filter((rule) => rule.enabled).length + "）"],
     ["隐藏规则", rules.filter((rule) => rule.enabled && rule.hidden).length + " 条"],
   ];
