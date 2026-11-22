@@ -2932,9 +2932,11 @@ dependencies = [
 
 [[package]]
 name = "poe2-realtime-filter"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "base64 0.22.1",
+ "brotli",
+ "crc32fast",
  "rayon",
  "regex",
  "reqwest 0.12.28",

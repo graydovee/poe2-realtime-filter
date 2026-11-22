@@ -36,7 +36,7 @@ export function RulesSection({
   return (
     <Panel
       title="自定义过滤规则"
-      description="从上到下依次匹配，第一个命中的规则生效。适用物品与价格区间可以只填一个，也可以同时填（取交集）。没有填写的特效交给基础过滤器，隐藏也是规则里的一个选项。"
+      description="规则从上到下匹配，第一条命中的规则生效。可以按物品、价格或两项同时筛选。"
     >
       <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiers.length ? (
@@ -48,7 +48,7 @@ export function RulesSection({
           ))
         ) : (
           <p className="col-span-2 text-xs leading-relaxed text-ink-muted sm:col-span-4">
-            当前赛季没有可用的锚点行情，跟随市价的价格档会被禁用；仍可以用「选择物品」或固定价格写规则。
+            跟随市价的价格档需要通货报价。请刷新本赛季行情，也可以用物品条件设置静态规则。
           </p>
         )}
       </div>
@@ -63,7 +63,7 @@ export function RulesSection({
       <div className="flex flex-col gap-3">
         {profile.rules.length === 0 && (
           <p className="rounded-sm border border-dashed border-line bg-surface-2/40 px-4 py-6 text-center text-xs text-ink-muted">
-            还没有规则，输出等于基础过滤器。可以先「新增规则」。
+            点击「新增规则」设置物品的显示效果。
           </p>
         )}
         {profile.rules.map((rule, index) => (

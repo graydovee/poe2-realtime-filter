@@ -147,10 +147,10 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
               : "方案已导入到下方列表");
           });
         }}>
-          <textarea aria-label="分享码" className="min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1400000} onChange={(event) => setShareCode(event.target.value)} />
+          <textarea aria-label="分享码" className="min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1404096} onChange={(event) => setShareCode(event.target.value)} />
           <div className="flex flex-wrap items-end gap-2">
-            <label className="max-w-full text-xs text-ink-muted">导入名称（可选）
-              <TextInput className="mt-1 w-64 max-w-full" placeholder="留空使用原名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
+            <label className="max-w-full text-xs text-ink-muted">导入名称
+              <TextInput className="mt-1 w-64 max-w-full" placeholder="默认使用分享码中的名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
             </label>
             <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !shareCode.trim()}>导入方案</Button>
           </div>
@@ -164,7 +164,7 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
 
       <Panel title="我的方案" action={<Button size="sm" variant="primary" disabled={busy || !library} onClick={onNew}>新建方案</Button>}>
         {!library && !error && <p className="text-sm text-ink-muted">正在读取本地方案…</p>}
-        {library && !library.schemes.length && <p className="text-sm text-ink-muted">还没有方案。可以新建方案，或导入分享码。</p>}
+        {library && !library.schemes.length && <p className="text-sm text-ink-muted">新建方案，或粘贴分享码导入。</p>}
         {shareOutput && (
           <div className="mb-4 grid gap-2">
             <label className="text-sm text-ink">手动复制分享码

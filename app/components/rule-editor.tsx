@@ -342,7 +342,7 @@ export function RuleEditor({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Disclosure summary={rule.target.itemIds.length ? "修改物品选择（" + rule.target.itemIds.length + " 项）" : "选择物品（可选）"} className="rounded-sm border border-line/60 px-3 py-2">
+            <Disclosure summary={rule.target.itemIds.length ? "修改物品选择 · 已选 " + rule.target.itemIds.length + " 项" : "选择物品"} className="rounded-sm border border-line/60 px-3 py-2">
               <div className="pt-3">
                 <ItemPicker
                   locale={locale}
@@ -418,7 +418,7 @@ export function RuleEditor({
             <div className="min-w-0">
               <span className="text-xs font-medium text-ink">完整特效预设</span>
               <p className="mt-1 truncate text-xs text-ink-muted" title={selected ? describeEffects(pickEffects(selected)) : describeEffects(rule.effects)}>
-                {selected ? describeEffects(pickEffects(selected)) : "自定义（逐项填写）"}
+                {selected ? describeEffects(pickEffects(selected)) : "自定义外观"}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -436,9 +436,9 @@ export function RuleEditor({
                 {filtered.map((preset) => (
                   <PresetCard key={preset.id} preset={preset} active={preset.id === rule.effectPresetId} onSelect={() => applyPreset(preset)} />
                 ))}
-                {filtered.length === 0 && <p className="col-span-full py-4 text-center text-xs text-ink-muted">没有匹配的预设。</p>}
+                {filtered.length === 0 && <p className="col-span-full py-4 text-center text-xs text-ink-muted">试试其他特效关键词。</p>}
               </div>
-              <p className="text-xs leading-relaxed text-ink-muted">预设是一次性填入光柱、地图图标、字体和音效；填好之后下面的字段仍可继续修改（改完会变成「自定义」）。</p>
+              <p className="text-xs leading-relaxed text-ink-muted">应用预设后，可展开「自定义外观」调整单项特效。</p>
             </div>
           )}
         </div>
@@ -447,7 +447,7 @@ export function RuleEditor({
           <AppearancePreview effects={shownEffects} name={rule.name || "示例物品"} file={customFile} base={base} />
         </div>
 
-        <Disclosure summary="自定义外观（光柱 / 地图图标 / 字体 / 音效）" className="border-t border-line pt-1">
+        <Disclosure summary="自定义外观" className="border-t border-line pt-1">
           <div className="grid gap-3 pt-3 sm:grid-cols-2">
             <Field label="光柱">
               <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />

@@ -67,5 +67,5 @@ jobs:
               signature = $signature
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
-          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes 'Windows x64 installer. If WebView2 is missing, setup downloads it from Microsoft. Refreshing poe.ninja prices requires an internet connection. Users of the old v0.4.x client install this version manually.'
+          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes 'Windows x64 installer. If WebView2 is missing, setup downloads it from Microsoft. Refreshing poe.ninja prices requires an internet connection.'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

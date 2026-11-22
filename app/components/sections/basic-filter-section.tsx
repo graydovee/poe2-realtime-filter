@@ -64,7 +64,7 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
         try {
           const cached = await local<BaseFilter[]>("source_filters", { source: source.id, cachedOnly: true });
           setOptions(cached);
-          if (cached.length) setNotice("可继续选择已下载的版本。");
+          if (cached.length) setNotice("请从下方列表选择已下载的版本。");
         } catch { /* Preserve the download error. */ }
       }
     } finally { setBusy(false); }
@@ -74,7 +74,7 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
     <Panel title="基础过滤器">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,13rem)] sm:items-start">
         <div className="min-w-0">
-          <p className="break-all text-sm font-medium text-ink">{base?.name ?? "尚未选择基础过滤器"}</p>
+          <p className="break-all text-sm font-medium text-ink">{base?.name ?? "选择一个基础过滤器"}</p>
           {base && <p className="mt-1 break-all text-xs text-ink-muted">
             {base.kind === "local" ? displayDirectory(base.path) : `${sources.find((source) => source.id === base.source)?.name ?? base.source} · ${base.version}`}
           </p>}
@@ -105,7 +105,7 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
               {busy && <p role="status" className="text-sm text-ink-muted">{picker.kind === "scan" ? "正在扫描…" : "正在读取来源…"}</p>}
               {error && <Alert tone="ember">{error}</Alert>}
               {notice && <p className="text-xs text-ink-muted">{notice}</p>}
-              {!busy && !error && !options.length && <p className="text-sm text-ink-muted">{picker.kind === "scan" ? "目录中没有可用的基础过滤器。" : "暂无已下载的过滤器。"}</p>}
+              {!busy && !error && !options.length && <p className="text-sm text-ink-muted">{picker.kind === "scan" ? "关闭列表后，可选择本地文件或下载过滤器。" : "关闭列表后，点击「下载过滤器」并选择来源。"}</p>}
               {!busy && <div className="grid max-h-[45vh] gap-2 overflow-y-auto">
                 {options.map((option) => <Button key={option.kind === "local" ? option.path : `${option.source}/${option.version}/${option.entry}`}
                   size="sm" className="base-filter-option" onClick={() => choose(option)}>

@@ -1,13 +1,10 @@
 import { DEFAULT_PROFILE } from "./default-profile";
 import type { FilterProfile, FilterRule } from "./types";
 
-/**
- * 请求体 / 数据库里的方案归一：补齐默认字段、统一赛季名。
- * 旧版方案（whitelist + visualPresets）不再支持，缺失 rules 时直接报错。
- */
+/** 检查本地方案的规则列表和格式版本，并补齐默认字段、统一赛季名。 */
 export function normalizeProfile(input: unknown): FilterProfile {
   const raw = (input ?? {}) as Partial<FilterProfile>;
-  if (!Array.isArray(raw.rules)) throw new Error("方案格式已更新，请重新添加自定义过滤规则");
+  if (!Array.isArray(raw.rules)) throw new Error("方案缺少规则列表");
   const league = normalizeLeague(raw.league ?? DEFAULT_PROFILE.league);
   if (raw.schemaVersion !== 2) throw new Error("不支持的方案格式版本");
   const rules = raw.rules.map((rule) => {

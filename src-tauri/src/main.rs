@@ -3,6 +3,7 @@
 mod base_filter;
 mod engine;
 mod market;
+mod share_code;
 mod store;
 
 use base_filter::BaseFilter;
@@ -329,8 +330,12 @@ async fn scheme_uninstall(app: tauri::AppHandle, id: String) -> Result<()> {
 }
 
 #[tauri::command]
-fn scheme_share(state: State<'_, Desktop>, id: String) -> Result<String> {
-    Store::share(Store::get(&state.store.load()?, &id)?)
+async fn scheme_share(app: tauri::AppHandle, id: String) -> Result<String> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        Store::share(Store::get(&state.store.load()?, &id)?)
+    })
+    .await
 }
 
 #[tauri::command]

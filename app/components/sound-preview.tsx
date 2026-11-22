@@ -96,10 +96,10 @@ export function SoundPreviewButton({ sound, file, base, className }: { sound?: P
   const missingBuiltin = sound?.type === "builtin" && checked && !builtinSource;
   const disabled = !sound || missingBuiltin;
   const hint = !sound
-    ? "当前没有设置音效，沿用基础过滤器"
+    ? "沿用基础过滤器的音效"
     : sound.type === "builtin"
       ? missingBuiltin
-        ? "内置音效 " + sound.id + " 是游戏资源，网页没有对应音频文件（放到 public/sounds/alert-sound-" + sound.id + ".mp3 即可试听）"
+        ? "可在游戏内试听内置音效 " + sound.id
         : "内置音效 " + sound.id
       : sound.fileName;
 

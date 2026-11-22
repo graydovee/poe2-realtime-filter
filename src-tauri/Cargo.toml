@@ -1,6 +1,6 @@
 [package]
 name = "poe2-realtime-filter"
-version = "0.5.3"
+version = "0.5.4"
 edition = "2021"
 
 [build-dependencies]
@@ -8,6 +8,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 base64 = "0.22"
+brotli = "9.1.3"
+crc32fast = "1"
 rquickjs = "0.11"
 rayon = "1"
 regex = "1"

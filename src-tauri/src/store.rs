@@ -2,8 +2,9 @@ use crate::{
     base_filter::{self, BaseFilter, Baseline},
     engine::{self, Result},
     market,
+    share_code::{self, Share},
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::Engine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -17,8 +18,6 @@ use std::{
 };
 use uuid::Uuid;
 
-const SHARE_PREFIX: &str = "POE2F1.";
-const SHARE_MAX: usize = 1024 * 1024;
 const AUDIO_MAX: usize = 8 * 1024 * 1024;
 const AUDIO_TOTAL_MAX: usize = 32 * 1024 * 1024;
 
@@ -75,13 +74,6 @@ impl Default for Library {
             schemes: vec![],
         }
     }
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Share {
-    name: String,
-    profile: Value,
 }
 
 #[derive(Deserialize)]
@@ -548,15 +540,10 @@ impl Store {
                 }
             }
         }
-        let bytes = serde_json::to_vec(&Share {
+        share_code::encode(&Share {
             name: scheme.name.clone(),
             profile,
         })
-        .map_err(|e| e.to_string())?;
-        if bytes.len() > SHARE_MAX {
-            return Err("方案过大，无法生成分享码".into());
-        }
-        Ok(format!("{SHARE_PREFIX}{}", URL_SAFE_NO_PAD.encode(bytes)))
     }
 
     pub fn import(
@@ -565,20 +552,7 @@ impl Store {
         code: &str,
         name_override: Option<String>,
     ) -> Result<String> {
-        let encoded = code
-            .trim()
-            .strip_prefix(SHARE_PREFIX)
-            .ok_or("不支持的分享码版本")?;
-        if encoded.len() > SHARE_MAX * 4 / 3 + 4 {
-            return Err("分享码过大".into());
-        }
-        let bytes = URL_SAFE_NO_PAD
-            .decode(encoded)
-            .map_err(|_| "分享码不是有效的 Base64URL")?;
-        if bytes.len() > SHARE_MAX {
-            return Err("分享码过大".into());
-        }
-        let mut share: Share = serde_json::from_slice(&bytes).map_err(|_| "分享码内容无效")?;
+        let mut share = share_code::decode(code)?;
         // A share code may describe a baseline but never authorize reading a local path.
         if let Some(fields) = share.profile.as_object_mut() {
             fields.remove("baseFilter");
@@ -1017,6 +991,21 @@ mod tests {
         expected.as_object_mut().unwrap().remove("baseFilter");
         expected["baseFilterHint"] = json!("fixture.filter");
         assert_eq!(Store::get(&library, &copy).unwrap().profile, expected);
+        let library_path = store.root.join("library.json");
+        let saved = fs::read(&library_path).unwrap();
+        let count = library.schemes.len();
+        let (head, payload) = code.rsplit_once('.').unwrap();
+        let mut payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(payload)
+            .unwrap();
+        payload[0] ^= 1;
+        let broken = format!(
+            "{head}.{}",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(payload)
+        );
+        assert!(store.import(&mut library, &broken, None).is_err());
+        assert_eq!(library.schemes.len(), count);
+        assert_eq!(fs::read(&library_path).unwrap(), saved);
         assert!(store.import(&mut library, "POE2F2.AAAAA", None).is_err());
         assert!(store.import(&mut library, "POE2F1.$$$", None).is_err());
         let renamed = store.default_game.join("新名字.filter");

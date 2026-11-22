@@ -16,7 +16,7 @@ export function ExcludedItemsSection({
   return (
     <Panel
       title="以下物品跳过自定义规则"
-      description="名单里的物品不参与任何规则，一律保持基础过滤器的效果 —— 不会被强制加音效、图标或光柱，也不会被规则隐藏。"
+      description="名单中的物品沿用基础过滤器的规则和特效。"
     >
       <div className="mb-4 rounded-sm border border-line bg-surface-2/50 px-4 py-3 text-xs leading-relaxed text-ink-muted">
         常用于「不想被规则覆盖」的基础通货、任务物品或自己盯着用的材料。已选 <b className="font-mono font-normal text-ink">{profile.skippedItemIds.length}</b> 项。
