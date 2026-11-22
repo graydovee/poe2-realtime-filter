@@ -3,7 +3,7 @@ export const NINJA_TYPES = ["Currency", "Fragments", "Abyss", "UncutGems", "Line
 const QUOTE_CURRENCIES = new Set(["divine", "chaos", "exalted"]);
 const isPositiveRate = (value) => Number.isFinite(value) && value > 0;
 
-export function parseExchange(payload, catalog, capturedAt) {
+export function parseExchange(payload, catalog, capturedAt, includeRates = true) {
   if (payload?.core?.primary !== "divine" || !Array.isArray(payload.items) || !Array.isArray(payload.lines)) {
     throw new Error("Unsupported poe.ninja exchange schema or primary currency");
   }
@@ -25,7 +25,7 @@ export function parseExchange(payload, catalog, capturedAt) {
   }
   const raw = payload.core.rates;
   let rates;
-  if (isPositiveRate(raw?.chaos) && isPositiveRate(raw?.exalted)) {
+  if (includeRates && isPositiveRate(raw?.chaos) && isPositiveRate(raw?.exalted)) {
     rates = { divineToChaos: raw.chaos, divineToExalted: raw.exalted, capturedAt, source: "poe.ninja PoE2 exchange" };
     // Use the same conversion basis for the denominations and threshold anchors.
     for (const [name, amount] of [["Divine Orb", 1], ["Chaos Orb", 1 / raw.chaos], ["Exalted Orb", 1 / raw.exalted]]) {

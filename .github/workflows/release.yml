@@ -67,5 +67,10 @@ jobs:
               signature = $signature
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
-          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes '支持腾讯服 POE2 和国际服 POE2。按服务器查看方案和行情，两服可共用基础过滤器。简化方案列表和游戏内过滤器选择界面。Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。'
+          @'
+          - 腾讯服和国际服按报价时间逐项更新缓存。接口返回的报价更晚时才替换本地报价，汇率也按时间更新。
+          - 版本号旁新增「检查更新」按钮，可手动查询新版本并查看检查结果。
+          - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
+          '@ | Set-Content -Encoding utf8NoBOM release-notes.md
+          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }

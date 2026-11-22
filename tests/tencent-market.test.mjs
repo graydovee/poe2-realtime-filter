@@ -16,8 +16,8 @@ const quotes = [
   row("Greater Jeweller's Orb", 1, "d", { error: true }),
 ];
 
-function load(items) {
-  return tencent.tencentSnapshot({ league: "0.5.5", body: [{ items }], lifetime: 4 * 3600000 }, data.ITEM_CATALOG, now);
+function load(items, previousQuotes) {
+  return tencent.tencentSnapshot({ league: "0.5.5", body: [{ items }], previousQuotes, lifetime: 4 * 3600000 }, data.ITEM_CATALOG, now);
 }
 
 test("Tencent league catalog retains upstream IDs and labels verbatim", () => {
@@ -29,7 +29,7 @@ test("Tencent league catalog retains upstream IDs and labels verbatim", () => {
 });
 
 test("Tencent uses buy first, sell fallback, denomination conversion and source timestamps", () => {
-  const result = load(quotes);
+  const { snapshot: result } = load(quotes);
   const prices = result.prices;
   assert.equal(result.server, "tencent");
   assert.equal(result.league, "0.5.5");
@@ -42,8 +42,44 @@ test("Tencent uses buy first, sell fallback, denomination conversion and source 
   assert.equal(prices["greater-jeweller-s-orb"], undefined);
 });
 
-test("Tencent rejects missing or stale conversion anchors", () => {
+test("Tencent accepts the newest quote even when the upstream only flags its age", () => {
+  const at = (hour) => ({ latest_datetime: `2026-11-21 ${hour}:00:00`, error: true, error_info: "数据已过时超过24h" });
+  const first = load([
+    row("Divine Orb", 100, "e", at("09")), row("Chaos Orb", 2, "e", at("10")),
+    row("Orb of Annulment", 0.2, "d", at("08")), row("Lesser Jeweller's Orb", 0.15, "e", at("09")),
+  ]);
+  const second = load([
+    row("Divine Orb", 200, "e", at("10")), row("Chaos Orb", 9, "e", at("09")),
+    row("Orb of Annulment", 0.9, "d", at("08")),
+    row("Lesser Jeweller's Orb", 9, "e", { ...at("11"), error_info: "价格出现剧烈波动" }),
+  ], first.quotes);
+  assert.equal(second.snapshot.rates.divineToExalted, 200);
+  assert.equal(second.snapshot.prices["chaos-orb"].amount, 2);
+  assert.equal(second.snapshot.prices["orb-of-annulment"].amount, 40);
+  assert.equal(second.snapshot.prices["orb-of-annulment"].capturedAt, "2026-11-21T00:00:00.000Z");
+  assert.equal(second.snapshot.prices["lesser-jeweller-s-orb"].amount, 0.15);
+  assert.equal(second.snapshot.capturedAt, "2026-11-21T02:00:00.000Z");
+  assert.equal(second.snapshot.expiresAt, "2026-11-23T08:00:00.000Z");
+
+  const restored = JSON.parse(JSON.stringify(second.quotes));
+  const third = load([row("Lesser Jeweller's Orb", 0.25, "e", at("11"))], restored);
+  assert.equal(third.snapshot.prices["orb-of-annulment"].amount, 40);
+  assert.equal(third.snapshot.prices["lesser-jeweller-s-orb"].amount, 0.25);
+  assert.equal(third.snapshot.capturedAt, "2026-11-21T03:00:00.000Z");
+});
+
+test("Tencent recovers previous quotes from the legacy cached response", () => {
+  const result = tencent.tencentSnapshot({
+    league: "0.5.5", previousBody: [{ items: quotes }], lifetime: 3600000,
+    body: [{ items: [row("Lesser Jeweller's Orb", 0.25, "e", { latest_datetime: "2026-11-23 11:30:00" })] }],
+  }, data.ITEM_CATALOG, now);
+  assert.equal(result.snapshot.prices["divine-orb"].amount, 100);
+  assert.equal(result.snapshot.prices["lesser-jeweller-s-orb"].amount, 0.25);
+});
+
+test("Tencent rejects missing anchors, future timestamps, and unrecognized errors", () => {
   assert.throws(() => load(quotes.slice(1)), /汇率/);
-  assert.throws(() => load(quotes.map((quote) => ({ ...quote, latest_datetime: "2026-11-21 11:00:00" }))), /汇率/);
-  assert.throws(() => tencent.tencentSnapshot({ league: "standard", body: [], lifetime: 3600000 }, data.ITEM_CATALOG, now), /没有返回/);
+  assert.throws(() => load(quotes.map((quote) => ({ ...quote, latest_datetime: "2026-11-23 12:30:00" }))), /没有返回可用报价/);
+  assert.throws(() => load(quotes.map((quote) => ({ ...quote, error: true }))), /没有返回可用报价/);
+  assert.throws(() => load([]), /没有返回可用报价/);
 });

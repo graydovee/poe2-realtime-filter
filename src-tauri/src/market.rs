@@ -24,13 +24,29 @@ const MAX_RESPONSE: u64 = 8 * 1024 * 1024;
 struct QuoteResponse {
     etag: Option<String>,
     modified: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    quote_time: Option<String>,
     body: Value,
+}
+
+impl QuoteResponse {
+    fn quote_time(&self) -> Option<&str> {
+        self.quote_time.as_deref().or(self.modified.as_deref())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
 struct SnapshotCache {
     responses: HashMap<String, QuoteResponse>,
     snapshot: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    quotes: Option<Value>,
+}
+
+#[derive(Deserialize)]
+struct MarketUpdate {
+    snapshot: Value,
+    quotes: Value,
 }
 
 pub struct Market {
@@ -67,13 +83,17 @@ impl Market {
         url: &str,
         query: &[(&str, &str)],
         previous: Option<&QuoteResponse>,
+        track_quote_time: bool,
     ) -> Result<QuoteResponse> {
         let mut request = self
             .client
             .get(url)
             .query(query)
             .header(header::ACCEPT, "application/json");
-        if let Some(previous) = previous {
+        // A legacy exchange response may not have a usable source time. Request its body again.
+        if let Some(previous) =
+            previous.filter(|old| !track_quote_time || old.quote_time().is_some())
+        {
             if let Some(tag) = &previous.etag {
                 request = request.header(header::IF_NONE_MATCH, tag);
             }
@@ -106,6 +126,7 @@ impl Market {
         };
         let etag = get_header(header::ETAG);
         let modified = get_header(header::LAST_MODIFIED);
+        let date = get_header(header::DATE);
         let mut bytes = Vec::new();
         response
             .take(MAX_RESPONSE + 1)
@@ -115,9 +136,21 @@ impl Market {
             return Err("行情响应过大".into());
         }
         let body = serde_json::from_slice(&bytes).map_err(|e| format!("行情格式无效 ({e})"))?;
+        let quote_time = if track_quote_time {
+            // Keep the original source time when HTTP 200 carries the same representation.
+            previous
+                .filter(|old| old.body == body)
+                .and_then(QuoteResponse::quote_time)
+                .map(str::to_owned)
+                .or_else(|| modified.clone())
+                .or(date)
+        } else {
+            None
+        };
         Ok(QuoteResponse {
             etag,
             modified,
+            quote_time,
             body,
         })
     }
@@ -140,7 +173,7 @@ impl Market {
                 Server::International => (INDEX, &[][..], "catalog"),
                 Server::Tencent => (TENCENT_INDEX, &[("version", "poe2")][..], "tencentCatalog"),
             };
-            let response = self.request(endpoint, query, cached.as_ref().map(|it| &it.0))?;
+            let response = self.request(endpoint, query, cached.as_ref().map(|it| &it.0), false)?;
             let catalog = engine::call(parser, &response.body)?;
             write_json(&path, &(&response, &catalog))?;
             return Ok(catalog);
@@ -168,27 +201,31 @@ impl Market {
             query.push(("season", league));
         }
         let path = self.snapshot_path(league);
+        let previous: Option<SnapshotCache> = read_json(&path);
+        let previous_response = previous
+            .as_ref()
+            .and_then(|cache| cache.responses.get("summary"));
         let response = {
             let _network = self.network.lock().map_err(|e| e.to_string())?;
-            let previous: Option<SnapshotCache> = read_json(&path);
-            self.request(
-                TENCENT_SUMMARY,
-                &query,
-                previous
-                    .as_ref()
-                    .and_then(|cache| cache.responses.get("summary")),
-            )?
+            self.request(TENCENT_SUMMARY, &query, previous_response, false)?
         };
         if current && self.catalog(true)?["defaultLeague"] != league {
             return Err("国服当前赛季已变化，请重新选择赛季".into());
         }
-        let snapshot = engine::call(
+        let update: MarketUpdate = engine::call(
             "tencentSnapshot",
-            json!({"league":league, "body":response.body, "lifetime": u64::from(minutes) * 120_000}),
+            json!({
+                "league": league,
+                "body": response.body,
+                "previousBody": previous_response.map(|old| &old.body),
+                "previousQuotes": previous.as_ref().and_then(|cache| cache.quotes.as_ref()),
+                "lifetime": u64::from(minutes) * 120_000,
+            }),
         )?;
         let cache = SnapshotCache {
             responses: HashMap::from([("summary".into(), response)]),
-            snapshot,
+            snapshot: update.snapshot,
+            quotes: Some(update.quotes),
         };
         write_json(&path, &cache)?;
         Ok(cache.snapshot)
@@ -209,27 +246,48 @@ impl Market {
                     let old = previous
                         .as_ref()
                         .and_then(|cache| cache.responses.get(kind));
-                    self.request(EXCHANGE, &[("league", league), ("type", kind)], old)
+                    self.request(EXCHANGE, &[("league", league), ("type", kind)], old, true)
                         .map(|response| (kind.clone(), response))
                         .map_err(|e| format!("{kind} {e}"))
                 })
                 .collect::<Result<HashMap<_, _>>>()
         })?;
-        let payloads: HashMap<_, _> = responses
-            .iter()
-            .map(|(kind, response)| (kind, &response.body))
-            .collect();
-        let snapshot = engine::call(
+        let payloads = exchange_payloads(&responses);
+        let previous_quotes = previous.as_ref().and_then(|cache| cache.quotes.as_ref());
+        let legacy_payloads = previous
+            .as_ref()
+            .filter(|_| previous_quotes.is_none())
+            .map(|cache| exchange_payloads(&cache.responses));
+        let update: MarketUpdate = engine::call(
             "snapshot",
-            json!({ "league": league, "payloads": payloads, "lifetime": u64::from(minutes) * 120_000 }),
+            json!({
+                "league": league,
+                "payloads": payloads,
+                "previous": legacy_payloads,
+                "previousQuotes": previous_quotes,
+                "lifetime": u64::from(minutes) * 120_000,
+            }),
         )?;
         let cache = SnapshotCache {
             responses,
-            snapshot,
+            snapshot: update.snapshot,
+            quotes: Some(update.quotes),
         };
         write_json(&path, &cache)?;
         Ok(cache.snapshot)
     }
+}
+
+fn exchange_payloads(responses: &HashMap<String, QuoteResponse>) -> HashMap<&str, Value> {
+    responses
+        .iter()
+        .map(|(kind, response)| {
+            (
+                kind.as_str(),
+                json!({ "body": response.body, "quoteTime": response.quote_time() }),
+            )
+        })
+        .collect()
 }
 
 pub fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
@@ -253,42 +311,118 @@ mod tests {
     };
 
     #[test]
-    fn conditional_requests_reuse_validated_response() {
+    fn conditional_requests_keep_the_original_quote_time() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let server = std::thread::spawn(move || {
-            for first in [true, false] {
+            for (stage, reply) in [
+                "200 OK\r\nContent-Length: 2\r\nETag: \"test\"\r\nLast-Modified: Fri, 21 Nov 2025 01:00:00 GMT\r\nDate: Fri, 21 Nov 2025 02:00:00 GMT\r\nConnection: close\r\n\r\n{}",
+                "200 OK\r\nContent-Length: 2\r\nETag: \"test\"\r\nDate: Fri, 21 Nov 2025 03:00:00 GMT\r\nConnection: close\r\n\r\n{}",
+                "304 Not Modified\r\nDate: Fri, 21 Nov 2025 04:00:00 GMT\r\nConnection: close\r\n\r\n",
+                "200 OK\r\nContent-Length: 2\r\nDate: Fri, 21 Nov 2025 05:00:00 GMT\r\nConnection: close\r\n\r\n[]",
+            ].into_iter().enumerate() {
                 let (mut stream, _) = listener.accept().unwrap();
-                let headers: Vec<_> = BufReader::new(&stream)
+                let has_tag = BufReader::new(&stream)
                     .lines()
                     .map_while(std::result::Result::ok)
                     .take_while(|line| !line.is_empty())
-                    .collect();
-                if first {
-                    assert!(!headers
-                        .iter()
-                        .any(|line| line.to_lowercase().starts_with("if-none-match:")));
-                    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nETag: \"test\"\r\nConnection: close\r\n\r\n{}").unwrap();
-                } else {
-                    assert!(headers
-                        .iter()
-                        .any(|line| line.to_lowercase() == "if-none-match: \"test\""));
-                    stream
-                        .write_all(b"HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n")
-                        .unwrap();
-                }
+                    .any(|line| line.to_lowercase() == "if-none-match: \"test\"");
+                assert_eq!(has_tag, stage != 0);
+                write!(stream, "HTTP/1.1 {reply}").unwrap();
             }
         });
         let dir = tempfile::tempdir().unwrap();
         let market = Market::new(dir.path().to_path_buf(), Server::International).unwrap();
-        let response = market.request(&url, &[], None).unwrap();
-        let reused = market.request(&url, &[], Some(&response)).unwrap();
-        assert_eq!(response.etag, reused.etag);
-        assert_eq!(response.body, reused.body);
+        let mut response = market.request(&url, &[], None, true).unwrap();
+        for _ in 0..2 {
+            assert_eq!(response.quote_time(), Some("Fri, 21 Nov 2025 01:00:00 GMT"));
+            let reused = market.request(&url, &[], Some(&response), true).unwrap();
+            assert_eq!(response.etag, reused.etag);
+            assert_eq!(response.body, reused.body);
+            assert_eq!(response.quote_time(), reused.quote_time());
+            response = reused;
+        }
+        let changed = market.request(&url, &[], Some(&response), true).unwrap();
+        assert_eq!(changed.quote_time(), Some("Fri, 21 Nov 2025 05:00:00 GMT"));
         assert_ne!(
             market.snapshot_path("Standard"),
             market.snapshot_path("HC Forbidden Rites")
         );
         server.join().unwrap();
+    }
+
+    #[test]
+    fn international_quotes_merge_per_item_and_preserve_newer_rates() {
+        let types: Vec<String> = engine::call("types", Value::Null).unwrap();
+        let make_payload = |kind: &str, time: &str, rate: u32, lines: Value| {
+            json!({
+                "quoteTime": time,
+                "body": {
+                    "core": { "primary": "divine", "rates": { "exalted": rate, "chaos": 25 } },
+                    "items": if kind == "Currency" { json!([
+                        {"id":"d", "name":"Divine Orb"}, {"id":"c", "name":"Chaos Orb"},
+                        {"id":"e", "name":"Exalted Orb"}, {"id":"a", "name":"Orb of Annulment"},
+                        {"id":"q", "name":"Orb of Alchemy"}
+                    ]) } else { json!([]) },
+                    "lines": lines,
+                },
+            })
+        };
+        let merge = |time, rate, lines: Value, previous: Option<Value>| {
+            let payloads: HashMap<_, _> = types
+                .iter()
+                .map(|kind| {
+                    let lines = if kind == "Currency" {
+                        lines.clone()
+                    } else {
+                        json!([])
+                    };
+                    (kind, make_payload(kind, time, rate, lines))
+                })
+                .collect();
+            engine::call::<MarketUpdate>(
+                "snapshot",
+                json!({
+                    "league": "Standard", "payloads": payloads, "lifetime": 7200000,
+                    "previousQuotes": previous,
+                }),
+            )
+            .unwrap()
+        };
+        let first = merge(
+            "Fri, 21 Nov 2025 02:00:00 GMT",
+            1000,
+            json!([
+                {"id":"a", "primaryValue":0.2}, {"id":"q", "primaryValue":0.25},
+            ]),
+            None,
+        );
+        let older = merge(
+            "Fri, 21 Nov 2025 01:00:00 GMT",
+            500,
+            json!([
+                {"id":"a", "primaryValue":0.9},
+            ]),
+            Some(first.quotes),
+        );
+        assert_eq!(older.snapshot["prices"]["orb-of-annulment"]["amount"], 0.2);
+        assert_eq!(older.snapshot["rates"]["divineToExalted"], 1000);
+        assert_eq!(older.snapshot["capturedAt"], "2025-11-21T02:00:00.000Z");
+        let newer = merge(
+            "Fri, 21 Nov 2025 03:00:00 GMT",
+            1200,
+            json!([
+                {"id":"a", "maxVolumeCurrency":"exalted", "maxVolumeRate":0.1},
+            ]),
+            Some(older.quotes),
+        );
+        assert_eq!(newer.snapshot["prices"]["orb-of-annulment"]["amount"], 10);
+        assert_eq!(newer.snapshot["prices"]["orb-of-alchemy"]["amount"], 0.25);
+        assert_eq!(
+            newer.snapshot["prices"]["orb-of-alchemy"]["capturedAt"],
+            "2025-11-21T02:00:00.000Z"
+        );
+        assert_eq!(newer.snapshot["rates"]["divineToExalted"], 1200);
+        assert_eq!(newer.snapshot["capturedAt"], "2025-11-21T03:00:00.000Z");
     }
 }

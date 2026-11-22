@@ -6,7 +6,8 @@ import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
 import type { LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
-import { NINJA_TYPES, parseExchange } from "../worker/market-adapter.mjs";
+import { internationalSnapshot } from "../worker/international-market";
+import { NINJA_TYPES } from "../worker/market-adapter.mjs";
 
 function catalog(input: { economyLeagues?: Array<{ name: string; displayName?: string; hardcore?: boolean; isPrivate?: boolean }> }): LeagueCatalog {
   const leagues = new Map<string, LeagueOption>();
@@ -22,22 +23,10 @@ function catalog(input: { economyLeagues?: Array<{ name: string; displayName?: s
   return { leagues: [...leagues.values()], defaultLeague: [...leagues.values()].find((entry) => !entry.hardcore && !entry.permanent)?.id ?? "Standard", capturedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 3600000).toISOString() };
 }
 
-function snapshot(input: { league: string; payloads: Record<string, unknown>; lifetime: number }): MarketSnapshot {
-  const now = Date.now();
-  const capturedAt = new Date(now).toISOString();
-  const currency = parseExchange(input.payloads.Currency, ITEM_CATALOG, capturedAt);
-  if (!currency.rates) throw new Error("poe.ninja 未返回完整的 D/C/E 汇率");
-  const prices = {};
-  for (const type of NINJA_TYPES) {
-    if (type !== "Currency") Object.assign(prices, parseExchange(input.payloads[type], ITEM_CATALOG, capturedAt).prices);
-  }
-  return { league: normalizeLeague(input.league), capturedAt, expiresAt: new Date(now + input.lifetime).toISOString(), source: "poe.ninja PoE2 exchange (Most Popular)", rates: currency.rates, prices: Object.assign(prices, currency.prices) };
-}
-
 const api = {
   types: () => NINJA_TYPES,
   catalog,
-  snapshot,
+  snapshot: (input: Parameters<typeof internationalSnapshot>[0]) => internationalSnapshot(input, ITEM_CATALOG),
   tencentCatalog,
   tencentSnapshot: (input: Parameters<typeof tencentSnapshot>[0]) => tencentSnapshot(input, ITEM_CATALOG),
   validate: validateProfile,

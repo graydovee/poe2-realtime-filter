@@ -40,6 +40,15 @@ struct UpdateStatus {
 }
 
 impl UpdateStatus {
+    fn begin_check(&mut self) -> bool {
+        if !matches!(self.phase, "idle" | "current" | "available" | "error") {
+            return false;
+        }
+        self.phase = "checking";
+        self.error = None;
+        true
+    }
+
     fn view(&self) -> Value {
         json!({"phase": self.phase, "error": self.error, "receivedBytes": self.received_bytes, "totalBytes": self.total_bytes, "version": self.offer.as_ref().map(|u| &u.version)})
     }
@@ -640,29 +649,43 @@ fn update_status(state: State<'_, Desktop>) -> Result<Value> {
     Ok(state.update.lock().map_err(|e| e.to_string())?.view())
 }
 
-async fn check_update(app: tauri::AppHandle) {
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Value> {
+    let state = app.state::<Desktop>();
+    {
+        let mut update = state.update.lock().map_err(|e| e.to_string())?;
+        if !update.begin_check() {
+            return Ok(update.view());
+        }
+        let _ = app.emit("app-update", update.view());
+    }
+
     let result = match app.updater() {
         Ok(updater) => updater.check().await,
         Err(error) => Err(error),
     };
-    let state = app.state::<Desktop>();
-    if let Ok(mut update) = state.update.lock() {
-        match result {
-            Ok(offer) => {
-                update.phase = if offer.is_some() {
-                    "available"
-                } else {
-                    "current"
-                };
-                update.offer = offer;
-            }
-            Err(error) => {
-                update.phase = "error";
-                update.error = Some(format!("无法检查客户端更新 · {error}"));
-            }
+    let mut update = state.update.lock().map_err(|e| e.to_string())?;
+    match result {
+        Ok(offer) => {
+            update.phase = if offer.is_some() {
+                "available"
+            } else {
+                "current"
+            };
+            update.offer = offer;
         }
-        let _ = app.emit("app-update", update.view());
-    };
+        Err(error) => {
+            update.phase = if update.offer.is_some() {
+                "available"
+            } else {
+                "error"
+            };
+            update.error = Some(format!("无法检查客户端更新 · {error}"));
+        }
+    }
+    let status = update.view();
+    let _ = app.emit("app-update", &status);
+    Ok(status)
 }
 
 #[tauri::command]
@@ -804,7 +827,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
             .collect(),
         schedule,
         update: Mutex::new(UpdateStatus {
-            phase: "checking",
+            phase: "idle",
             ..Default::default()
         }),
     });
@@ -871,7 +894,10 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
             }
         });
     }
-    tauri::async_runtime::spawn(check_update(app.handle().clone()));
+    let update_app = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        let _ = check_update(update_app).await;
+    });
     Ok(())
 }
 
@@ -918,6 +944,7 @@ fn main() {
             local_sound,
             scheme_download,
             update_status,
+            check_update,
             update_download,
             update_install
         ])
@@ -933,6 +960,30 @@ mod updater_tests {
         io::{BufRead, BufReader, Write},
         net::TcpListener,
     };
+
+    #[test]
+    fn update_check_can_retry_and_preserves_updates_in_progress() {
+        let mut status = UpdateStatus {
+            phase: "idle",
+            ..Default::default()
+        };
+        assert!(status.begin_check());
+        assert_eq!(status.phase, "checking");
+        assert!(!status.begin_check());
+        for phase in ["current", "error", "available"] {
+            status.phase = phase;
+            status.error = Some("failed".into());
+            assert!(status.begin_check());
+            assert!(status.error.is_none());
+        }
+        status.bytes = Some(vec![1]);
+        for phase in ["downloading", "verifying", "ready", "installing"] {
+            status.phase = phase;
+            assert!(!status.begin_check());
+            assert_eq!(status.phase, phase);
+            assert_eq!(status.bytes.as_deref(), Some([1].as_slice()));
+        }
+    }
 
     #[test]
     fn updater_download_reports_progress_and_rejects_invalid_signature() {
