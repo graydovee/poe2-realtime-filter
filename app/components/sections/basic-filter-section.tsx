@@ -34,6 +34,13 @@ export function BasicFilterSection({ profile, onBaseChange }: {
   const visibleOptions = picker?.kind === "scan" && hideSubscriptions
     ? options.filter((option) => option.kind !== "subscribed")
     : options;
+  const optionGroups = new Map<string, BaseFilter[]>();
+  for (const option of visibleOptions) {
+    const version = option.kind === "downloaded" ? option.version : "";
+    const group = optionGroups.get(version);
+    if (group) group.push(option);
+    else optionGroups.set(version, [option]);
+  }
 
   function choose(selected: BaseFilter) {
     onBaseChange(selected);
@@ -123,15 +130,36 @@ export function BasicFilterSection({ profile, onBaseChange }: {
                   ? options.length ? "关闭「隐藏订阅过滤器」以查看订阅文件。" : "可选择本地文件或下载过滤器。"
                   : "关闭列表后，点击「下载过滤器」并选择来源。"
               }</p>}
-              {!busy && <div className="grid max-h-[45vh] gap-2 overflow-y-auto">
-                {visibleOptions.map((option) => <Button key={locationLabel(option)}
-                  size="sm" className="base-filter-option" onClick={() => choose(option)}>
-                  <span className="min-w-0 break-words">{option.name}</span>
-                  {picker.kind === "scan"
-                    ? option.kind === "subscribed" && <span className="text-xs text-ink-muted">{option.source === "online" ? "国际服订阅" : "WeGame 订阅"}</span>
-                    : <span className="min-w-0 break-all text-xs text-ink-muted">{locationLabel(option)}</span>}
-                </Button>)}
-              </div>}
+              {!busy && optionGroups.size > 0 && (
+                <div className="max-h-[45dvh] space-y-4 overflow-y-auto overscroll-contain py-1 pr-2 [scrollbar-gutter:stable]">
+                  {[...optionGroups].map(([version, group]) => {
+                    const names = new Map<string, number>();
+                    for (const option of group) names.set(option.name, (names.get(option.name) ?? 0) + 1);
+                    return (
+                      <div key={version}>
+                        {version && <h4 className="mb-2 text-xs font-medium text-ink-muted">版本 {version}</h4>}
+                        <ul className="space-y-2" role="list">
+                          {group.map((option) => {
+                            const detail = option.kind === "subscribed"
+                              ? option.source === "online" ? "国际服订阅" : "WeGame 订阅"
+                              : option.kind === "downloaded" && (names.get(option.name) ?? 0) > 1
+                                ? option.entry.split("/").slice(0, -1).join("/") || "默认目录"
+                                : undefined;
+                            return (
+                              <li key={locationLabel(option)}>
+                                <Button size="sm" className="h-auto w-full flex-col items-start gap-0.5 py-2 text-left" onClick={() => choose(option)}>
+                                  <span className="max-w-full [overflow-wrap:anywhere]">{option.name}</span>
+                                  {detail && <span className="max-w-full text-xs font-normal text-ink-muted [overflow-wrap:anywhere]">{detail}</span>}
+                                </Button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
           <div className="modal-actions">
