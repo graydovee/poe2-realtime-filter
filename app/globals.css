@@ -534,7 +534,7 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid rg
 .modal-card { width:min(420px,100%); padding:22px; border:1px solid rgba(200,164,92,.28); border-radius:6px; background:var(--surface-2); box-shadow:0 25px 80px rgba(0,0,0,.5); }
 .modal-card.modal-wide { width:min(1120px,calc(100vw - 2rem)); }
 .modal-card.modal-base-picker { width: min(580px, calc(100vw - 2rem)); }
-.base-filter-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 36px; height: auto; padding: 8px 12px; text-align: left; white-space: normal; }
+.base-filter-option { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-height: 36px; height: auto; padding: 8px 12px; text-align: left; white-space: normal; }
 .modal-card > h3 { margin:0 0 10px; font-size:17px; }
 .modal-card:not(.modal-wide) p { color:var(--muted); font-size:12px; line-height:1.7; }
 .modal-card label:not(:has([role="switch"])) { display:block; margin-top:16px; }

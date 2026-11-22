@@ -121,6 +121,7 @@ export type FilterRule = {
 
 export type BaseFilter =
   | { kind: "local"; path: string; name: string }
+  | { kind: "subscribed"; source: "online" | "wegame"; directory: string; entry: string; name: string }
   | { kind: "downloaded"; source: string; version: string; entry: string; name: string };
 
 export type FilterProfile = {

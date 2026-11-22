@@ -143,13 +143,14 @@ function validateSafety(
   };
 }
 
-export function generateFilter(profile: FilterProfile, baseline: string, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean; baselineName?: string; distinguishCustom?: boolean } = {}): GeneratedBundle {
-  const baselineFile = options.baselineName ?? baselineFileFor(profile);
+export function generateFilter(profile: FilterProfile, baseline: string | null, inputSnapshot?: MarketSnapshot, options: { includeMarketTimestamp?: boolean; baselineName?: string; distinguishCustom?: boolean } = {}): GeneratedBundle {
+  const standalone = baseline === null;
+  const baselineFile = standalone ? "" : options.baselineName ?? baselineFileFor(profile);
   const league = profile.league ?? "Standard";
   const snapshot = inputSnapshot && inputSnapshot.league === league && snapshotUsable(inputSnapshot)
     ? inputSnapshot
     : { ...FALLBACK_SNAPSHOT, league };
-  const skipped = new Set(profile.skippedItemIds ?? []);
+  const skipped = new Set(standalone ? [] : profile.skippedItemIds ?? []);
   const rawRules = profile.rules ?? [];
   const rules = resolveAutoRanges(rawRules.filter((rule) => rule.enabled), snapshot);
   const autoDisabled = rules.filter((rule) => !rule.enabled).map((rule) => rule.name);
@@ -158,11 +159,13 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
   const matched = new Set<string>();
   const applied = new Map<string, { rule: FilterRule; count: number }>();
-  const inherited = rawRules.some((rule) => rule.enabled && rule.followBaseline) ? inspectBaseStyles(baseline) : {};
+  const followsBaseline = rawRules.some((rule) => rule.enabled && rule.followBaseline);
+  const inherited = baseline !== null && followsBaseline ? inspectBaseStyles(baseline) : {};
   const warnings = rawRules.flatMap((rule) => {
     const warning = rule.enabled && rule.followBaseline ? inherited[rule.id]?.warning : undefined;
     return warning ? [warning] : [];
   });
+  if (standalone && followsBaseline) warnings.push("跟随基础过滤器的规则使用游戏默认样式。");
   const soundFiles = new Set<string>();
   let unpriced = 0;
   let ambiguous = 0;
@@ -187,34 +190,35 @@ export function generateFilter(profile: FilterProfile, baseline: string, inputSn
     }
   }
 
-  if (!rawRules.some((rule) => rule.enabled)) warnings.push("没有启用任何自定义规则，输出与基础过滤器完全一致。");
+  const defaultDisplay = standalone ? "使用游戏默认显示" : "沿用基础过滤器规则";
+  if (!rawRules.some((rule) => rule.enabled)) warnings.push("当前未启用规则，所有物品" + defaultDisplay + "。");
   if (autoDisabled.length) warnings.push(autoDisabled.join("、") + " 跟随市价的价格档因缺少锚点行情被禁用。");
   const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id)).map((rule) => rule.name);
   if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
-    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，其余物品沿用基础过滤器规则。");
+    warnings.push("当前没有有效的 poe.ninja 价格或汇率快照，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
   }
   if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
-  if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项沿用基础过滤器规则，避免误覆盖其他物品。");
+  if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项" + defaultDisplay + "。");
   if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
 
-  const safetyReport = validateSafety(baselineFile, baseline, hidden, skipped, warnings, snapshot.rates?.divineToExalted);
+  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
-    "# Base: " + baselineFile,
+    standalone ? "# Mode: custom rules" : "# Base: " + baselineFile,
     "# League: " + league,
-    ...(!options.baselineName ? ["# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness]] : []),
+    ...(!standalone && !options.baselineName ? ["# Strictness: " + profile.strictness + " - " + STRICTNESS_LABELS[profile.strictness]] : []),
     "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
     "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
-    "# Safety: 未配置的动作交给基础过滤器；隐藏规则会让安全检查失败。",
+    standalone ? "# Unmatched items: game defaults" : "# Safety: 未配置的动作交给基础过滤器；隐藏规则会让安全检查失败。",
     "",
   ].join("\n");
-  const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + baseline;
+  const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + (baseline ?? "Show\n");
   for (const match of filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)) soundFiles.add(match[1]);
   return {
     filterFile,
     baselineFile,
-    fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + (options.baselineName ? "" : "-" + BASELINE_NAMES[profile.strictness].toLowerCase()) + ".filter",
+    fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + (options.baselineName || standalone ? "" : "-" + BASELINE_NAMES[profile.strictness].toLowerCase()) + ".filter",
     soundFiles: [...soundFiles],
     appliedRules: [...applied.values()].map(({ rule, count }) => ({ ruleId: rule.id, ruleName: rule.name, itemCount: count })),
     safetyReport: { ...safetyReport, unpricedItems: unpriced, ambiguousItems: ambiguous },

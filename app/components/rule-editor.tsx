@@ -104,6 +104,7 @@ function pickEffects(preset: EffectPreset): RuleEffects {
 }
 
 function AppearancePreview({ effects, name, file, base }: { effects: RuleEffects; name: string; file?: File; base?: BaseFilter }) {
+  const defaultStyleLabel = base ? "沿用基础" : "游戏默认";
   const { color: iconColor, shape } = iconParts(effects.icon);
   const [beamColor] = (effects.beam ?? "").split(" ");
   const beam = colorValues[beamColor] ?? "transparent";
@@ -152,13 +153,13 @@ function AppearancePreview({ effects, name, file, base }: { effects: RuleEffects
       </div>
       <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] content-center gap-x-3 gap-y-2 text-xs leading-relaxed">
         <dt className="text-ink-muted">光柱</dt>
-        <dd className="text-ink/90">{effects.beam ? (colorNames[effects.beam.split(" ")[0]] ?? effects.beam) + (effects.beam.endsWith("Temp") ? "（临时）" : "") : "沿用基础"}</dd>
+        <dd className="text-ink/90">{effects.beam ? (colorNames[effects.beam.split(" ")[0]] ?? effects.beam) + (effects.beam.endsWith("Temp") ? "（临时）" : "") : defaultStyleLabel}</dd>
         <dt className="text-ink-muted">地图图标</dt>
-        <dd className="text-ink/90">{effects.icon ? describeIcon(effects.icon) : "沿用基础"}</dd>
+        <dd className="text-ink/90">{effects.icon ? describeIcon(effects.icon) : defaultStyleLabel}</dd>
         <dt className="text-ink-muted">字体</dt>
-        <dd className="text-ink/90">{font.fontSize ? font.fontSize + " 号" : "沿用基础"}</dd>
+        <dd className="text-ink/90">{font.fontSize ? font.fontSize + " 号" : defaultStyleLabel}</dd>
         <dt className="text-ink-muted">音效</dt>
-        <dd className="text-ink/90">{effects.sound ? (effects.sound.type === "builtin" ? "内置 " + effects.sound.id + " · 音量 " + effects.sound.volume : effects.sound.fileName) : "沿用基础"}</dd>
+        <dd className="text-ink/90">{effects.sound ? (effects.sound.type === "builtin" ? "内置 " + effects.sound.id + " · 音量 " + effects.sound.volume : effects.sound.fileName) : defaultStyleLabel}</dd>
       </dl>
     </div>
   );
@@ -272,6 +273,7 @@ export function RuleEditor({
   const priceConditionLocked = priceConditionOn && !itemConditionOn;
   const selected = presets.find((preset) => preset.id === rule.effectPresetId);
   const filtered = query.trim() ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(query.trim())) : presets;
+  const defaultStyleLabel = base ? "沿用基础" : "游戏默认";
   const soundValue = !rule.effects.sound ? NONE : rule.effects.sound.type === "custom" ? CUSTOM_SOUND : rule.effects.sound.type === "builtin" ? "builtin:" + rule.effects.sound.id : "base:" + rule.effects.sound.fileName;
 
   function applyPreset(preset: EffectPreset) {
@@ -410,7 +412,7 @@ export function RuleEditor({
         {canFollow && <div className="rounded-sm border border-line bg-surface-2 p-3">
           <Switch checked={Boolean(rule.followBaseline)} onCheckedChange={(followBaseline) => onChange({ followBaseline })} label="跟随基础过滤器" />
           {rule.followBaseline && <p className="mt-2 text-xs text-ink-muted">
-            {!base ? "选择基础过滤器后自动读取特效。" : inherited?.warning ?? (inherited ? describeEffects(inherited.effects) : "基础特效尚未读取")}
+            {!base ? "当前使用游戏默认样式。" : inherited?.warning ?? (inherited ? describeEffects(inherited.effects) : "基础特效尚未读取")}
           </p>}
         </div>}
         <div className="rounded-sm border border-line bg-surface-2 p-3">
@@ -450,10 +452,10 @@ export function RuleEditor({
         <Disclosure summary="自定义外观" className="border-t border-line pt-1">
           <div className="grid gap-3 pt-3 sm:grid-cols-2">
             <Field label="光柱">
-              <TextInput aria-label={rule.name + " 光柱"} placeholder="PlayEffect，留空沿用基础" value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
+              <TextInput aria-label={rule.name + " 光柱"} placeholder={`PlayEffect，留空使用${defaultStyleLabel === "沿用基础" ? "基础样式" : "游戏默认样式"}`} value={rule.effects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
             </Field>
             <Field label="地图图标">
-              <TextInput aria-label={rule.name + " 地图图标"} placeholder="MinimapIcon，留空沿用基础" value={rule.effects.icon ?? ""} onChange={(event) => editEffects({ icon: event.target.value })} />
+              <TextInput aria-label={rule.name + " 地图图标"} placeholder={`MinimapIcon，${defaultStyleLabel}`} value={rule.effects.icon ?? ""} onChange={(event) => editEffects({ icon: event.target.value })} />
             </Field>
             <Field label="字号" hint="18–45">
               <div className="flex gap-2">
@@ -462,7 +464,7 @@ export function RuleEditor({
                   min={18}
                   max={45}
                   aria-label={rule.name + " 字号"}
-                  placeholder="沿用基础"
+                  placeholder={defaultStyleLabel}
                   value={font.fontSize ?? ""}
                   onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
                 />
@@ -478,7 +480,7 @@ export function RuleEditor({
             ).map(([key, label]) => (
               <Field key={key} label={label}>
                 <div className="flex gap-2">
-                  <TextInput aria-label={rule.name + " " + label} placeholder="R G B (A)，留空沿用基础" value={font[key] ?? ""} onChange={(event) => editFont({ [key]: event.target.value })} />
+                  <TextInput aria-label={rule.name + " " + label} placeholder={`R G B (A)，${defaultStyleLabel}`} value={font[key] ?? ""} onChange={(event) => editFont({ [key]: event.target.value })} />
                   <ColorSwatch color={font[key]} />
                 </div>
               </Field>
@@ -497,7 +499,7 @@ export function RuleEditor({
                     } else editEffects({ sound: { type: "neversink", fileName: value.slice(5) } });
                   }}
                   options={[
-                    { value: NONE, label: "沿用基础" },
+                    { value: NONE, label: defaultStyleLabel },
                     ...EFFECT_PRESETS.sounds.flatMap((sound) => sound.type === "builtin" ? [{
                       value: "builtin:" + sound.id,
                       label: "内置音效 " + sound.id + " · 音量 " + sound.volume,
@@ -506,6 +508,9 @@ export function RuleEditor({
                     { value: CUSTOM_SOUND, label: "自定义上传…" },
                   ]}
                 />
+                {!base && !rule.followBaseline && rule.effects.sound?.type === "neversink" && (
+                  <p className="text-xs text-ember">请选择内置音效或上传音效，替换「{rule.effects.sound.fileName}」。</p>
+                )}
                 {rule.effects.sound?.type === "custom" && (
                   <FileInput
                     label={rule.name + " 自定义音效"}

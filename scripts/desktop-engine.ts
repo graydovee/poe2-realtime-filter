@@ -39,10 +39,10 @@ const api = {
   validate: validateProfile,
   baseStyles: (input: string) => inspectBaseStyles(input),
   requiresMarket: (input: unknown) => validateProfile(input).rules.some((rule) => rule.enabled && rule.target.priceEnabled !== false && Boolean(rule.target.range)),
-  generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string; baselineName: string; market?: MarketSnapshot }) => {
+  generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string | null; baselineName: string | null; market?: MarketSnapshot }) => {
     const valid = validateProfile(profile);
     const quote = market?.league === valid.league && Date.parse(market.expiresAt) >= Date.now() ? market : { ...FALLBACK_SNAPSHOT, league: valid.league };
-    return { ...generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName, distinguishCustom: true }), market: quote };
+    return { ...generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName: baselineName ?? undefined, distinguishCustom: true }), market: quote };
   },
 };
 

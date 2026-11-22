@@ -51,6 +51,7 @@ export default function HomePage() {
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState("");
   const requestVersion = useRef(0);
+  const baseFilterChanged = useRef(false);
   useEffect(() => { window.scrollTo(0, 0); }, [view]);
 
   const base = profile.baseFilter;
@@ -209,6 +210,7 @@ export default function HomePage() {
       }));
     }
     requestVersion.current += 1;
+    baseFilterChanged.current = false;
     setSchemeId(scheme?.id ?? null);
     setSchemeName(scheme?.name ?? "");
     const league = leagueCatalog?.defaultLeague ?? DEFAULT_PROFILE.league;
@@ -241,7 +243,7 @@ export default function HomePage() {
         if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
         uploads[sound.fileName] = await fileToBase64(file);
       }
-      await local<string>("scheme_save", { edit: { id: schemeId, name: name.trim(), profile, sounds: uploads } });
+      await local<string>("scheme_save", { edit: { id: schemeId, name: name.trim(), profile, sounds: uploads, baseFilterChanged: baseFilterChanged.current } });
       setNameDialog(false);
       setSaveFeedback(`「${name.trim()}」已保存`);
       setSchemeRevision((current) => current + 1);
@@ -323,11 +325,15 @@ export default function HomePage() {
             <div className="flex min-w-0 flex-col gap-4">
               <BasicFilterSection
                 profile={profile}
-                onBaseChange={(base) => update("baseFilter", base)}
+                onBaseChange={(baseFilter) => {
+                  baseFilterChanged.current = true;
+                  setDirty(true);
+                  setProfile((current) => ({ ...current, baseFilter, baseFilterHint: undefined }));
+                }}
                 onLocaleChange={(locale: Locale) => update("locale", locale)}
               />
               {baseStylesError && <p role="alert" className="text-sm text-ember">{baseStylesError}</p>}
-              <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
+              {base && <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />}
               <RulesSection
                 profile={profile}
                 market={selectedMarket}

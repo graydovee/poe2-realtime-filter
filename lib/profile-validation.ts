@@ -58,7 +58,12 @@ export function validateProfile(input:unknown):FilterProfile {
  const base=p.baseFilter;
  const name=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=260&&!/[\x00-\x1f]/.test(value);
  const path=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=32767&&!/[\x00-\x1f]/.test(value);
- if(base!==undefined&&(!base||!name(base.name)||!(base.kind==='local'?path(base.path):base.kind==='downloaded'&&name(base.source)&&name(base.version)&&path(base.entry))))throw new Error('无效的基础过滤器来源');
+ if (base !== undefined) {
+  const validLocation = base?.kind === 'local' && path(base.path)
+   || base?.kind === 'subscribed' && ['online', 'wegame'].includes(base.source) && path(base.directory) && path(base.entry)
+   || base?.kind === 'downloaded' && name(base.source) && name(base.version) && path(base.entry);
+  if (!validLocation || !name(base.name)) throw new Error('无效的基础过滤器来源');
+ }
  if(p.baseFilterHint!==undefined&&!name(p.baseFilterHint))throw new Error('无效的基础过滤器名称');
  if(typeof p.league!=='string'||!p.league.trim()||p.league.length>120||typeof p.originalLeague!=='string'||!p.originalLeague.trim()||p.originalLeague.length>120)throw new Error('无效赛季');
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');

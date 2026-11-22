@@ -83,10 +83,12 @@ pub struct Edit {
     pub name: String,
     pub profile: Value,
     pub sounds: BTreeMap<String, String>,
+    pub base_filter_changed: Option<bool>,
 }
 
 pub struct Store {
     root: PathBuf,
+    downloads: base_filter::SourceDownloads,
     pub default_game: PathBuf,
 }
 
@@ -272,7 +274,7 @@ fn expand_filter(
                 }
             };
             if cache_root.is_some_and(|root| !imported.starts_with(root)) {
-                return Err(format!("过滤器依赖「{reference}」超出下载目录"));
+                return Err(format!("过滤器依赖「{reference}」超出基础过滤器目录"));
             }
             let content = base_filter::read_filter(&imported)?;
             expand_filter(&imported, &content, cache_root, parents, expanded)?;
@@ -340,6 +342,7 @@ impl Store {
     pub fn new(root: PathBuf, game: PathBuf) -> Self {
         Self {
             root,
+            downloads: base_filter::SourceDownloads::default(),
             default_game: game,
         }
     }
@@ -445,7 +448,28 @@ impl Store {
             return self.add(library, &edit.name, edit.profile, edit.sounds);
         };
         let scheme = Self::get_mut(library, &id)?;
-        scheme.profile = engine::call("validate", edit.profile)?;
+        let mut profile = edit.profile;
+        if edit.base_filter_changed == Some(false) {
+            if let (Some(draft), Some(current)) =
+                (profile.as_object_mut(), scheme.profile.as_object())
+            {
+                // A tray update may have replaced the base while the draft was open.
+                for field in ["baseFilter", "baseFilterHint"] {
+                    if let Some(value) = current.get(field) {
+                        draft.insert(field.into(), value.clone());
+                    } else {
+                        draft.remove(field);
+                    }
+                }
+            }
+        }
+        let profile: Value = engine::call("validate", profile)?;
+        if scheme.profile["baseFilter"] != profile["baseFilter"]
+            || scheme.profile["baseFilterHint"] != profile["baseFilterHint"]
+        {
+            scheme.status.clear();
+        }
+        scheme.profile = profile;
         self.store_sounds(scheme, edit.sounds)?;
         self.persist(library)?;
         Ok(id)
@@ -556,6 +580,18 @@ impl Store {
         // A share code may describe a baseline but never authorize reading a local path.
         if let Some(fields) = share.profile.as_object_mut() {
             fields.remove("baseFilter");
+            if let Some(name) = fields.get("baseFilterHint").and_then(Value::as_str) {
+                let name = name.to_lowercase();
+                // An unavailable directory leaves the reference available for manual selection.
+                let mut matching = base_filter::scan(&self.base_directory(library))
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|base| base.name().to_lowercase() == name);
+                if let (Some(base), None) = (matching.next(), matching.next()) {
+                    fields.insert("baseFilter".into(), json!(base));
+                    fields.remove("baseFilterHint");
+                }
+            }
         }
         self.add(
             library,
@@ -630,16 +666,70 @@ impl Store {
         base_filter::cached_source(&self.root, source)
     }
 
-    pub fn source_download(&self, source: &str) -> Result<Vec<BaseFilter>> {
-        base_filter::download(&self.root, source)
+    pub fn source_download(
+        &self,
+        source: &str,
+        versions: &BTreeSet<String>,
+    ) -> Result<Vec<BaseFilter>> {
+        self.downloads.download(&self.root, source, versions)
     }
 
-    fn baseline(&self, profile: &Value) -> Result<Baseline> {
+    pub fn download_offers(
+        &self,
+        names: &[String],
+    ) -> Result<BTreeMap<String, Vec<base_filter::DownloadOffer>>> {
+        self.downloads.offers(&self.root, names)
+    }
+
+    pub fn downloaded_base(scheme: &Scheme) -> Option<BaseFilter> {
+        let base = serde_json::from_value(scheme.profile["baseFilter"].clone()).ok()?;
+        matches!(base, BaseFilter::Downloaded { .. }).then_some(base)
+    }
+
+    pub fn set_downloaded_base(
+        &self,
+        scheme: &mut Scheme,
+        base: &BaseFilter,
+        install: bool,
+        market: Option<Value>,
+    ) -> Result<()> {
+        let BaseFilter::Downloaded { version, .. } = base else {
+            return Err("下载的基础过滤器来源无效".into());
+        };
+        let mut updated = scheme.clone();
+        let profile = updated.profile.as_object_mut().ok_or("方案格式无效")?;
+        profile.insert("baseFilter".into(), json!(base));
+        profile.remove("baseFilterHint");
+        if install {
+            self.install(&mut updated, market, None)?;
+        } else {
+            let baseline = self.load_baseline(base)?;
+            self.prepare_sounds(&baseline.text, Some(&baseline), Some(&updated))?;
+        }
+        updated.status = if install {
+            format!("基础过滤器已更新至 {version} · {}", updated.status)
+        } else {
+            format!("基础过滤器已就绪 · {version}")
+        };
+        *scheme = updated;
+        Ok(())
+    }
+
+    fn baseline(&self, profile: &Value) -> Result<Option<Baseline>> {
         if profile["baseFilter"].is_null() {
-            return Err("请先选择基础过滤器".into());
+            if let Some(name) = profile["baseFilterHint"].as_str() {
+                return Err(format!(
+                    "未能匹配基础过滤器「{name}」，请在编辑页选择或清除基础过滤器"
+                ));
+            }
+            return Ok(None);
         }
         let base: BaseFilter = serde_json::from_value(profile["baseFilter"].clone())
             .map_err(|_| "基础过滤器来源无效，请重新选择")?;
+        self.load_baseline(&base).map(Some)
+    }
+
+    fn load_baseline(&self, base: &BaseFilter) -> Result<Baseline> {
         let mut baseline = base.load(&self.root)?;
         let mut expanded = String::new();
         expand_filter(
@@ -654,7 +744,7 @@ impl Store {
     }
 
     pub fn base_styles(&self, base: BaseFilter) -> Result<Value> {
-        let baseline = self.baseline(&json!({"baseFilter": base}))?;
+        let baseline = self.load_baseline(&base)?;
         engine::call("baseStyles", json!(baseline.text))
     }
 
@@ -665,8 +755,12 @@ impl Store {
         }
         let parent = baseline.path.parent().ok_or("无法确定基础过滤器目录")?;
         let mut candidates = vec![parent.join(reference)];
-        if baseline.cache_root.is_none() && !reference.is_absolute() {
-            candidates.push(game.join(reference));
+        if !reference.is_absolute() {
+            if let Some(root) = &baseline.game_root {
+                candidates.push(root.join(reference));
+            } else if baseline.cache_root.is_none() {
+                candidates.push(game.join(reference));
+            }
         }
         for path in candidates {
             let absolute = match path.canonicalize() {
@@ -679,7 +773,7 @@ impl Store {
                 .as_ref()
                 .is_some_and(|root| !absolute.starts_with(root))
             {
-                return Err(format!("音效「{name}」超出下载过滤器的目录"));
+                return Err(format!("音效「{name}」超出基础过滤器目录"));
             }
             let bytes = base_filter::read_limited(&absolute, AUDIO_MAX)
                 .map_err(|error| format!("无法读取基础过滤器音效「{name}」：{error}"))?;
@@ -695,27 +789,32 @@ impl Store {
     }
 
     pub fn preview_base_audio(&self, base: BaseFilter, name: &str) -> Result<Vec<u8>> {
-        let baseline = self.baseline(&json!({"baseFilter": base}))?;
+        let baseline = self.load_baseline(&base)?;
         self.base_audio(&baseline, name, &self.base_directory(&self.load()?))
     }
 
     fn generate(
         &self,
         profile: &Value,
-        baseline: &Baseline,
+        baseline: Option<&Baseline>,
         market: Option<Value>,
     ) -> Result<Value> {
         engine::call(
             "generate",
-            json!({ "profile": profile, "baseline": baseline.text, "baselineName": baseline.name, "market": market }),
+            json!({
+                "profile": profile,
+                "baseline": baseline.map(|base| &base.text),
+                "baselineName": baseline.map(|base| &base.name),
+                "market": market,
+            }),
         )
     }
 
     pub fn preview(&self, profile: Value, market: Option<Value>) -> Result<Value> {
         let baseline = self.baseline(&profile)?;
-        let mut result = self.generate(&profile, &baseline, market)?;
+        let mut result = self.generate(&profile, baseline.as_ref(), market)?;
         let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
-        let (text, _) = self.prepare_sounds(text, &baseline, None)?;
+        let (text, _) = self.prepare_sounds(text, baseline.as_ref(), None)?;
         result["filterFile"] = json!(text);
         Ok(result)
     }
@@ -723,11 +822,12 @@ impl Store {
     fn prepare_sounds(
         &self,
         text: &str,
-        baseline: &Baseline,
+        baseline: Option<&Baseline>,
         scheme: Option<&Scheme>,
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
+        let base_text = baseline.map_or("", |base| base.text.as_str());
         let overlay = text
-            .strip_suffix(&baseline.text)
+            .strip_suffix(base_text)
             .ok_or("生成结果缺少基础过滤器正文")?;
         let game = match scheme.and_then(|scheme| scheme.installed.as_ref()) {
             Some(installed) => installed.directory.clone(),
@@ -737,7 +837,7 @@ impl Store {
         let mut assets = BTreeMap::new();
         let mut total = 0;
         let mut output = String::with_capacity(text.len());
-        for (part, is_overlay) in [(overlay, true), (baseline.text.as_str(), false)] {
+        for (part, is_overlay) in [(overlay, true), (base_text, false)] {
             for line in part.split_inclusive('\n') {
                 let trimmed = line.trim_end_matches(['\r', '\n']);
                 let end = &line[trimmed.len()..];
@@ -776,7 +876,13 @@ impl Store {
                         match if custom {
                             self.audio(scheme, name)
                         } else {
-                            self.base_audio(baseline, name, &game)
+                            baseline
+                                .ok_or_else(|| {
+                                    format!(
+                                        "请选择内置音效或上传音效，替换基础过滤器音效「{name}」"
+                                    )
+                                })
+                                .and_then(|base| self.base_audio(base, name, &game))
                         } {
                             Ok(bytes) => {
                                 let extension = Path::new(name)
@@ -817,7 +923,7 @@ impl Store {
         market: Option<Value>,
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         let baseline = self.baseline(&scheme.profile)?;
-        let result = self.generate(&scheme.profile, &baseline, market)?;
+        let result = self.generate(&scheme.profile, baseline.as_ref(), market)?;
         if engine::call::<bool>("requiresMarket", &scheme.profile)?
             && result["market"]["rates"].is_null()
         {
@@ -827,7 +933,7 @@ impl Store {
             return Err("规则未通过安全检查，请先查看预览报告".into());
         }
         let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
-        self.prepare_sounds(text, &baseline, Some(scheme))
+        self.prepare_sounds(text, baseline.as_ref(), Some(scheme))
     }
 
     fn filter_path(directory: &Path, name: &str) -> Result<PathBuf> {
@@ -1029,6 +1135,231 @@ mod tests {
     }
 
     #[test]
+    fn import_matches_only_unique_names_inside_the_game_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let game = temp.path().join("custom-game");
+        let online = game.join("OnlineFilters");
+        let wegame = game.join("WeGameFilters").join("author");
+        fs::create_dir_all(&online).unwrap();
+        fs::create_dir_all(&wegame).unwrap();
+        fs::write(game.join("Reference.FILTER"), "Show\n\tSetFontSize 32\n").unwrap();
+        fs::write(
+            online.join("ABC123"),
+            "\u{feff}#Online Item Filter\r\n#name:Subscribed Example\r\nShow\r\n",
+        )
+        .unwrap();
+        fs::write(online.join("bad-cache"), "#name:Looks Valid\nShow\n").unwrap();
+        fs::write(
+            wegame.join("作者.filter"),
+            "Show\n\tCustomAlertSound \"WeGameFilters/author/notice.ogg\" 250\n",
+        )
+        .unwrap();
+        fs::write(wegame.join("notice.ogg"), b"test asset").unwrap();
+        fs::write(
+            wegame.join("Reference.filter"),
+            "# poe2-filter generated overlay\nShow\n",
+        )
+        .unwrap();
+        let mut library = store.load().unwrap();
+        library.settings.filter_directory = Some(game.clone());
+        let share = |name: &str, hint: Option<&str>| {
+            let mut profile = json!({
+                "schemaVersion": 2, "league": "Standard", "locale": "cn",
+                "rules": [], "skippedItemIds": [],
+                "baseFilter": {"kind":"local", "path": "DO NOT USE", "name":"spoofed"}
+            });
+            if let Some(hint) = hint {
+                profile["baseFilterHint"] = json!(hint);
+            }
+            share_code::encode(&Share {
+                name: name.into(),
+                profile,
+            })
+            .unwrap()
+        };
+        for (name, hint, kind, source) in [
+            ("本地", "reference.filter", "local", Value::Null),
+            (
+                "国际服",
+                "SUBSCRIBED EXAMPLE",
+                "subscribed",
+                json!("online"),
+            ),
+            ("WeGame", "作者.filter", "subscribed", json!("wegame")),
+        ] {
+            let id = store
+                .import(&mut library, &share(name, Some(hint)), None)
+                .unwrap();
+            let scheme = Store::get(&library, &id).unwrap();
+            assert_eq!(scheme.profile["baseFilter"]["kind"], kind);
+            assert_eq!(scheme.profile["baseFilter"]["source"], source);
+            assert!(scheme.profile["baseFilterHint"].is_null());
+            let (_, sounds) = store.prepare_filter(scheme, None).unwrap();
+            assert_eq!(sounds.len(), usize::from(name == "WeGame"));
+            let shared = share_code::decode(&Store::share(scheme).unwrap()).unwrap();
+            assert!(shared.profile["baseFilter"].is_null());
+            assert_eq!(
+                shared.profile["baseFilterHint"],
+                scheme.profile["baseFilter"]["name"]
+            );
+        }
+        fs::write(wegame.join("reference.filter"), "Show\n").unwrap();
+        for (name, hint) in [
+            ("重名", "reference.filter"),
+            ("坏缓存", "Looks Valid"),
+            ("缺失", "unavailable.filter"),
+            ("路径", "../Reference.FILTER"),
+        ] {
+            let id = store
+                .import(&mut library, &share(name, Some(hint)), None)
+                .unwrap();
+            let scheme = Store::get(&library, &id).unwrap();
+            assert!(scheme.profile["baseFilter"].is_null());
+            assert_eq!(scheme.profile["baseFilterHint"], hint);
+            assert!(store
+                .preview(scheme.profile.clone(), None)
+                .unwrap_err()
+                .contains(hint));
+        }
+        let id = store
+            .import(&mut library, &share("独立", None), None)
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        assert!(scheme.profile["baseFilter"].is_null());
+        assert!(store
+            .prepare_filter(scheme, None)
+            .unwrap()
+            .0
+            .ends_with("\nShow\n"));
+    }
+
+    #[test]
+    fn downloaded_base_upgrade_keeps_installed_version_until_resources_validate() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let entry = "Strict.filter";
+        let source = "neversink";
+        let base = |version: &str| BaseFilter::Downloaded {
+            source: source.into(),
+            version: version.into(),
+            entry: entry.into(),
+            name: entry.into(),
+        };
+        let cache = store.root.join("base-filters").join(source);
+        for (version, text) in [
+            ("0.1.0", "Show\n SetFontSize 33\n"),
+            (
+                "0.2.0",
+                "Show\n SetFontSize 42\n CustomAlertSound \"ping.ogg\" 250\n",
+            ),
+        ] {
+            fs::create_dir_all(cache.join(version)).unwrap();
+            fs::write(cache.join(version).join(entry), text).unwrap();
+        }
+        let mut library = store.load().unwrap();
+        let mut initial = profile(&store);
+        initial["baseFilter"] = json!(base("0.1.0"));
+        let id = store
+            .add(&mut library, "下载版", initial.clone(), BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        store.install(scheme, None, None).unwrap();
+        let installed = store.default_game.join("下载版.filter");
+        let previous = fs::read(&installed).unwrap();
+        assert!(store
+            .set_downloaded_base(scheme, &base("0.2.0"), true, None)
+            .unwrap_err()
+            .contains("ping.ogg"));
+        assert_eq!(fs::read(&installed).unwrap(), previous);
+        assert_eq!(scheme.profile["baseFilter"]["version"], "0.1.0");
+
+        fs::write(cache.join("0.2.0").join("ping.ogg"), b"fake audio").unwrap();
+        store
+            .set_downloaded_base(scheme, &base("0.2.0"), true, None)
+            .unwrap();
+        assert_eq!(scheme.profile["baseFilter"]["version"], "0.2.0");
+        let text = fs::read_to_string(&installed).unwrap();
+        assert!(text.contains("SetFontSize 42"));
+        assert!(text.contains("CustomAlertSound \"poe2rf-"));
+        store
+            .save(
+                &mut library,
+                Edit {
+                    id: Some(id.clone()),
+                    name: "下载版".into(),
+                    profile: initial,
+                    sounds: BTreeMap::new(),
+                    base_filter_changed: Some(false),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            Store::get(&library, &id).unwrap().profile["baseFilter"]["version"],
+            "0.2.0"
+        );
+    }
+
+    #[test]
+    fn standalone_install_refresh_and_zip_apply_rules_and_check_assets() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut draft = profile(&store);
+        draft.as_object_mut().unwrap().remove("baseFilter");
+        draft["rules"] = json!([{
+            "id": "standalone", "name": "显示", "enabled": true, "hidden": false,
+            "target": {"itemIds": ["divine-orb"]},
+            "effects": {"font": {"fontSize": 38}, "sound": {"type": "custom", "fileName": "ping.ogg"}}
+        }]);
+        draft["skippedItemIds"] = json!(["divine-orb"]);
+        let preview = store.preview(draft.clone(), None).unwrap();
+        assert!(preview["filterFile"]
+            .as_str()
+            .unwrap()
+            .contains("SetFontSize 38"));
+        assert!(preview["filterFile"]
+            .as_str()
+            .unwrap()
+            .ends_with("\nShow\n"));
+        assert_eq!(preview["baselineFile"], "");
+        let sounds = BTreeMap::from([(
+            "ping.ogg".into(),
+            base64::engine::general_purpose::STANDARD.encode(b"fixture audio"),
+        )]);
+        let id = store.add(&mut library, "独立方案", draft, sounds).unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        let (text, assets) = store.prepare_filter(scheme, None).unwrap();
+        assert!(text.contains("SetFontSize 38"));
+        assert_eq!(assets.len(), 1);
+        let bundle = filter_zip(&scheme.name, &text, assets).unwrap();
+        assert_eq!(
+            zip::ZipArchive::new(std::io::Cursor::new(bundle))
+                .unwrap()
+                .len(),
+            2
+        );
+        store.install(scheme, None, None).unwrap();
+        let installed = store.default_game.join("独立方案.filter");
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        scheme.profile["rules"][0]["effects"]["font"]["fontSize"] = json!(40);
+        store.install(scheme, None, None).unwrap();
+        let refreshed = fs::read_to_string(&installed).unwrap();
+        assert!(refreshed.contains("SetFontSize 40"));
+        scheme.profile["rules"][0]["effects"]["sound"]["type"] = json!("neversink");
+        assert!(store
+            .install(scheme, None, None)
+            .unwrap_err()
+            .contains("替换基础过滤器音效「ping.ogg」"));
+        assert_eq!(fs::read_to_string(&installed).unwrap(), refreshed);
+        assert_eq!(scheme.profile["skippedItemIds"], json!(["divine-orb"]));
+        scheme.profile["baseFilter"] = profile(&store)["baseFilter"].clone();
+        let (with_base, _) = store.prepare_filter(scheme, None).unwrap();
+        assert!(!with_base.contains("SetFontSize 40"));
+        assert!(with_base.contains("SetFontSize 31"));
+    }
+
+    #[test]
     fn directory_changes_only_affect_new_installs_and_uninstall_keeps_scheme() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
@@ -1061,6 +1392,7 @@ mod tests {
 
         // Editing even a stale draft that supplies a different name never changes a game file.
         let edit = Edit {
+            base_filter_changed: None,
             id: Some(id.clone()),
             name: "草稿旧名称".into(),
             profile: profile(&store),
@@ -1171,7 +1503,7 @@ mod tests {
         assert!(store
             .install(copy, None, None)
             .unwrap_err()
-            .contains("请先选择基础过滤器"));
+            .contains("未能匹配基础过滤器"));
         copy.profile["baseFilter"] = profile(&store)["baseFilter"].clone();
         assert!(store
             .install(copy, None, None)

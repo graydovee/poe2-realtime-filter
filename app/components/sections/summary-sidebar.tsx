@@ -27,12 +27,12 @@ export function SummarySidebar({
   const rules = profile.rules ?? [];
   const rows: Array<[string, string]> = [
     ["赛季", profile.league],
-    ["基础过滤器", profile.baseFilter?.name ?? "未选择"],
+    ["基础过滤器", profile.baseFilter?.name ?? (profile.baseFilterHint ? "待选择" : "仅自定义规则")],
     ["客户端语言", LOCALE_LABELS[profile.locale]],
     ["自定义规则", rules.length + " 条（启用 " + rules.filter((rule) => rule.enabled).length + "）"],
     ["隐藏规则", rules.filter((rule) => rule.enabled && rule.hidden).length + " 条"],
-    ["跳过物品", profile.skippedItemIds.length + " 项"],
   ];
+  if (profile.baseFilter) rows.push(["跳过物品", profile.skippedItemIds.length + " 项"]);
 
   return (
     <aside className="flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">

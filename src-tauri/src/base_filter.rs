@@ -5,17 +5,23 @@ use crate::{
 use reqwest::blocking::{Client, Response};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::{self, Cursor, Read},
     path::{Component, Path, PathBuf},
-    time::Duration,
+    sync::Mutex,
+    time::{Duration, Instant},
 };
 
 const SOURCE: &str = "neversink";
-const RELEASE: &str =
-    "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/latest";
-const ZIP_PREFIX: &str =
-    "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/zipball/";
+const DOWNLOAD_SOURCES: &[DownloadSource] = &[DownloadSource {
+    id: SOURCE,
+    label: "NeverSink",
+    release: "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/latest",
+    tree: "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/git/trees/",
+    zipball: "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/zipball/",
+    asset: "https://github.com/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/download/",
+}];
 const MAX_FILTER: usize = 8 * 1024 * 1024;
 const MAX_ARCHIVE: usize = 32 * 1024 * 1024;
 const MAX_EXTRACTED: usize = 160 * 1024 * 1024;
@@ -27,6 +33,12 @@ pub enum BaseFilter {
         path: PathBuf,
         name: String,
     },
+    Subscribed {
+        source: SubscriptionSource,
+        directory: PathBuf,
+        entry: PathBuf,
+        name: String,
+    },
     Downloaded {
         source: String,
         version: String,
@@ -35,11 +47,28 @@ pub enum BaseFilter {
     },
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SubscriptionSource {
+    Online,
+    WeGame,
+}
+
+impl SubscriptionSource {
+    fn cache_directory(self) -> &'static str {
+        match self {
+            Self::Online => "OnlineFilters",
+            Self::WeGame => "WeGameFilters",
+        }
+    }
+}
+
 pub struct Baseline {
     pub path: PathBuf,
     pub name: String,
     pub text: String,
     pub cache_root: Option<PathBuf>,
+    pub game_root: Option<PathBuf>,
 }
 
 fn filter_name(path: &Path) -> bool {
@@ -77,10 +106,14 @@ fn read_bounded(file: impl Read, limit: usize) -> io::Result<Vec<u8>> {
 }
 
 pub(crate) fn read_filter(path: &Path) -> Result<String> {
-    let display = display_directory(path);
     if !filter_name(path) {
         return Err("请选择 .filter 文件".into());
     }
+    read_filter_text(path)
+}
+
+fn read_filter_text(path: &Path) -> Result<String> {
+    let display = display_directory(path);
     let bytes = read_limited(path, MAX_FILTER).map_err(|error| {
         format!("无法读取基础过滤器「{display}」，请检查文件或重新选择。{error}")
     })?;
@@ -132,26 +165,41 @@ impl BaseFilter {
             .canonicalize()
             .map_err(|error| format!("无法打开「{}」：{error}", path.display()))?;
         read_filter(&path)?;
-        let name = path
-            .file_name()
-            .and_then(|part| part.to_str())
-            .ok_or("无法读取过滤器文件名")?
-            .to_owned();
+        let name = file_name(&path)?;
         Ok(Self::Local {
             path: PathBuf::from(display_directory(&path)),
             name,
         })
     }
 
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::Local { name, .. }
+            | Self::Subscribed { name, .. }
+            | Self::Downloaded { name, .. } => name,
+        }
+    }
+
     pub fn load(&self, data_root: &Path) -> Result<Baseline> {
         let (path, cache_root) = match self {
             Self::Local { path, .. } if path.is_absolute() => (path.clone(), None),
+            Self::Subscribed {
+                source,
+                directory,
+                entry,
+                ..
+            } => {
+                return load_subscription(*source, directory, entry);
+            }
             Self::Downloaded {
                 source,
                 version,
                 entry,
                 ..
-            } if source == SOURCE && version_valid(version) && safe_relative(Path::new(entry)) => {
+            } if DownloadSource::find(source).is_ok()
+                && version_valid(version)
+                && safe_relative(Path::new(entry)) =>
+            {
                 let root = data_root.join("base-filters").join(source).join(version);
                 let resolved = root.join(entry).canonicalize().map_err(|error| {
                     format!("无法读取已下载的基础过滤器「{entry}」，请重新选择。{error}")
@@ -164,46 +212,207 @@ impl BaseFilter {
             }
             _ => return Err("基础过滤器来源无效，请重新选择".into()),
         };
-        let text = read_filter(&path)?;
-        let name = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or("无法读取基础过滤器文件名")?
-            .to_owned();
         Ok(Baseline {
+            text: read_filter(&path)?,
+            name: file_name(&path)?,
             path,
-            name,
-            text,
             cache_root,
+            game_root: None,
         })
     }
 }
 
+fn file_name(path: &Path) -> Result<String> {
+    Ok(path
+        .file_name()
+        .and_then(|part| part.to_str())
+        .ok_or("无法读取过滤器文件名")?
+        .to_owned())
+}
+
+fn online_name(text: &str) -> Option<String> {
+    let mut lines = text.lines();
+    if lines.next()?.trim() != "#Online Item Filter" {
+        return None;
+    }
+    let name = lines
+        .take(20)
+        .take_while(|line| line.trim_start().starts_with('#'))
+        .find_map(|line| line.trim_start().strip_prefix("#name:"))?
+        .trim();
+    if name.is_empty() || name.encode_utf16().count() > 260 || name.chars().any(char::is_control) {
+        return None;
+    }
+    Some(name.to_owned())
+}
+
+fn load_subscription(
+    source: SubscriptionSource,
+    directory: &Path,
+    entry: &Path,
+) -> Result<Baseline> {
+    if !directory.is_absolute()
+        || !safe_relative(entry)
+        || !entry.starts_with(source.cache_directory())
+    {
+        return Err("订阅过滤器的位置无效，请重新选择".into());
+    }
+    let root = directory
+        .canonicalize()
+        .map_err(|error| format!("无法读取游戏过滤器目录：{error}"))?;
+    let location = root.join(entry);
+    let path = location.canonicalize().map_err(|error| {
+        format!(
+            "无法读取订阅过滤器「{}」，请重新选择。{error}",
+            display_directory(&location)
+        )
+    })?;
+    if !path.starts_with(root.join(source.cache_directory())) {
+        return Err("订阅过滤器超出游戏缓存目录".into());
+    }
+    let (text, name) = match source {
+        SubscriptionSource::Online => {
+            let text = read_filter_text(&path)?;
+            let name = online_name(&text).ok_or("国际服订阅过滤器缺少名称，请在游戏中重新加载")?;
+            (text, name)
+        }
+        SubscriptionSource::WeGame => (read_filter(&path)?, file_name(&path)?),
+    };
+    Ok(Baseline {
+        path,
+        name,
+        text,
+        cache_root: Some(root.clone()),
+        game_root: Some(root),
+    })
+}
+
+fn scan_subscriptions(root: &Path, source: SubscriptionSource, options: &mut Vec<BaseFilter>) {
+    let cache = root.join(source.cache_directory());
+    if !cache.canonicalize().is_ok_and(|resolved| resolved == cache) {
+        return;
+    }
+    let mut pending = vec![(cache.clone(), 0)];
+    while let Some((directory, depth)) = pending.pop() {
+        let Ok(files) = fs::read_dir(&directory) else {
+            continue;
+        };
+        for file in files.flatten() {
+            let Ok(file_type) = file.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            let path = file.path();
+            if file_type.is_dir() && matches!(source, SubscriptionSource::WeGame) && depth < 12 {
+                if path
+                    .canonicalize()
+                    .is_ok_and(|resolved| resolved == path && resolved.starts_with(&cache))
+                {
+                    pending.push((path, depth + 1));
+                }
+            } else if file_type.is_file()
+                && (matches!(source, SubscriptionSource::Online) || filter_name(&path))
+            {
+                let Ok(entry) = path.strip_prefix(root) else {
+                    continue;
+                };
+                if let Ok(baseline) = load_subscription(source, root, entry) {
+                    options.push(BaseFilter::Subscribed {
+                        source,
+                        directory: PathBuf::from(display_directory(root)),
+                        entry: entry.to_owned(),
+                        name: baseline.name,
+                    });
+                }
+            }
+        }
+    }
+}
+
 pub fn scan(directory: &Path) -> Result<Vec<BaseFilter>> {
-    let files = match fs::read_dir(directory) {
-        Ok(files) => files,
+    let root = match directory.canonicalize() {
+        Ok(root) => root,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(vec![]),
         Err(error) => {
             return Err(format!(
-                "无法扫描「{}」：{error}",
+                "无法读取「{}」：{error}",
                 display_directory(directory)
-            ))
+            ));
         }
     };
-    let mut paths: Vec<_> = files
-        .filter_map(|entry| entry.ok().map(|file| file.path()))
-        .filter(|path| filter_name(path))
+    let files = fs::read_dir(&root)
+        .map_err(|error| format!("无法读取「{}」：{error}", display_directory(directory)))?;
+    let mut options: Vec<_> = files
+        .flatten()
+        .filter_map(|file| {
+            let path = file.path();
+            if !filter_name(&path) || !path.canonicalize().ok()?.starts_with(&root) {
+                return None;
+            }
+            BaseFilter::from_file(&path).ok()
+        })
         .collect();
-    paths.sort_by_key(|path| {
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase()
+    scan_subscriptions(&root, SubscriptionSource::Online, &mut options);
+    scan_subscriptions(&root, SubscriptionSource::WeGame, &mut options);
+    options.sort_by_cached_key(|base| {
+        let location = match base {
+            BaseFilter::Local { path, .. } => path.as_path(),
+            BaseFilter::Subscribed { entry, .. } => entry.as_path(),
+            BaseFilter::Downloaded { entry, .. } => Path::new(entry),
+        };
+        (base.name().to_lowercase(), location.to_owned())
     });
-    Ok(paths
-        .iter()
-        .filter_map(|path| BaseFilter::from_file(path).ok())
-        .collect())
+    Ok(options)
+}
+
+struct DownloadSource {
+    id: &'static str,
+    label: &'static str,
+    release: &'static str,
+    tree: &'static str,
+    zipball: &'static str,
+    asset: &'static str,
+}
+
+impl DownloadSource {
+    fn find(id: &str) -> Result<&'static Self> {
+        DOWNLOAD_SOURCES
+            .iter()
+            .find(|source| source.id == id)
+            .ok_or_else(|| "不支持的过滤器来源".into())
+    }
+}
+
+#[derive(Default)]
+pub struct SourceDownloads(Mutex<BTreeMap<&'static str, ReleaseCache>>);
+
+#[derive(Default)]
+struct ReleaseCache {
+    latest: Option<Release>,
+    etag: Option<reqwest::header::HeaderValue>,
+    checked: Option<Instant>,
+    catalog: Option<Vec<String>>,
+}
+
+#[derive(Serialize)]
+pub struct DownloadOffer {
+    pub source: &'static str,
+    pub label: &'static str,
+}
+
+#[derive(Deserialize)]
+struct Tree {
+    truncated: bool,
+    tree: Vec<TreeEntry>,
+}
+
+#[derive(Deserialize)]
+struct TreeEntry {
+    path: String,
+    #[serde(rename = "type")]
+    kind: String,
 }
 
 #[derive(Deserialize)]
@@ -253,17 +462,172 @@ fn get(client: &Client, url: &str) -> Result<Response> {
         .map_err(|error| format!("无法从 GitHub 下载过滤器：{error}"))
 }
 
-pub fn download(data_root: &Path, source: &str) -> Result<Vec<BaseFilter>> {
-    match source {
-        SOURCE => download_neversink(data_root),
-        _ => Err("不支持的过滤器来源".into()),
+impl ReleaseCache {
+    fn latest(&mut self, client: &Client, source: &DownloadSource) -> Result<&Release> {
+        // Opening multiple schemes in succession shares a release check with the tray task.
+        if !self
+            .checked
+            .is_some_and(|time| time.elapsed() < Duration::from_secs(60))
+        {
+            let mut request = client.get(source.release);
+            if let Some(etag) = &self.etag {
+                request = request.header(reqwest::header::IF_NONE_MATCH, etag);
+            }
+            let response = request
+                .send()
+                .and_then(Response::error_for_status)
+                .map_err(|error| format!("无法检查 {} 发布：{error}", source.label))?;
+            if response.status() != reqwest::StatusCode::NOT_MODIFIED {
+                let etag = response.headers().get(reqwest::header::ETAG).cloned();
+                let release: Release = read_metadata(response)?;
+                if !version_valid(&release.tag_name) {
+                    return Err("来源返回了无效的过滤器版本".into());
+                }
+                if self.latest.as_ref().map(|old| &old.tag_name) != Some(&release.tag_name) {
+                    self.catalog = None;
+                }
+                self.latest = Some(release);
+                self.etag = etag;
+            }
+            self.checked = Some(Instant::now());
+        }
+        self.latest
+            .as_ref()
+            .ok_or_else(|| "缺少过滤器发布信息".into())
+    }
+
+    fn entries(
+        &mut self,
+        data_root: &Path,
+        client: &Client,
+        source: &DownloadSource,
+    ) -> Result<Vec<String>> {
+        let version = self.latest(client, source)?.tag_name.clone();
+        let cached = cached_entries(data_root, source.id, &version)?;
+        if !cached.is_empty() {
+            return Ok(cached
+                .into_iter()
+                .filter_map(|base| match base {
+                    BaseFilter::Downloaded { entry, .. } => Some(entry),
+                    _ => None,
+                })
+                .collect());
+        }
+        if self.catalog.is_none() {
+            let tree: Tree = read_metadata(get(
+                client,
+                &format!("{}{}?recursive=1", source.tree, version),
+            )?)?;
+            if tree.truncated {
+                return Err("过滤器来源返回的列表不完整".into());
+            }
+            self.catalog = Some(
+                tree.tree
+                    .into_iter()
+                    .filter_map(|entry| {
+                        let path = Path::new(&entry.path);
+                        (entry.kind == "blob" && safe_relative(path) && filter_name(path))
+                            .then_some(entry.path)
+                    })
+                    .collect(),
+            );
+        }
+        Ok(self.catalog.clone().unwrap_or_default())
+    }
+}
+
+fn read_metadata<T: serde::de::DeserializeOwned>(response: Response) -> Result<T> {
+    let bytes = read_bounded(response, 1024 * 1024)
+        .map_err(|error| format!("读取过滤器来源信息失败：{error}"))?;
+    serde_json::from_slice(&bytes).map_err(|error| format!("读取过滤器来源信息失败：{error}"))
+}
+
+fn unique<T>(mut matches: impl Iterator<Item = T>) -> Option<T> {
+    let first = matches.next()?;
+    matches.next().is_none().then_some(first)
+}
+
+pub fn matching_download(
+    filters: &[BaseFilter],
+    name: &str,
+    preferred_entry: Option<&str>,
+) -> Option<BaseFilter> {
+    if let Some(entry) = preferred_entry {
+        let exact = unique(filters.iter().filter(|base| {
+            matches!(base, BaseFilter::Downloaded { entry: candidate, .. } if candidate.to_lowercase() == entry.to_lowercase())
+        }));
+        if exact.is_some() {
+            return exact.cloned();
+        }
+    }
+    let name = name.to_lowercase();
+    unique(
+        filters
+            .iter()
+            .filter(|base| base.name().to_lowercase() == name),
+    )
+    .cloned()
+}
+
+impl SourceDownloads {
+    pub fn offers(
+        &self,
+        data_root: &Path,
+        names: &[String],
+    ) -> Result<BTreeMap<String, Vec<DownloadOffer>>> {
+        let mut offers = BTreeMap::<String, Vec<DownloadOffer>>::new();
+        if names.is_empty() {
+            return Ok(offers);
+        }
+        let client = source_client()?;
+        let mut releases = self.0.lock().map_err(|error| error.to_string())?;
+        for source in DOWNLOAD_SOURCES {
+            let entries = releases
+                .entry(source.id)
+                .or_default()
+                .entries(data_root, &client, source)?;
+            for name in names {
+                let target = name.to_lowercase();
+                if unique(entries.iter().filter(|entry| {
+                    Path::new(entry)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .is_some_and(|value| value.to_lowercase() == target)
+                }))
+                .is_some()
+                {
+                    offers.entry(name.clone()).or_default().push(DownloadOffer {
+                        source: source.id,
+                        label: source.label,
+                    });
+                }
+            }
+        }
+        Ok(offers)
+    }
+
+    pub fn download(
+        &self,
+        data_root: &Path,
+        id: &str,
+        current_versions: &BTreeSet<String>,
+    ) -> Result<Vec<BaseFilter>> {
+        let source = DownloadSource::find(id)?;
+        let client = source_client()?;
+        let mut releases = self.0.lock().map_err(|error| error.to_string())?;
+        let release = releases
+            .entry(source.id)
+            .or_default()
+            .latest(&client, source)?;
+        if current_versions.len() == 1 && current_versions.contains(&release.tag_name) {
+            return Ok(vec![]);
+        }
+        download_release(data_root, &client, source, release)
     }
 }
 
 pub fn cached_source(data_root: &Path, source: &str) -> Result<Vec<BaseFilter>> {
-    if source != SOURCE {
-        return Err("不支持的过滤器来源".into());
-    }
+    DownloadSource::find(source)?;
     let directory = data_root.join("base-filters").join(source);
     let Ok(versions) = fs::read_dir(directory) else {
         return Ok(vec![]);
@@ -282,35 +646,30 @@ pub fn cached_source(data_root: &Path, source: &str) -> Result<Vec<BaseFilter>> 
     Ok(filters)
 }
 
-fn download_neversink(data_root: &Path) -> Result<Vec<BaseFilter>> {
-    let client = source_client()?;
-    let response = read_bounded(get(&client, RELEASE)?, 1024 * 1024)
-        .map_err(|error| format!("读取发布信息失败：{error}"))?;
-    let release: Release =
-        serde_json::from_slice(&response).map_err(|error| format!("读取发布信息失败：{error}"))?;
-    if !version_valid(&release.tag_name) {
-        return Err("GitHub 返回了无效的过滤器版本".into());
-    }
-    let cached = cached_entries(data_root, SOURCE, &release.tag_name)?;
+fn download_release(
+    data_root: &Path,
+    client: &Client,
+    source: &DownloadSource,
+    release: &Release,
+) -> Result<Vec<BaseFilter>> {
+    let cached = cached_entries(data_root, source.id, &release.tag_name)?;
     if !cached.is_empty() {
         return Ok(cached);
     }
     let asset = release.assets.iter().find(|asset| {
         asset.name.to_ascii_lowercase().ends_with(".zip")
-            && asset.browser_download_url.starts_with(
-                "https://github.com/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/download/",
-            )
+            && asset.browser_download_url.starts_with(source.asset)
     });
     let url = match asset {
         Some(asset) => &asset.browser_download_url,
-        None if release.zipball_url.starts_with(ZIP_PREFIX) => &release.zipball_url,
+        None if release.zipball_url.starts_with(source.zipball) => &release.zipball_url,
         _ => return Err("GitHub 发布缺少有效的过滤器压缩包".into()),
     };
-    let bytes = read_bounded(get(&client, url)?, MAX_ARCHIVE)
+    let bytes = read_bounded(get(client, url)?, MAX_ARCHIVE)
         .map_err(|error| format!("读取过滤器压缩包失败：{error}"))?;
     cache_archive(
         data_root,
-        SOURCE,
+        source.id,
         &release.tag_name,
         &bytes,
         asset.is_none(),
@@ -426,6 +785,74 @@ mod tests {
     use std::io::Write;
 
     #[test]
+    fn release_checks_reuse_the_etag_and_catalog_on_304() {
+        use std::{
+            io::{BufRead, BufReader},
+            net::TcpListener,
+        };
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let source = DownloadSource {
+            release: &*Box::leak(url.into_boxed_str()),
+            ..DOWNLOAD_SOURCES[0]
+        };
+        let server = std::thread::spawn(move || {
+            for conditional in [false, true] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let headers: Vec<_> = BufReader::new(&stream)
+                    .lines()
+                    .map_while(io::Result::ok)
+                    .take_while(|line| !line.is_empty())
+                    .collect();
+                assert_eq!(
+                    headers
+                        .iter()
+                        .any(|line| line.eq_ignore_ascii_case("if-none-match: \"fixture\"")),
+                    conditional
+                );
+                if conditional {
+                    write!(
+                        stream,
+                        "HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else {
+                    let body = r#"{"tag_name":"0.1.0","zipball_url":"","assets":[]}"#;
+                    write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nETag: \"fixture\"\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                }
+            }
+        });
+        let client = source_client().unwrap();
+        let mut cache = ReleaseCache::default();
+        assert_eq!(cache.latest(&client, &source).unwrap().tag_name, "0.1.0");
+        cache.catalog = Some(vec!["Strict.filter".into()]);
+        cache.checked = None;
+        assert_eq!(cache.latest(&client, &source).unwrap().tag_name, "0.1.0");
+        assert_eq!(cache.catalog.unwrap(), ["Strict.filter"]);
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn matching_download_preserves_style_and_rejects_ambiguous_names() {
+        let base = |entry: &str| BaseFilter::Downloaded {
+            source: SOURCE.into(),
+            version: "0.1.0".into(),
+            entry: entry.into(),
+            name: "Strict.filter".into(),
+        };
+        let filters = [base("A/Strict.filter"), base("B/Strict.filter")];
+        assert!(matching_download(&filters, "strict.filter", None).is_none());
+        assert!(
+            matches!(matching_download(&filters, "strict.filter", Some("b/strict.filter")), Some(BaseFilter::Downloaded { entry, .. }) if entry == "B/Strict.filter")
+        );
+        assert!(
+            matching_download(&filters[..1], "strict.filter", Some("moved/Strict.filter"))
+                .is_some()
+        );
+    }
+
+    #[test]
     fn scans_supported_filters_and_excludes_old_generated_markers() {
         let directory = tempfile::tempdir().unwrap();
         fs::write(
@@ -476,7 +903,26 @@ mod tests {
     #[ignore = "downloads an official GitHub release for local verification"]
     fn downloads_real_neversink_release() {
         let directory = tempfile::tempdir().unwrap();
-        let filters = download(directory.path(), SOURCE).unwrap();
+        let downloads = SourceDownloads::default();
+        let names = [
+            "NeverSink's filter 2 - 3-STRICT.filter".to_owned(),
+            "missing.filter".into(),
+        ];
+        let offers = downloads.offers(directory.path(), &names).unwrap();
+        assert_eq!(offers[&names[0]][0].source, SOURCE);
+        assert!(!offers.contains_key(&names[1]));
+        assert!(!directory.path().join("base-filters").exists());
+        let filters = downloads
+            .download(directory.path(), SOURCE, &BTreeSet::new())
+            .unwrap();
+        let selected = matching_download(&filters, &names[0], None).unwrap();
+        let BaseFilter::Downloaded { version, .. } = selected else {
+            unreachable!()
+        };
+        assert!(downloads
+            .download(directory.path(), SOURCE, &BTreeSet::from([version]))
+            .unwrap()
+            .is_empty());
         assert!(filters.len() >= 7);
         let custom = filters.iter().find(|base| matches!(base, BaseFilter::Downloaded { name, .. } if name.contains("2-SEMI-STRICT") && name.contains("customsounds"))).unwrap();
         let loaded = custom.load(directory.path()).unwrap();

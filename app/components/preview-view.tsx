@@ -47,7 +47,7 @@ export function PreviewView({ generated }: { generated: Generated }) {
       <aside className="flex flex-col gap-4">
         <Panel>
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-gold">模板与行情</span>
-          <h3 className="mt-2 break-words font-mono text-xs leading-relaxed text-ink">{generated.baselineFile}</h3>
+          <h3 className="mt-2 break-words font-mono text-xs leading-relaxed text-ink">{generated.baselineFile || "仅自定义规则"}</h3>
           <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-[11px]">
             <dt className="text-ink-muted">赛季</dt>
             <dd className="text-right text-ink/90">{generated.market.league}</dd>
@@ -70,7 +70,7 @@ export function PreviewView({ generated }: { generated: Generated }) {
           <Disclosure summary="数据说明">
             <div className="space-y-2 pb-1 text-[11px] leading-relaxed text-ink-muted">
               <p>
-                目录 {generated.safetyReport.catalogSize} 项 · 未定价 {generated.safetyReport.unpricedItems} 项 · 按原始规则处理{" "}
+                目录 {generated.safetyReport.catalogSize} 项 · 未定价 {generated.safetyReport.unpricedItems} 项 · {generated.baselineFile ? "沿用基础规则" : "使用游戏默认显示"}{" "}
                 {generated.safetyReport.ambiguousItems} 项
               </p>
               {generated.safetyReport.warnings.map((warning) => (

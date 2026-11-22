@@ -6,11 +6,11 @@ mod market;
 mod share_code;
 mod store;
 
-use base_filter::BaseFilter;
+use base_filter::{matching_download, BaseFilter, DownloadOffer};
 use engine::Result;
 use serde_json::{json, Value};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::{mpsc, Mutex},
     time::Duration,
@@ -46,6 +46,79 @@ impl UpdateStatus {
 }
 
 impl Desktop {
+    fn refresh_base_filters(&self) -> Result<()> {
+        let library = self.store.load()?;
+        if library.settings.paused {
+            return Ok(());
+        }
+        let mut sources = BTreeMap::<String, BTreeSet<String>>::new();
+        for scheme in &library.schemes {
+            if let Some(BaseFilter::Downloaded {
+                source, version, ..
+            }) = Store::downloaded_base(scheme)
+            {
+                sources.entry(source).or_default().insert(version);
+            }
+        }
+        for (source, versions) in sources {
+            // Check once per source, and release the network lock before editing the library.
+            let outcome = self.store.source_download(&source, &versions);
+            if matches!(&outcome, Ok(filters) if filters.is_empty()) {
+                continue;
+            }
+            let _guard = self.changes.lock().map_err(|error| error.to_string())?;
+            let mut current = self.store.load()?;
+            if current.settings.paused {
+                break;
+            }
+            let mut changed = false;
+            for scheme in &mut current.schemes {
+                let Some(BaseFilter::Downloaded {
+                    source: selected,
+                    version,
+                    entry,
+                    name,
+                }) = Store::downloaded_base(scheme)
+                else {
+                    continue;
+                };
+                if selected != source || !versions.contains(&version) {
+                    continue;
+                }
+                let result = match &outcome {
+                    Ok(filters) => match matching_download(filters, &name, Some(&entry)) {
+                        Some(BaseFilter::Downloaded {
+                            version: ref latest,
+                            ..
+                        }) if *latest == version => continue,
+                        Some(base) => {
+                            let install = scheme.installed.is_some() && scheme.auto_refresh;
+                            let snapshot = install
+                                .then(|| self.market.snapshot(scheme.league()))
+                                .flatten();
+                            self.store
+                                .set_downloaded_base(scheme, &base, install, snapshot)
+                        }
+                        None => Err(format!("新版中找不到「{name}」")),
+                    },
+                    Err(reason) => Err(reason.clone()),
+                };
+                if let Err(reason) = result {
+                    let status = format!("基础过滤器更新失败，沿用当前版本 · {reason}");
+                    if scheme.status == status {
+                        continue;
+                    }
+                    scheme.status = status;
+                }
+                changed = true;
+            }
+            if changed {
+                self.store.persist(&current)?;
+            }
+        }
+        Ok(())
+    }
+
     fn refresh_leagues(&self, extra_league: Option<String>) -> Result<()> {
         let _running = self.refresh.lock().map_err(|e| e.to_string())?;
         let library = self.store.load()?;
@@ -262,8 +335,45 @@ async fn source_filters(
         if cached_only {
             state.store.source_cache(&source)
         } else {
-            state.store.source_download(&source)
+            state.store.source_download(&source, &BTreeSet::new())
         }
+    })
+    .await
+}
+
+#[tauri::command]
+async fn base_download_offers(
+    app: tauri::AppHandle,
+    names: Vec<String>,
+) -> Result<BTreeMap<String, Vec<DownloadOffer>>> {
+    on_worker(move || app.state::<Desktop>().store.download_offers(&names)).await
+}
+
+#[tauri::command]
+async fn scheme_download_base(app: tauri::AppHandle, id: String, source: String) -> Result<()> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let before = state.store.load()?;
+        let scheme = Store::get(&before, &id)?;
+        let hint = scheme.profile["baseFilterHint"]
+            .as_str()
+            .filter(|_| scheme.profile["baseFilter"].is_null())
+            .ok_or("方案无需下载基础过滤器")?;
+        let filters = state.store.source_download(&source, &BTreeSet::new())?;
+        let base = matching_download(&filters, hint, None)
+            .ok_or_else(|| format!("下载列表中未找到唯一的同名过滤器「{hint}」"))?;
+        let _guard = state.changes.lock().map_err(|error| error.to_string())?;
+        let mut current = state.store.load()?;
+        let scheme = Store::get_mut(&mut current, &id)?;
+        if !scheme.profile["baseFilter"].is_null()
+            || scheme.profile["baseFilterHint"].as_str() != Some(hint)
+        {
+            return Err("方案的基础过滤器已更改".into());
+        }
+        state
+            .store
+            .set_downloaded_base(scheme, &base, false, None)?;
+        state.store.persist(&current)
     })
     .await
 }
@@ -623,6 +733,8 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     std::thread::spawn(move || loop {
         let state = handle.state::<Desktop>();
         let refresh = state.refresh_leagues(None);
+        let base_refresh = state.refresh_base_filters();
+        let refresh = refresh.and(base_refresh);
         let _ = handle.emit("local-refresh", refresh.as_ref().err());
         let minutes = state
             .store
@@ -666,6 +778,8 @@ fn main() {
             scan_base_filters,
             pick_base_filter,
             source_filters,
+            base_download_offers,
+            scheme_download_base,
             base_styles,
             preview,
             scheme_save,

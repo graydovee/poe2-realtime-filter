@@ -68,6 +68,6 @@ export const FALLBACK_SNAPSHOT: MarketSnapshot = {
   league: "Standard",
   capturedAt: "1970-01-01T00:00:00.000Z",
   expiresAt: "1970-01-01T00:00:00.000Z",
-  source: "NeverSink baseline fallback",
+  source: "No market data",
   prices: {},
 };

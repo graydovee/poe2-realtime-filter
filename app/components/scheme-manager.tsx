@@ -16,10 +16,17 @@ type Props = {
   onNew: () => void;
 };
 
+type DownloadOffer = { source: string; label: string };
+
 type SchemeDialog = { kind: "rename" | "remove" | "uninstall"; scheme: LocalScheme };
 
 export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNew }: Props) {
   const [library, setLibrary] = useState<Library>();
+  const [baseOffers, setBaseOffers] = useState<Record<string, DownloadOffer[]>>({});
+  const [offerRevision, setOfferRevision] = useState(0);
+  const missingBaseNames = JSON.stringify([...new Set(library?.schemes.flatMap(({ profile }) =>
+    !profile.baseFilter && profile.baseFilterHint ? [profile.baseFilterHint] : [],
+  ))].sort());
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const [interval, setInterval] = useState<string>();
@@ -47,7 +54,10 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
   useEffect(() => {
     if (!isDesktop()) return;
     void reload();
-    const listener = listen("local-refresh", () => { void reload(); });
+    const listener = listen("local-refresh", () => {
+      void reload();
+      setOfferRevision((current) => current + 1);
+    });
     return () => { void listener.then((unlisten) => unlisten()).catch(() => {}); };
   }, [reload]);
 
@@ -57,6 +67,16 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
     setError("");
     void reload();
   }, [reload, revision, saveNotice]);
+
+  useEffect(() => {
+    const names: string[] = JSON.parse(missingBaseNames);
+    if (!isDesktop() || !names.length) return;
+    let active = true;
+    void local<Record<string, DownloadOffer[]>>("base_download_offers", { names })
+      .then((offers) => { if (active) setBaseOffers(offers); })
+      .catch(() => { /* Manual base selection remains available. */ });
+    return () => { active = false; };
+  }, [missingBaseNames, offerRevision]);
 
   async function run(action: () => Promise<void>) {
     setExpandedMenu(undefined);
@@ -191,7 +211,26 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
                       <Badge tone={scheme.installed ? "sage" : "muted"}>{scheme.installed ? "已安装" : "未安装"}</Badge>
                     </div>
                     {scheme.installed && <p className="mt-1 truncate text-xs text-ink-muted" title={displayDirectory(scheme.installed.directory)}>{displayDirectory(scheme.installed.directory)}</p>}
-                    {scheme.status && <p className="mt-1 break-words text-xs text-ink-muted">{scheme.status}</p>}
+                    {!scheme.profile.baseFilter && scheme.profile.baseFilterHint ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <p className="break-words text-xs text-ember">未能匹配基础过滤器「{scheme.profile.baseFilterHint}」。</p>
+                        {Object.prototype.hasOwnProperty.call(baseOffers, scheme.profile.baseFilterHint) ? baseOffers[scheme.profile.baseFilterHint].map((offer) => (
+                          <button key={offer.source} type="button" className="rounded-sm text-xs text-gold-bright underline underline-offset-4 disabled:opacity-50" disabled={busy}
+                            onClick={() => void run(async () => {
+                              setFeedback(`正在下载并校验 ${offer.label} 基础过滤器…`);
+                              try {
+                                await local("scheme_download_base", { id: scheme.id, source: offer.source });
+                                setFeedback(`「${scheme.name}」已选用下载的基础过滤器`);
+                              } catch (cause) {
+                                setFeedback("");
+                                throw cause;
+                              }
+                            })}>从 {offer.label} 下载</button>
+                        )) : <p className="text-xs text-ink-muted">可在编辑页选择或清除基础过滤器。</p>}
+                      </div>
+                    ) : scheme.status && scheme.status !== "请先选择基础过滤器" && (
+                      <p className="mt-1 break-words text-xs text-ink-muted">{scheme.status}</p>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {scheme.installed && <Switch label="自动刷新" checked={scheme.autoRefresh} disabled={busy} onCheckedChange={(enabled) => {
@@ -263,7 +302,7 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         {directoryError && <p id="filter-directory-error" role="alert" className="mt-3 break-words text-sm text-ember">{directoryError}</p>}
       </Panel>
 
-      <Panel title="刷新设置" description="托盘会定时更新已安装且开启自动刷新的方案。刷新行情也会更新同赛季开启自动刷新的方案。">
+      <Panel title="刷新设置" description="托盘会定时检查下载的基础过滤器和行情。已安装且开启自动刷新的方案会自动更新游戏里的过滤器。">
         <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => {
           event.preventDefault();
           if (library) void run(async () => {

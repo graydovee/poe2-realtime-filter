@@ -6,16 +6,24 @@ import { LOCALE_LABELS } from "../../../lib/data";
 import { displayDirectory, explain, local } from "../../../lib/desktop";
 import type { BaseFilter, FilterProfile, Locale } from "../../../lib/types";
 import { Alert, Button, Field, Panel } from "../ui/primitives";
-import { Select } from "../ui/controls";
+import { Select, Switch } from "../ui/controls";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 
 const sources = [{ id: "neversink", name: "NeverSink" }] as const;
 type Source = (typeof sources)[number];
 type Picker = { kind: "scan" } | { kind: "source" } | { kind: "versions"; source: Source };
 
+function locationLabel(base: BaseFilter) {
+  switch (base.kind) {
+    case "local": return displayDirectory(base.path);
+    case "subscribed": return `${base.source === "online" ? "国际服订阅" : "WeGame 订阅"} · ${base.entry}`;
+    case "downloaded": return `${sources.find((source) => source.id === base.source)?.name ?? base.source} · ${base.version} · ${base.entry}`;
+  }
+}
+
 export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
   profile: FilterProfile;
-  onBaseChange: (base: BaseFilter) => void;
+  onBaseChange: (base?: BaseFilter) => void;
   onLocaleChange: (locale: Locale) => void;
 }) {
   const [picker, setPicker] = useState<Picker>();
@@ -23,7 +31,11 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [hideSubscriptions, setHideSubscriptions] = useState(true);
   const base = profile.baseFilter;
+  const visibleOptions = picker?.kind === "scan" && hideSubscriptions
+    ? options.filter((option) => option.kind !== "subscribed")
+    : options;
 
   function choose(selected: BaseFilter) {
     onBaseChange(selected);
@@ -45,6 +57,8 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
     setPicker({ kind: "scan" });
     setOptions([]);
     setError("");
+    setNotice("");
+    setHideSubscriptions(true);
     setBusy(true);
     try { setOptions(await local<BaseFilter[]>("scan_base_filters")); }
     catch (error) { setError(explain(error)); }
@@ -74,17 +88,21 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
     <Panel title="基础过滤器">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,13rem)] sm:items-start">
         <div className="min-w-0">
-          <p className="break-all text-sm font-medium text-ink">{base?.name ?? "选择一个基础过滤器"}</p>
+          <p className="break-all text-sm font-medium text-ink">{base?.name ?? (profile.baseFilterHint ? "选择基础过滤器" : "仅自定义规则")}</p>
           {base && <p className="mt-1 break-all text-xs text-ink-muted">
-            {base.kind === "local" ? displayDirectory(base.path) : `${sources.find((source) => source.id === base.source)?.name ?? base.source} · ${base.version}`}
+            {locationLabel(base)}
           </p>}
-          {!base && profile.baseFilterHint && <p className="mt-1 break-all text-xs text-ink-muted">分享方案原用 {profile.baseFilterHint}</p>}
+          {!base && profile.baseFilterHint && <p className="mt-1 break-all text-xs text-ink-muted">分享方案引用「{profile.baseFilterHint}」</p>}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy} onClick={() => void scan()}><FileSearch aria-hidden="true" className="size-4" />扫描游戏目录</Button>
+            <Button size="sm" disabled={busy} onClick={() => void scan()}><FileSearch aria-hidden="true" className="size-4" />选择游戏内过滤器</Button>
             <Button size="sm" disabled={busy} onClick={() => void pickFile()}><FolderOpen aria-hidden="true" className="size-4" />选择本地文件</Button>
             <Button size="sm" disabled={busy} onClick={() => { setOptions([]); setError(""); setNotice(""); setPicker({ kind: "source" }); }}>
               <Download aria-hidden="true" className="size-4" />下载过滤器
             </Button>
+            {(base || profile.baseFilterHint) && <Button size="sm" disabled={busy} onClick={() => {
+              onBaseChange();
+              setError("");
+            }}>清除基础过滤器</Button>}
           </div>
         </div>
         <Field label="客户端语言">
@@ -94,7 +112,7 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
       </div>
       {!picker && error && <div className="mt-3"><Alert tone="ember">{error}</Alert></div>}
       {picker && (
-        <ConfirmDialog title={picker.kind === "scan" ? "游戏目录中的过滤器" : picker.kind === "source" ? "选择下载来源" : picker.source.name}
+        <ConfirmDialog title={picker.kind === "scan" ? "选择游戏内过滤器" : picker.kind === "source" ? "选择下载来源" : picker.source.name}
           className="modal-base-picker" busy={busy} onCancel={() => setPicker(undefined)}>
           {picker.kind === "source" ? (
             <div className="my-4 grid gap-2">
@@ -105,12 +123,17 @@ export function BasicFilterSection({ profile, onBaseChange, onLocaleChange }: {
               {busy && <p role="status" className="text-sm text-ink-muted">{picker.kind === "scan" ? "正在扫描…" : "正在读取来源…"}</p>}
               {error && <Alert tone="ember">{error}</Alert>}
               {notice && <p className="text-xs text-ink-muted">{notice}</p>}
-              {!busy && !error && !options.length && <p className="text-sm text-ink-muted">{picker.kind === "scan" ? "关闭列表后，可选择本地文件或下载过滤器。" : "关闭列表后，点击「下载过滤器」并选择来源。"}</p>}
+              {picker.kind === "scan" && <Switch label="隐藏订阅过滤器" checked={hideSubscriptions} onCheckedChange={setHideSubscriptions} />}
+              {!busy && !error && !visibleOptions.length && <p className="text-sm text-ink-muted">{
+                picker.kind === "scan"
+                  ? options.length ? "关闭「隐藏订阅过滤器」以查看订阅文件。" : "可选择本地文件或下载过滤器。"
+                  : "关闭列表后，点击「下载过滤器」并选择来源。"
+              }</p>}
               {!busy && <div className="grid max-h-[45vh] gap-2 overflow-y-auto">
-                {options.map((option) => <Button key={option.kind === "local" ? option.path : `${option.source}/${option.version}/${option.entry}`}
+                {visibleOptions.map((option) => <Button key={locationLabel(option)}
                   size="sm" className="base-filter-option" onClick={() => choose(option)}>
                   <span className="min-w-0 break-words">{option.name}</span>
-                  {option.kind === "downloaded" && <span className="font-mono text-xs text-ink-muted">{option.version}</span>}
+                  <span className="min-w-0 break-all text-xs text-ink-muted">{locationLabel(option)}</span>
                 </Button>)}
               </div>}
             </div>
