@@ -1,84 +1,60 @@
 # PoE2 Realtime Filter
 
-Windows x64 单机过滤器客户端，提供本地方案管理与过滤器制作。从 poe.ninja 获取赛季行情，支持本地基础过滤器和第三方过滤器下载。可以离线编辑、保存和分享方案，选好基础过滤器后也可离线预览。
+面向《流放之路 2》的 Windows x64 掉落过滤器编辑器。选择一个基础过滤器，然后按赛季行情、物品分类或指定物品设置显示规则。客户端可以定时读取 poe.ninja 的行情，并重新生成游戏中已安装的过滤器。
 
-[下载 Windows 安装包](https://github.com/graydovee/poe2-realtime-filter/releases/latest)
+[从 GitHub Releases 下载 Windows 安装包](https://github.com/graydovee/poe2-realtime-filter/releases/latest)
 
-## 使用
+## 安装与更新
 
-1. 在「我的方案」新建方案，或粘贴 `POE2F1.` 分享码导入。自定义音效缺失时，可在规则编辑器里补齐。
-2. 在制作页扫描游戏目录、手动选取 `.filter`，或通过「下载过滤器」选择 NeverSink。下载的版本保存在本地，可离线使用。调整赛季和规则后，点击「预览」检查结果，再保存方案。回到「我的方案」点击「安装到游戏」，然后在 PoE2 里选择同名过滤器。
-3. 从「更多」可以重命名、下载含音效的 ZIP、复制分享码或删除方案。卸载只移除游戏过滤器，保留方案。删除方案时默认保留游戏文件。
-4. 已安装方案默认每 30 分钟刷新。关闭窗口后托盘会继续运行，右键托盘图标可彻底退出。行情暂不可用时保留上次成功安装的过滤器。
-5. 版本号旁出现「更新」时可以下载新版，签名验证通过后选择「安装并重启」。旧版 v0.4.x 用户首次请手动安装。
+从发布页下载 `poe2-realtime-filter-windows-x64-vX.Y.Z-setup.exe` 并运行。安装器会复用系统已有的 Microsoft Edge WebView2。如果系统缺少 WebView2，安装器会联网从微软下载并安装运行时。
 
-本地方案、设置和缓存存放在客户端安装目录的 `data` 子目录。从 v0.5.1 或更早版本更新时，客户端从新的方案库开始，原用户目录数据留在原处。过滤器默认写入 Windows 文档目录下的 `My Games\Path of Exile 2`。可在「过滤器目录」修改新安装位置，已安装的过滤器继续使用各自的原目录。
+客户端启动时检查更新。版本号旁出现「更新」时，点击下载，等签名校验通过后选择「安装并重启」。从 v0.4.x 升级时，先从发布页手动安装当前客户端。
 
-未知物品沿用所选基础过滤器的规则。可以将物品加入跳过名单，避免被自定义规则覆盖。
+## 制作第一个过滤器
 
-## 开发与发布
+1. 打开客户端，在「我的方案」里点击「新建方案」，选择你正在玩的赛季。
+2. 选一个基础过滤器。已有 `.filter` 时，可以用「扫描游戏目录」或「选择本地文件」。也可以点击「下载过滤器」，从 NeverSink 的可用档位和风格里挑选。客户端会记住所选下载版本，直到你手动更换。
+3. 调整规则。新方案自带崇高石、混沌石、剥离石和神圣石四档价格规则。启用「跟随基础过滤器」的规则会尝试继承对应通货的颜色、光柱、小地图图标和音效等特效。手动修改特效后，该规则使用你设置的样式。
+4. 点击「预览」查看生成结果和安全检查，再点「保存方案」并填写方案名。回到「我的方案」，点「安装到游戏」生成过滤器。进入 PoE2，在游戏设置中选中以方案名命名的过滤器。
 
-需要 Node.js 22、Rust stable、Visual Studio C++ Build Tools 和 WebView2。
+默认安装到 Windows 文档目录下的 `My Games\Path of Exile 2`。可以在「方案管理 → 过滤器目录」指定其他目录。已有安装仍使用原目录，如需搬到新目录，先卸载过滤器，再重新安装。
+
+未知物品沿用基础过滤器的规则。把指定物品加入「跳过名单」，也可以让它们沿用基础过滤器。
+
+## 行情与自动刷新
+
+- 在「方案管理」选择赛季并点击「刷新行情」，可以立即获取该赛季的报价。价格规则按当前赛季的行情换算成崇高石比较，价格数据需要联网获取。
+- 自动刷新只处理已安装且开启「自动刷新」的方案，默认每 30 分钟运行一次。同赛季的方案共用一份行情。可以在「刷新设置」里调整间隔或暂停后台刷新。
+- 关闭窗口后，托盘中的客户端会继续刷新。从托盘菜单退出即可停止。行情请求失败、所需文件缺失或安全检查未通过时，游戏继续使用上一次成功生成的文件。
+
+## 分享、备份与管理
+
+| 要做什么 | 在哪里操作 |
+| --- | --- |
+| 分享可编辑的规则 | 「更多 → 分享码」复制 `POE2F1.` 开头的分享码。接收者在「导入分享码」粘贴即可创建方案，再选择自己的基础过滤器，按提示补齐自定义音效。 |
+| 获取可直接使用的过滤器 | 「更多 → 下载」保存 ZIP，内含 `.filter` 和需要随包分发的音效。解压到游戏过滤器目录，并保留压缩包内的目录结构。 |
+| 修改游戏里的过滤器名称 | 「更多 → 重命名」同步调整方案名和已安装的过滤器文件名。遇到重名或外部文件冲突时，客户端会提示处理。 |
+| 停止使用某个过滤器 | 点击「卸载过滤器」移除游戏中的 `.filter` 并保留方案。通过「更多 → 删除」删除方案时，默认保留游戏中的文件。 |
+
+方案、设置、音效和缓存存放在安装目录的 `data` 子目录。重装或换电脑前可以备份整个 `data` 目录。选用本地 `.filter` 作为基础过滤器时，还要备份原文件及其依赖。恢复后如果文件路径变了，在编辑页重新选择基础过滤器。
+
+## 本地开发
+
+客户端使用 Tauri 2、Rust 和 React，编辑器与后台刷新共用 TypeScript 过滤器生成逻辑。Windows 开发环境需要 Node.js 22、Rust stable、带 C++ 工作负载的 Visual Studio Build Tools 和 WebView2。
 
 ```powershell
 npm ci
+rustup target add x86_64-pc-windows-msvc
+npm run tauri -- dev
+```
+
+运行测试并构建本地验收安装包：
+
+```powershell
 npm test
 npm run build:engine
-cargo test --locked --manifest-path src-tauri/Cargo.toml
-npm run tauri dev
+cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+npm run tauri -- build --ci --no-sign --target x86_64-pc-windows-msvc -- --locked
 ```
 
-将 `package.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 和 `src-tauri/tauri.conf.json` 中的版本同步后打 `vX.Y.Z` 标签。Windows GitHub Actions 使用 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 创建签名安装包和 `latest.json`。
-
-## 物品数据与特效
-
-### 通货与材料的分组
-
-`crafting`（通货与材料）分支的口径**直接跟随 [poe.ninja PoE2 经济侧栏](https://poe.ninja/poe2/economy/forbiddenrites/currency)**，只额外把「神庙」从基础通货里拆出来：
-
-| 分组 | 对应 poe.ninja 标签页 | 数量 |
-|---|---|---|
-| 基础通货 | Currency（去掉神庙） | 36 |
-| 碎片 | Fragments（通货碎片与各种碎片） | 10 |
-| 深渊骨骸 | Abyssal Bones | 11 |
-| 精华 | Essences | 82 |
-| 预兆 | Omens | 37 |
-| 探险 | Expedition（溶剂与远征传说） | 30 |
-| 液化情绪 | Liquid Emotions | 26 |
-| 催化剂 | Catalysts | 26 |
-| 维金 | Verisium（合金 / 维金 / 星辉矿 / 徽记） | 25 |
-| 神庙 | 自己拆出来的：阿兹里神庙专属通货 | 14 |
-| 试炼钥匙 | poe.ninja 未收录：赛克玛试炼钥匙 | 3 |
-
-判定与复核方式：每件物品在 `data/item-mechanics.json` 里都有 `{ mechanic, evidence }`，其中 `evidence` 说明依据。优先级是
-
-1. **poe.ninja 标签页**（153 件）：直接按商店分类，和界面里看到的一致；
-2. **wiki 分类 / tags / drop_text**（20 件）：poe.ninja 未收录的条目回落到 poe2wiki 的 `Category:Abyss`、`verisium_*` 标签、`Verisium Remnant` 掉落文本等；
-3. **名称族与人工校正**（45 件）：`Thaumaturgic Flux (Level N)`、`Aldur's Saga`、`* Key` 等；另有 2 条人工校正写在脚本里。
-
-两个刻意的偏差：poe.ninja 会把同一族材料拆到两个标签页（部分溶剂在 Verisium、部分星辉矿在 Expedition），这里按材料族归一；`Breach Splinter` 在商店属于 Breach 标签页，但这里和其他碎片一起进「碎片」。
-
-更新流程：
-
-```bash
-node scripts/build-item-mechanics.mjs    # 抓 poe.ninja 标签页 + wiki 兜底（需要网络）
-node scripts/apply-catalog-mechanics.mjs # 写回 data/item-catalog.json（离线、确定）
-node scripts/validate-data.mjs           # 校验分组词条、展示顺序与未归类条目
-```
-
-更新 NeverSink 或客户端数据后，如果新物品没有分组归属，`validate:data` 和 `tests/item-taxonomy.test.mjs` 会直接失败并点名。
-
-### 特效预设集合
-
-四个默认价格档从所选基础过滤器读取对应通货的特效。关闭「跟随基础过滤器」可手动修改。手动预设的数据由开发脚本生成：
-
-```bash
-node scripts/extract-neversink-effects.mjs
-```
-
-- 产物一 `data/neversink-effects.json`：按视觉风格分组的外观预设，一个预设 = 光柱 + 地图图标 + 字体（字号 + 三色）+ 音效，default / aura / cobalt / customsounds / darkmode / mythic / vaal / zen 分别是 104 / 99 / 96 / 104 / 101 / 61 / 99 / 87 种。
-- 产物二 `data/default-rules.json`：4 条默认价格规则，`effectPresetId` 指向前者里的一个预设，`effects` 与预设完全一致（取自 default 风格 2-SEMI-STRICT 里对应通货的原始规则）。
-- 选择预设后四项一起填好，仍可逐项改；改完规则会标记为「自定义」，生成器只读具体值，不依赖预设数据。
-- 规则卡片上有「播放音效」按钮：基础过滤器的自定义音效从所选来源读取；内置音效（`PlayAlertSound 1–16`）播放 `public/sounds/alert-sound-N.ogg`（从游戏 `FMOD/Desktop/Four_ItemFilter.bank` 导出，见 [public/sounds/README.md](public/sounds/README.md)），缺失时按钮置灰。
-
-wiki 侧的分类与三语对照方法参考同组织的 [poe2-skills](https://git.graydove.cn/graydove/poe2-skills) 中的 `poe2-wiki-search` skill。
+安装包生成在 `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。正式发布由 `vX.Y.Z` 标签触发，GitHub Actions 构建带更新签名的安装包，并生成指向同一个安装包的 `latest.json`。参见 [Windows 发布工作流](.github/workflows/release.yml)。

@@ -36,7 +36,7 @@
                    "windows":  {
                                    "nsis":  { "installMode":  "currentUser" },
                                    "webviewInstallMode":  {
-                                                              "type":  "offlineInstaller"
+                                                              "type":  "downloadBootstrapper"
                                                           }
                                },
                    "createUpdaterArtifacts":  true
@@ -52,5 +52,5 @@
                                                 }
                                 }
                 },
-    "version":  "0.5.2"
+    "version":  "0.5.3"
 }
