@@ -54,7 +54,19 @@ export function matcherLines(item: ItemDefinition): string[] {
 }
 
 function soundLine(sound: PresetSound, distinguishCustom: boolean): string {
-  return sound.type === "builtin" ? "\tPlayAlertSound " + sound.id + " " + sound.volume : "\tCustomAlertSound " + quote((distinguishCustom && sound.type === "custom" ? "@poe2rf-custom/" : "") + sound.fileName) + " 300";
+  if (sound.type === "builtin") {
+    const command = sound.positional ? "PlayAlertSoundPositional" : "PlayAlertSound";
+    return `\t${command} ${sound.id} ${sound.volume}`;
+  }
+  if (sound.type === "baseline") {
+    const command = sound.optional ? "CustomAlertSoundOptional" : "CustomAlertSound";
+    const name = (distinguishCustom ? "@poe2rf-baseline/" : "") + sound.fileName;
+    const references = name.split(";").map((file, index) => index > 0 && distinguishCustom ? "@poe2rf-baseline/" + file : file).join(";");
+    const alert = `\t${command} ${quote(references)}${sound.volume === undefined ? "" : ` ${sound.volume}`}`;
+    return sound.fallback ? `${soundLine(sound.fallback, distinguishCustom)}\n${alert}` : alert;
+  }
+  const name = (distinguishCustom && sound.type === "custom" ? "@poe2rf-custom/" : "") + sound.fileName;
+  return `\tCustomAlertSound ${quote(name)} 300`;
 }
 
 /** 只输出规则里真正填写的动作；留空 = 交给基础过滤器。 */

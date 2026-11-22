@@ -68,8 +68,9 @@ jobs:
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
           @'
-          - 腾讯服和国际服按报价时间逐项更新缓存。接口返回的报价更晚时才替换本地报价，汇率也按时间更新。
-          - 版本号旁新增「检查更新」按钮，可手动查询新版本并查看检查结果。
+          - 特效预设和四档通货样式按当前选择的基础过滤器提取，支持 Import 依赖和自定义音效。
+          - 新方案的四个价格档默认只匹配「通货与材料」，单个物品缺价时跳过该物品。
+          - 调整第三方过滤器下载弹窗，长名称和多选项可完整显示。
           - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
           '@ | Set-Content -Encoding utf8NoBOM release-notes.md
           gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md

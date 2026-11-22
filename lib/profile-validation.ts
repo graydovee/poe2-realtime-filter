@@ -2,13 +2,14 @@ import { DEFAULT_EFFECT_ITEMS } from "./baseline-effects";
 import { ITEM_CATALOG, STYLE_LABELS } from "./data";
 import { CURRENCY_ANCHORS } from "./pricing";
 import { normalizeProfile } from "./profile";
-import type { FilterProfile, FilterRule, PricePoint } from "./types";
+import type { BuiltinSound, FilterProfile, FilterRule, PricePoint } from "./types";
 
 const safeName=(value:string)=>value.replace(/[^a-zA-Z0-9._-]/g,'_');
 const beamPattern=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
-const iconPattern=/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (Circle|Star|Diamond|Square|Pentagon|Hexagon|Triangle|Cross|Kite|UpsideDownHouse)$/;
+const iconPattern=/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (Circle|Star|Diamond|Square|Pentagon|Hexagon|Triangle|Cross|Kite|UpsideDownHouse|Moon|Raindrop)$/;
 const colorPattern=/^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/;
 const number=(value:unknown,min:number,max:number)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max;
+const validBuiltinSound=(sound:BuiltinSound)=>sound.type==='builtin'&&Number.isInteger(sound.id)&&number(sound.id,1,16)&&number(sound.volume,0,300)&&(sound.positional===undefined||typeof sound.positional==='boolean');
 const catalogIds=new Set(ITEM_CATALOG.map(i=>i.id));
 
 function validatePoint(point:PricePoint,label:string){
@@ -45,11 +46,16 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  if(effects.icon!==undefined&&!iconPattern.test(effects.icon))throw new Error('无效地图图标');
  const font=effects.font;
  if(font){
-  if(font.fontSize!==undefined&&(!Number.isInteger(font.fontSize)||!number(font.fontSize,18,45)))throw new Error('字体范围为18–45');
+  if(font.fontSize!==undefined&&(!Number.isInteger(font.fontSize)||!number(font.fontSize,1,45)))throw new Error('字体范围为1–45');
   for(const color of [font.textColor,font.borderColor,font.backgroundColor])if(color!==undefined&&(!colorPattern.test(color)||color.split(' ').some(n=>+n>255)))throw new Error('无效颜色');
  }
  const sound=effects.sound;
- if(sound&&(sound.type==='builtin'?!Number.isInteger(sound.id)||!number(sound.id,1,16)||!number(sound.volume,0,300):!['custom','neversink'].includes(sound.type)||typeof sound.fileName!=='string'||safeName(sound.fileName)!==sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(sound.fileName)))throw new Error('无效音效');
+ if(sound?.type==='baseline'){
+  const name=sound.fileName;
+  if(typeof name!=='string'||name.length>1024||name.split(';').some(file=>!/^.+\.(mp3|wav|ogg)$/i.test(file)||file.split('/').some(part=>!part||part==='.'||part==='..'||/[\\:"<>|?*\x00-\x1f]/.test(part))))throw new Error('无效的基础过滤器音效路径');
+  if(sound.fallback!==undefined&&(!sound.optional||!sound.fallback||!validBuiltinSound(sound.fallback)))throw new Error('无效的备用音效');
+  if(sound.optional!==undefined&&typeof sound.optional!=='boolean'||sound.volume!==undefined&&!number(sound.volume,0,300))throw new Error('无效音效');
+ }else if(sound&&(sound.type==='builtin'?!validBuiltinSound(sound):!['custom','neversink'].includes(sound.type)||typeof sound.fileName!=='string'||safeName(sound.fileName)!==sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(sound.fileName)))throw new Error('无效音效');
 }
 
 export function validateProfile(input:unknown):FilterProfile {

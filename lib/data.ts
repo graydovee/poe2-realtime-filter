@@ -1,8 +1,7 @@
 import catalogData from "../data/item-catalog.json";
-import effectsData from "../data/neversink-effects.json";
 import rulesData from "../data/default-rules.json";
 import mechanicsData from "../data/item-mechanics.json";
-import type { EffectPresets, FilterRule, ItemDefinition, Locale, MarketSnapshot, Strictness } from "./types";
+import type { FilterRule, ItemDefinition, Locale, MarketSnapshot, Strictness } from "./types";
 
 export const STRICTNESS_LABELS: Record<Strictness, string> = {
   0: "宽松",
@@ -51,18 +50,16 @@ export const TAXONOMY = mechanicsData as {
   items: Record<string, { mechanic: string; evidence: string }>;
 };
 
-/** 基础过滤器里出现过的完整特效（光柱 + 图标 + 字体 + 音效），按视觉风格分组。 */
-export const EFFECT_PRESETS = effectsData as EffectPresets;
-
-/** 某些风格在 vendored 文件里缺失时回落到 default 的预设。 */
-export function effectPresetsFor(style: string) {
-  return EFFECT_PRESETS.styles[style] ?? EFFECT_PRESETS.styles.default ?? [];
-}
-
-/** 默认 4 条价格规则（崇高石 / 混沌石 / 剥离石 / 神圣石），由 scripts/extract-neversink-effects.mjs 生成。 */
-export const DEFAULT_RULES = (rulesData as { rules: FilterRule[] }).rules;
-
 export const ITEM_CATALOG = catalogData.items as ItemDefinition[];
+
+const craftingItemIds = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "crafting").map((item) => item.id);
+
+/** 新方案的四个价格档，每档默认匹配整个「通货与材料」分类。 */
+export const DEFAULT_RULES: FilterRule[] = (rulesData as { rules: FilterRule[] }).rules.map((rule) => ({
+  id: rule.id, name: rule.name, enabled: true, hidden: false, autoRange: true, followBaseline: true,
+  target: { ...rule.target, itemIds: [...craftingItemIds], itemEnabled: true },
+  effects: {},
+}));
 
 export const FALLBACK_SNAPSHOT: MarketSnapshot = {
   league: "Standard",

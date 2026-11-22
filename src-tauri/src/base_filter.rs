@@ -935,7 +935,8 @@ mod tests {
         let profile = serde_json::json!({"schemaVersion":2,"locale":"cn","league":"Standard","baseFilter":custom,"rules":[],"skippedItemIds":[]});
         let result = store.preview(profile, None).unwrap();
         assert!(result["filterFile"].as_str().unwrap().contains("poe2rf-"));
-        let styles = store.base_styles(custom.clone()).unwrap();
+        let inspection = store.base_styles(custom.clone()).unwrap();
+        let styles = &inspection["styles"];
         assert!(
             styles
                 .as_object()

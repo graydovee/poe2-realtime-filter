@@ -75,13 +75,13 @@ export function SoundPreviewButton({ sound, file, base, className }: { sound?: P
       source = url;
     } else if ((sound.type === "neversink" || sound.type === "baseline") && base) {
       try {
-        source = URL.createObjectURL(await readSound(sound.fileName, undefined, base));
+        source = URL.createObjectURL(await readSound(sound.type === "baseline" ? `@poe2rf-baseline/${sound.fileName.split(";")[0]}` : sound.fileName, undefined, base));
         urlRef.current = source;
       } catch { return; }
     }
     if (!source) return;
     const audio = new Audio(source);
-    audio.volume = sound.type === "builtin" ? Math.min(1, Math.max(0.05, sound.volume / 300)) : 1;
+    audio.volume = sound.type === "builtin" || sound.type === "baseline" ? Math.min(1, (sound.volume ?? 100) / 300) : 1;
     audio.onended = () => setPlaying(false);
     audio.onerror = () => setPlaying(false);
     audioRef.current = audio;

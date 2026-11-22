@@ -77,10 +77,12 @@ export type PriceRange = {
   max?: PricePoint;
 };
 
+export type BuiltinSound = { type: "builtin"; id: number; volume: number; positional?: boolean; fileName?: never };
+
 export type PresetSound =
-  | { type: "builtin"; id: number; volume: number; fileName?: never }
+  | BuiltinSound
   | { type: "neversink"; fileName: string }
-  | { type: "baseline"; fileName: string }
+  | { type: "baseline"; fileName: string; volume?: number; optional?: boolean; fallback?: BuiltinSound }
   | { type: "custom"; fileName: string };
 
 /** 规则适用物品：物品集合与价格区间可单独启用或同时启用，同时启用时取交集。 */

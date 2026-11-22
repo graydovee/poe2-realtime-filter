@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 
-import type { InheritedStyle } from "../../../lib/baseline-effects";
+import type { BaseInspection } from "../../../lib/baseline-effects";
 import { currencyPriceTiers, formatPrice } from "../../../lib/pricing";
 import type { FilterProfile, FilterRule, MarketSnapshot } from "../../../lib/types";
 import { RuleEditor } from "../rule-editor";
@@ -12,7 +12,7 @@ export function RulesSection({
   profile,
   market,
   customSounds,
-  baseStyles,
+  baseInspection,
   onRuleChange,
   onRemoveRule,
   onAddRule,
@@ -22,7 +22,7 @@ export function RulesSection({
   profile: FilterProfile;
   market: MarketSnapshot;
   customSounds: Record<string, File>;
-  baseStyles: Record<string, InheritedStyle>;
+  baseInspection?: BaseInspection;
   onRuleChange: (id: string, patch: Partial<FilterRule>) => void;
   onRemoveRule: (id: string) => void;
   onAddRule: () => void;
@@ -73,9 +73,9 @@ export function RulesSection({
             index={index}
             total={profile.rules.length}
             locale="cn"
-            style={profile.style}
             base={profile.baseFilter}
-            inherited={baseStyles[rule.id]}
+            inherited={baseInspection?.styles[rule.id]}
+            presets={baseInspection?.presets ?? []}
             market={market}
             customFile={customSounds[rule.id]}
             onChange={(patch) => onRuleChange(rule.id, patch)}

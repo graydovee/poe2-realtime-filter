@@ -1,7 +1,7 @@
 import { currencyPriceTiers, toExalted } from "../lib/pricing";
 import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
-import { inspectBaseStyles } from "../lib/baseline-effects";
+import { inspectBaseFilter } from "../lib/baseline-effects";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
@@ -30,7 +30,7 @@ const api = {
   tencentCatalog,
   tencentSnapshot: (input: Parameters<typeof tencentSnapshot>[0]) => tencentSnapshot(input, ITEM_CATALOG),
   validate: validateProfile,
-  baseStyles: (input: string) => inspectBaseStyles(input),
+  baseStyles: ({ text, audio }: { text: string; audio: Record<string, string> }) => inspectBaseFilter(text, audio),
   requiresMarket: (input: unknown) => validateProfile(input).rules.some((rule) => rule.enabled && rule.target.priceEnabled !== false && Boolean(rule.target.range)),
   generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string | null; baselineName: string | null; market?: MarketSnapshot }) => {
     const valid = validateProfile(profile);
@@ -53,6 +53,7 @@ const api = {
           marketIssue = `「${rule.name}」缺少价格区间所需的报价`;
           break;
         }
+        if (rule.autoRange) continue;
         const missing = rule.target.itemEnabled !== false && rule.target.itemIds.find((id) =>
           !valid.skippedItemIds.includes(id) && ITEM_CATALOG.some((item) => item.id === id && item.priceable && !item.ambiguous) && !quote.prices[id]);
         if (missing) {

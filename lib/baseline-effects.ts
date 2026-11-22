@@ -1,5 +1,5 @@
 import { ITEM_CATALOG } from "./data";
-import type { ItemMatcher, RuleEffects } from "./types";
+import type { EffectPreset, ItemMatcher, RuleEffects } from "./types";
 
 export const DEFAULT_EFFECT_ITEMS = {
   "default-exalted": "exalted-orb",
@@ -8,15 +8,18 @@ export const DEFAULT_EFFECT_ITEMS = {
   "default-divine": "divine-orb",
 } as const;
 
-type ActionGroup = "beam" | "icon" | "fontSize" | "textColor" | "borderColor" | "backgroundColor" | "sound" | "dropSound" | "dropSoundIfAlert";
+type ActionGroup = "beam" | "icon" | "fontSize" | "textColor" | "borderColor" | "backgroundColor" | "builtinSound" | "customSound" | "dropSound" | "dropSoundIfAlert";
 type Action = { key: ActionGroup; command: string; value: string };
 type Block = { show: boolean; continue: boolean; conditions: string[]; actions: Action[] };
 export type InheritedStyle = { effects: RuleEffects; actions: string[]; warning?: string };
 
+export type BaseInspection = { styles: Record<string, InheritedStyle>; presets: EffectPreset[] };
+type AudioReferences = Record<string, string>;
+
 const actionGroups: Record<string, ActionGroup> = {
   PlayEffect: "beam", MinimapIcon: "icon", SetFontSize: "fontSize", SetTextColor: "textColor",
-  SetBorderColor: "borderColor", SetBackgroundColor: "backgroundColor", PlayAlertSound: "sound",
-  PlayAlertSoundPositional: "sound", CustomAlertSound: "sound", CustomAlertSoundOptional: "sound",
+  SetBorderColor: "borderColor", SetBackgroundColor: "backgroundColor", PlayAlertSound: "builtinSound",
+  PlayAlertSoundPositional: "builtinSound", CustomAlertSound: "customSound", CustomAlertSoundOptional: "customSound",
   DisableDropSound: "dropSound", EnableDropSound: "dropSound", DisableDropSoundIfAlertSound: "dropSoundIfAlert",
   EnableDropSoundIfAlertSound: "dropSoundIfAlert",
 };
@@ -91,25 +94,37 @@ function matchesCondition(condition: string, item: ItemMatcher): boolean | undef
   return undefined;
 }
 
-function displayEffects(actions: Action[]): RuleEffects {
+function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects {
+  const latest = new Map(actions.map((action) => [action.key, action]));
+  // Build in a fixed order so equivalent effects have the same preset key.
+  actions = [...latest.values()].sort((left, right) => left.key.localeCompare(right.key));
   const effects: RuleEffects = {};
   for (const { key, command, value } of actions) {
     if (key === "beam" && value !== "None") effects.beam = value;
     if (key === "icon" && value !== "-1") effects.icon = value;
     if (key === "fontSize") effects.font = { ...effects.font, fontSize: Number(value) };
     if (key === "textColor" || key === "borderColor" || key === "backgroundColor") effects.font = { ...effects.font, [key]: value };
-    if (key === "sound") {
+    if (key === "builtinSound" || key === "customSound") {
       const [first, volume] = tokenize(value);
       if (!first || /^(?:"?none"?|0)$/i.test(first)) continue;
-      if (command.startsWith("Custom")) effects.sound = { type: "baseline", fileName: first.replace(/^"|"$/g, "") };
-      else if (/^\d+$/.test(first)) effects.sound = { type: "builtin", id: Number(first), volume: Number(volume ?? 300) };
+      if (command.startsWith("Custom")) {
+        const references = first.replace(/^"|"$/g, "").split(";");
+        if (references.every((reference) => Object.prototype.hasOwnProperty.call(audio, reference))) effects.sound = {
+          type: "baseline", fileName: references.map((reference) => audio[reference]).join(";"),
+          ...(volume !== undefined ? { volume: Number(volume) } : {}),
+          ...(command === "CustomAlertSoundOptional" ? { optional: true, ...(effects.sound?.type === "builtin" ? { fallback: effects.sound } : {}) } : {}),
+        };
+      } else if (/^\d+$/.test(first)) effects.sound = {
+        type: "builtin", id: Number(first), volume: Number(volume ?? 50),
+        ...(command === "PlayAlertSoundPositional" ? { positional: true } : {}),
+      };
     }
   }
   return effects;
 }
 
 /** Treat an unresolved condition as branching. Inherit only when both outcomes agree. */
-function styleFor(blocks: Block[], item: ItemMatcher): InheritedStyle | undefined {
+function styleFor(blocks: Block[], item: ItemMatcher, audio: AudioReferences): InheritedStyle | undefined {
   type State = { actions: Action[]; show: boolean };
   let active: State[] = [{ actions: [], show: false }];
   let result: State | undefined;
@@ -138,17 +153,36 @@ function styleFor(blocks: Block[], item: ItemMatcher): InheritedStyle | undefine
   for (const state of active) if (!finish(state)) return undefined;
   if (!result?.show) return undefined;
   return {
-    effects: displayEffects(result.actions),
+    effects: displayEffects(result.actions, audio),
     actions: result.actions.map(({ command, value }) => "\t" + command + (value ? " " + value : "")),
   };
 }
 
-export function inspectBaseStyles(baseline: string): Record<string, InheritedStyle> {
-  const blocks = readBlocks(baseline);
+function anchorStyles(blocks: Block[], audio: AudioReferences): Record<string, InheritedStyle> {
   return Object.fromEntries(Object.entries(DEFAULT_EFFECT_ITEMS).map(([ruleId, itemId]) => {
     const item = ITEM_CATALOG.find((entry) => entry.id === itemId)!;
-    return [ruleId, styleFor(blocks, { class: "Stackable Currency", ...item.matcher }) ?? {
+    return [ruleId, styleFor(blocks, { class: "Stackable Currency", ...item.matcher }, audio) ?? {
       effects: {}, actions: [], warning: `无法确定基础过滤器中「${item.name}」的显示特效，使用游戏默认显示样式。`,
     }];
   }));
+}
+
+export function inspectBaseStyles(baseline: string): Record<string, InheritedStyle> {
+  return anchorStyles(readBlocks(baseline), {});
+}
+
+export function inspectBaseFilter(baseline: string, audio: AudioReferences): BaseInspection {
+  const blocks = readBlocks(baseline);
+  const styles = anchorStyles(blocks, audio);
+  const presets: EffectPreset[] = [];
+  const seen = new Set<string>();
+  function add(effects: RuleEffects) {
+    const key = JSON.stringify(effects);
+    if (!Object.keys(effects).length || seen.has(key)) return;
+    seen.add(key);
+    presets.push({ id: `base-${presets.length + 1}`, ...effects });
+  }
+  for (const block of blocks) if (block.show) add(displayEffects(block.actions, audio));
+  for (const style of Object.values(styles)) add(style.effects);
+  return { styles, presets };
 }

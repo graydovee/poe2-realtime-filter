@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { FALLBACK_SNAPSHOT } from "../lib/data";
 import type { FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot } from "../lib/types";
 
-import type { InheritedStyle } from "../lib/baseline-effects";
+import type { BaseInspection } from "../lib/baseline-effects";
 import { DEFAULT_PROFILE } from "../lib/default-profile";
 
 import { AppShell } from "./components/app-shell";
@@ -40,7 +40,9 @@ export default function HomePage() {
   const [newName, setNewName] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [profile, setProfile] = useState<FilterProfile>(DEFAULT_PROFILE);
-  const [baseStyles, setBaseStyles] = useState<Record<string, InheritedStyle>>({});
+  const [baseInspection, setBaseInspection] = useState<BaseInspection>();
+  const [baseRevision, setBaseRevision] = useState(0);
+  const inspectionRequest = useRef(0);
   const [baseStylesError, setBaseStylesError] = useState("");
   const [customSounds, setCustomSounds] = useState<Record<string, File>>({});
   const [generated, setGenerated] = useState<Generated | null>(null);
@@ -56,15 +58,15 @@ export default function HomePage() {
 
   const base = profile.baseFilter;
   useEffect(() => {
-    setBaseStyles({});
+    setBaseInspection(undefined);
     setBaseStylesError("");
     if (view !== "editor" || !base) return;
-    let current = true;
-    void local<Record<string, InheritedStyle>>("base_styles", { base })
-      .then((styles) => { if (current) setBaseStyles(styles); })
-      .catch((error) => { if (current) setBaseStylesError(explain(error)); });
-    return () => { current = false; };
-  }, [view, base]);
+    const request = ++inspectionRequest.current;
+    void local<BaseInspection>("base_styles", { base })
+      .then((inspection) => { if (request === inspectionRequest.current) setBaseInspection(inspection); })
+      .catch((error) => { if (request === inspectionRequest.current) setBaseStylesError(explain(error)); });
+    return () => { inspectionRequest.current += 1; };
+  }, [view, base, baseRevision]);
 
   const server = profile.server ?? "international";
   const matchingMarket = (market.server ?? "international") === server && market.league === profile.league;
@@ -213,6 +215,8 @@ export default function HomePage() {
     }
     requestVersion.current += 1;
     baseFilterChanged.current = false;
+    setBaseInspection(undefined);
+    setBaseStylesError("");
     setSchemeId(scheme?.id ?? null);
     setSchemeName(scheme?.name ?? "");
     const catalog = await local<LeagueCatalog>("local_catalog", { server: target }).catch(() => null);
@@ -220,7 +224,6 @@ export default function HomePage() {
     const league = catalog?.defaultLeague ?? (target === "international" ? DEFAULT_PROFILE.league : "");
     setProfile(scheme ? { ...scheme.profile, server: target } : {
       ...structuredClone(DEFAULT_PROFILE), server: target, league, originalLeague: league,
-      rules: DEFAULT_PROFILE.rules.map((rule) => ({ ...rule, effects: {}, effectPresetId: undefined, followBaseline: true })),
     });
     setCustomSounds(soundFiles);
     setGenerated(null);
@@ -331,6 +334,10 @@ export default function HomePage() {
                 profile={profile}
                 onBaseChange={(baseFilter) => {
                   baseFilterChanged.current = true;
+                  inspectionRequest.current += 1;
+                  setBaseInspection(undefined);
+                  setBaseStylesError("");
+                  setBaseRevision((revision) => revision + 1);
                   setDirty(true);
                   setProfile((current) => ({ ...current, baseFilter, baseFilterHint: undefined }));
                 }}
@@ -341,7 +348,7 @@ export default function HomePage() {
                 profile={profile}
                 market={selectedMarket}
                 customSounds={customSounds}
-                baseStyles={baseStyles}
+                baseInspection={baseInspection}
                 onRuleChange={updateRule}
                 onRemoveRule={removeRule}
                 onAddRule={addRule}

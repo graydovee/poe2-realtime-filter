@@ -355,15 +355,29 @@ fn expand_filter(
                 .captures(trimmed)
                 .and_then(|captures| captures.get(3).or_else(|| captures.get(4)));
             if let Some(reference) = reference {
-                let sound = Path::new(reference.as_str());
-                let relative = directory.join(sound);
-                if !sound.is_absolute() && base_filter::audio_name(sound) && relative.is_file() {
-                    let absolute = display_directory(&relative);
+                let paths: Vec<_> = reference
+                    .as_str()
+                    .split(';')
+                    .map(|name| {
+                        let sound = Path::new(name);
+                        let relative = directory.join(sound);
+                        if !sound.is_absolute()
+                            && base_filter::audio_name(sound)
+                            && relative.is_file()
+                        {
+                            display_directory(&relative)
+                        } else {
+                            name.to_owned()
+                        }
+                    })
+                    .collect();
+                let paths = paths.join(";");
+                if paths != reference.as_str() {
                     expanded.push_str(&line[..reference.start()]);
                     if !line[..reference.start()].ends_with('"') {
                         expanded.push('"');
                     }
-                    expanded.push_str(&absolute);
+                    expanded.push_str(&paths);
                     if !line[reference.end()..].starts_with('"') {
                         expanded.push('"');
                     }
@@ -385,6 +399,7 @@ fn expand_filter(
     Ok(())
 }
 
+const BASE_SOUND_PREFIX: &str = "@poe2rf-baseline/";
 const CUSTOM_SOUND_PREFIX: &str = "@poe2rf-custom/";
 
 fn sound_names(profile: &Value) -> BTreeSet<String> {
@@ -840,9 +855,80 @@ impl Store {
         Ok(baseline)
     }
 
+    // Imported rules can refer to absolute paths after expansion. Persist relative
+    // names in presets and only resolve names which the current base actually uses.
+    fn base_sound_references(baseline: &Baseline) -> BTreeMap<String, Option<String>> {
+        let parent = baseline
+            .path
+            .parent()
+            .and_then(|path| path.canonicalize().ok());
+        let directory = parent.as_deref().map(display_directory);
+        let mut references = BTreeMap::new();
+        for line in baseline.text.lines() {
+            let Some(captures) = audio_pattern().captures(line) else {
+                continue;
+            };
+            let sounds = captures
+                .get(3)
+                .or_else(|| captures.get(4))
+                .unwrap()
+                .as_str();
+            for raw in sounds.split(';') {
+                let path = Path::new(raw);
+                if !base_filter::audio_name(path) {
+                    continue;
+                }
+                let relative = if path.is_absolute() {
+                    directory
+                        .as_ref()
+                        .and_then(|dir| path.strip_prefix(dir).ok())
+                } else {
+                    Some(path)
+                };
+                let portable = relative
+                    .filter(|path| {
+                        path.components()
+                            .all(|part| matches!(part, std::path::Component::Normal(_)))
+                    })
+                    .or_else(|| path.file_name().map(Path::new));
+                let Some(name) = portable.and_then(Path::to_str) else {
+                    continue;
+                };
+                let name = name.replace('\\', "/");
+                references
+                    .entry(name)
+                    .and_modify(|source: &mut Option<String>| {
+                        if source.as_deref() != Some(raw) {
+                            *source = None;
+                        }
+                    })
+                    .or_insert_with(|| Some(raw.to_owned()));
+            }
+        }
+        references
+    }
+
+    fn resolve_base_sound<'a>(
+        references: &'a BTreeMap<String, Option<String>>,
+        name: &str,
+    ) -> Result<&'a str> {
+        match references.get(name) {
+            Some(Some(source)) => Ok(source),
+            Some(None) => Err(format!("基础过滤器中有多个同名音效「{name}」")),
+            None => Err(format!("当前基础过滤器缺少音效「{name}」")),
+        }
+    }
+
     pub fn base_styles(&self, base: BaseFilter) -> Result<Value> {
         let baseline = self.load_baseline(&base)?;
-        engine::call("baseStyles", json!(baseline.text))
+        let audio: BTreeMap<_, _> = Self::base_sound_references(&baseline)
+            .into_iter()
+            .filter_map(|(name, raw)| Some((raw?, name)))
+            .collect();
+        engine::call(
+            "baseStyles",
+            json!({ "text": baseline.text, "audio": audio }),
+        )
     }
 
     pub fn base_audio(&self, baseline: &Baseline, name: &str, game: &Path) -> Result<Vec<u8>> {
@@ -887,6 +973,13 @@ impl Store {
 
     pub fn preview_base_audio(&self, base: BaseFilter, name: &str) -> Result<Vec<u8>> {
         let baseline = self.load_baseline(&base)?;
+        let references;
+        let name = if let Some(name) = name.strip_prefix(BASE_SOUND_PREFIX) {
+            references = Self::base_sound_references(&baseline);
+            Self::resolve_base_sound(&references, name)?
+        } else {
+            name
+        };
         self.base_audio(&baseline, name, &self.base_directory(&self.load()?))
     }
 
@@ -930,7 +1023,8 @@ impl Store {
             Some(installed) => installed.directory.clone(),
             None => self.base_directory(&self.load()?),
         };
-        let mut names = BTreeMap::<(&str, bool, bool), Option<String>>::new();
+        let mut names = BTreeMap::<(&str, bool, bool, bool), Option<String>>::new();
+        let mut references = None;
         let mut assets = BTreeMap::new();
         let mut total = 0;
         let mut output = String::with_capacity(text.len());
@@ -958,55 +1052,94 @@ impl Store {
                     output.push_str(line);
                     continue;
                 }
-                let custom = is_overlay && name.starts_with(CUSTOM_SOUND_PREFIX);
-                let name = if custom {
-                    &name[CUSTOM_SOUND_PREFIX.len()..]
-                } else {
-                    name
-                };
                 let optional = &captures[2] == "CustomAlertSoundOptional";
-                let key = (name, custom, optional);
-                if !names.contains_key(&key) {
-                    let target = if custom && scheme.is_none() {
-                        Some(name.to_owned()) // Draft uploads are checked when saving and installing.
+                let mut targets = Vec::new();
+                for name in name.split(';') {
+                    let custom = is_overlay && name.starts_with(CUSTOM_SOUND_PREFIX);
+                    let name = if custom {
+                        &name[CUSTOM_SOUND_PREFIX.len()..]
                     } else {
-                        match if custom {
-                            self.audio(scheme, name)
-                        } else {
-                            baseline
-                                .ok_or_else(|| {
-                                    format!(
-                                        "请选择内置音效或上传音效，替换基础过滤器音效「{name}」"
-                                    )
-                                })
-                                .and_then(|base| self.base_audio(base, name, &game))
-                        } {
-                            Ok(bytes) => {
-                                let extension = Path::new(name)
-                                    .extension()
-                                    .ok_or("无效音效文件名")?
-                                    .to_string_lossy()
-                                    .to_ascii_lowercase();
-                                let target = format!("poe2rf-{}.{extension}", digest(&bytes));
-                                if !assets.contains_key(&target) {
-                                    total += bytes.len();
-                                    if total > AUDIO_TOTAL_MAX {
-                                        return Err("过滤器所需音效合计超过 32 MB".into());
-                                    }
-                                    assets.insert(target.clone(), bytes);
-                                }
-                                Some(target)
-                            }
-                            Err(_) if optional => None,
-                            Err(error) => return Err(error),
-                        }
+                        name
                     };
-                    names.insert(key, target);
+                    let key = (
+                        name,
+                        custom,
+                        optional,
+                        is_overlay && name.starts_with(BASE_SOUND_PREFIX),
+                    );
+                    if !names.contains_key(&key) {
+                        let target = if custom && scheme.is_none() {
+                            Some(name.to_owned()) // Draft uploads are checked when saving and installing.
+                        } else {
+                            match if custom {
+                                self.audio(scheme, name)
+                            } else {
+                                baseline
+                                    .ok_or_else(|| {
+                                        let file =
+                                            name.strip_prefix(BASE_SOUND_PREFIX).unwrap_or(name);
+                                        format!(
+                                            "请选择基础过滤器，或在规则中替换基础过滤器音效「{file}」"
+                                        )
+                                    })
+                                    .and_then(|base| {
+                                        let reference = if let Some(portable) = name
+                                            .strip_prefix(BASE_SOUND_PREFIX)
+                                            .filter(|_| is_overlay)
+                                        {
+                                            let map = references.get_or_insert_with(|| {
+                                                Self::base_sound_references(base)
+                                            });
+                                            Self::resolve_base_sound(map, portable)?
+                                        } else {
+                                            name
+                                        };
+                                        self.base_audio(base, reference, &game).map_err(|error| {
+                                            if reference != name {
+                                                format!(
+                                                    "无法打包音效「{}」：{error}",
+                                                    name.trim_start_matches(BASE_SOUND_PREFIX)
+                                                )
+                                            } else {
+                                                error
+                                            }
+                                        })
+                                    })
+                            } {
+                                Ok(bytes) => {
+                                    let extension = Path::new(name)
+                                        .extension()
+                                        .ok_or("无效音效文件名")?
+                                        .to_string_lossy()
+                                        .to_ascii_lowercase();
+                                    let target = format!("poe2rf-{}.{extension}", digest(&bytes));
+                                    if !assets.contains_key(&target) {
+                                        total += bytes.len();
+                                        if total > AUDIO_TOTAL_MAX {
+                                            return Err("过滤器所需音效合计超过 32 MB".into());
+                                        }
+                                        assets.insert(target.clone(), bytes);
+                                    }
+                                    Some(target)
+                                }
+                                Err(_) if optional => None,
+                                Err(error) => return Err(error),
+                            }
+                        };
+                        names.insert(key, target);
+                    }
+                    if let Some(target) = &names[&key] {
+                        targets.push(target.clone());
+                    }
                 }
-                if let Some(target) = &names[&key] {
+                if !targets.is_empty() {
                     output.push_str(&format!(
                         "{}{} \"{}\"{}{}",
-                        &captures[1], &captures[2], target, &captures[5], end
+                        &captures[1],
+                        &captures[2],
+                        targets.join(";"),
+                        &captures[5],
+                        end
                     ));
                 }
             }
@@ -1761,6 +1894,129 @@ mod tests {
     }
 
     #[test]
+    fn price_tier_install_requires_anchors_but_allows_missing_item_quotes() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut rules: Value =
+            serde_json::from_str(include_str!("../../data/default-rules.json")).unwrap();
+        for rule in rules["rules"].as_array_mut().unwrap() {
+            rule["target"]["itemIds"] = json!([
+                "exalted-orb",
+                "chaos-orb",
+                "orb-of-annulment",
+                "divine-orb",
+                "gnawed-jawbone"
+            ]);
+            rule["followBaseline"] = json!(true);
+            rule["effects"] = json!({});
+        }
+        let input = json!({"schemaVersion":2, "league":"Standard", "rules":rules["rules"], "skippedItemIds":[]});
+        let mut prices = serde_json::Map::new();
+        for (id, amount) in [
+            ("exalted-orb", 1),
+            ("chaos-orb", 10),
+            ("orb-of-annulment", 100),
+            ("divine-orb", 1000),
+        ] {
+            prices.insert(
+                id.into(),
+                json!({"itemId":id, "amount":amount, "currency":"exalted"}),
+            );
+        }
+        let mut market = json!({"league":"Standard", "capturedAt":"2026-01-01T00:00:00Z", "expiresAt":"2099-01-01T00:00:00Z", "rates":{"divineToExalted":1000,"divineToChaos":100}, "prices":prices});
+        let id = store
+            .add(&mut library, "Price tier QA", input, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        store.install(scheme, Some(market.clone()), None).unwrap();
+        let file = store.default_game.join("Price tier QA.filter");
+        let before = fs::read_to_string(&file).unwrap();
+        assert_eq!(before.matches("Show # poe2-filter rule:").count(), 4);
+        assert!(!before.contains("Gnawed Jawbone"));
+        market["prices"]
+            .as_object_mut()
+            .unwrap()
+            .remove("chaos-orb");
+        assert!(store
+            .install(scheme, Some(market), None)
+            .unwrap_err()
+            .contains("锚点"));
+        assert_eq!(fs::read_to_string(file).unwrap(), before);
+    }
+
+    #[test]
+    fn applied_base_preset_shares_portable_audio_and_preserves_installed_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut input = profile(&store);
+        let source = store.root.join("fixture.filter");
+        let nested = store.root.join("sub");
+        fs::create_dir(&nested).unwrap();
+        fs::write(&source, "Import \"sub/child.filter\"\nShow\n").unwrap();
+        fs::write(nested.join("child.filter"), "Show\n BaseType == \"Exalted Orb\"\n SetFontSize 43\n PlayAlertSoundPositional 2 50\n CustomAlertSoundOptional \"tone.ogg;second.ogg\" 85\nShow\n BaseType == \"Chaos Orb\"\n CustomAlertSound \"required.ogg\" 60\n").unwrap();
+        fs::write(nested.join("tone.ogg"), b"nested audio").unwrap();
+        fs::write(nested.join("second.ogg"), b"second audio").unwrap();
+        fs::write(nested.join("required.ogg"), b"required audio").unwrap();
+        let base: BaseFilter = serde_json::from_value(input["baseFilter"].clone()).unwrap();
+        let inspection = store.base_styles(base.clone()).unwrap();
+        let effects = inspection["styles"]["default-exalted"]["effects"].clone();
+        assert_eq!(effects["sound"]["fileName"], "sub/tone.ogg;sub/second.ogg");
+        assert_eq!(effects["sound"]["fallback"]["positional"], true);
+        assert!(inspection["presets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|preset| preset["sound"] == effects["sound"]));
+        assert_eq!(
+            store
+                .preview_base_audio(base, "@poe2rf-baseline/sub/tone.ogg")
+                .unwrap(),
+            b"nested audio"
+        );
+        input["rules"] = json!([{
+            "id":"default-exalted", "name":"Applied preset", "enabled": true,
+            "hidden":false, "followBaseline":false, "effects": effects,
+            "target": {"itemIds":["exalted-orb"]}
+        }]);
+        let id = store
+            .add(&mut library, "Preset QA", input.clone(), BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        let share = share_code::decode(&Store::share(scheme).unwrap()).unwrap();
+        assert!(share.profile["baseFilter"].is_null());
+        assert_eq!(share.profile["rules"][0]["effects"], effects);
+        assert_eq!(share.profile["baseFilterHint"], input["baseFilter"]["name"]);
+        let preview = store.preview(input, None).unwrap();
+        let (text, resources) = store.prepare_filter(scheme, None).unwrap();
+        assert_eq!(preview["filterFile"], text);
+        assert_eq!(resources.len(), 3);
+        let archive = filter_zip(&scheme.name, &text, resources).unwrap();
+        assert_eq!(
+            zip::ZipArchive::new(std::io::Cursor::new(archive))
+                .unwrap()
+                .len(),
+            4
+        );
+        assert!(text.contains("PlayAlertSoundPositional 2 50"));
+        assert!(text.contains(&format!(
+            "CustomAlertSoundOptional \"poe2rf-{}.ogg;poe2rf-{}.ogg\" 85",
+            digest(b"nested audio"),
+            digest(b"second audio")
+        )));
+        store.install(scheme, None, None).unwrap();
+        let installed = store.default_game.join("Preset QA.filter");
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        fs::remove_file(nested.join("required.ogg")).unwrap();
+        assert!(store
+            .install(scheme, None, None)
+            .unwrap_err()
+            .contains("required.ogg"));
+        assert_eq!(fs::read_to_string(installed).unwrap(), text);
+    }
+
+    #[test]
     fn expands_local_filter_imports_in_order_with_relative_sounds() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
@@ -1783,7 +2039,8 @@ mod tests {
         assert!(!output["filterFile"].as_str().unwrap().contains("Import "));
         let base = serde_json::from_value(input["baseFilter"].clone()).unwrap();
         assert_eq!(
-            store.base_styles(base).unwrap()["default-exalted"]["effects"]["font"]["fontSize"],
+            store.base_styles(base).unwrap()["styles"]["default-exalted"]["effects"]["font"]
+                ["fontSize"],
             44
         );
         fs::write(
