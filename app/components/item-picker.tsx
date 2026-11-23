@@ -9,6 +9,7 @@ import { FILTER_ITEMS_BY_ID, PICKER_ITEMS } from "../../lib/data";
 import type { ItemDefinition, Locale } from "../../lib/types";
 import { SearchInput } from "./ui/controls";
 import { Button, EmptyState } from "./ui/primitives";
+import { CachedItemImage } from "./cached-item-image";
 
 export type ItemPickerEntry = { id: string; label: string; itemIds: string[] };
 export type ItemPickerToggle = { ids: string[]; checked: boolean; label: string; key: string };
@@ -18,11 +19,16 @@ function ItemImage({ item }: { item: ItemDefinition }) {
   const group = item.categoryPath[0];
   const Icon = group === "gems" ? Gem : group === "equipment" ? Shield : item.stackable ? Coins : Package;
   return (
-    <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-line/60 bg-surface">
+    <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line/60 bg-surface">
       {item.iconUrl && !failed ? (
-        // The catalog uses the source's image cache with an item-category fallback.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.iconUrl} alt="" width={36} height={36} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-9 object-contain" />
+        <CachedItemImage
+          src={item.iconUrl}
+          alt=""
+          width={36}
+          height={36}
+          className="size-9 object-contain"
+          onError={() => setFailed(true)}
+        />
       ) : <Icon className="size-5 text-ink-muted" />}
     </span>
   );
@@ -66,14 +72,14 @@ export function ItemPicker({ locale, entries, onToggle, onRemoveEntry, onGemLeve
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface-2/45 p-2">
         <SearchInput className="min-w-40 flex-1" value={query} aria-label="搜索物品" placeholder="搜索中文或英文物品名" onChange={(event) => { setQuery(event.target.value); setLimit(60); }} />
-        <Button size="sm" variant={selectedOnly ? "secondary" : "ghost"} aria-pressed={selectedOnly} onClick={() => { setSelectedOnly(!selectedOnly); setLimit(60); }}>
+        <Button size="sm" variant={selectedOnly ? "secondary" : "ghost"} className="rounded-lg" aria-pressed={selectedOnly} onClick={() => { setSelectedOnly(!selectedOnly); setLimit(60); }}>
           已选 {selected.size} 项
         </Button>
       </div>
       {!selectedOnly && !search && (
-        <nav className="flex flex-wrap items-center gap-1 text-xs text-ink-muted" aria-label="物品分类路径">
+        <nav className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-surface-2/35 px-2 py-1.5 text-xs text-ink-muted" aria-label="物品分类路径">
           <button type="button" className="rounded-sm px-1.5 py-1 hover:text-ink" aria-current={!path.length ? "location" : undefined} onClick={() => navigate([])}>全部分类</button>
           {path.map((key, index) => (
             <span key={key} className="flex items-center gap-1">
@@ -84,7 +90,7 @@ export function ItemPicker({ locale, entries, onToggle, onRemoveEntry, onGemLeve
         </nav>
       )}
       {!selectedOnly && (canBatch || stackables.length > 0) && (
-        <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-line bg-surface-2 px-2 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2 py-1.5">
           {canBatch && <span className="mr-auto px-1 text-xs text-ink-muted">已选 {count(scope)} / {scope.length}</span>}
           {canBatch && <Button size="sm" variant="ghost" disabled={scope.length === count(scope)} onClick={() => toggle(scope, true, group, search ? "search" : path.join("/"))}>{search ? "全选搜索结果" : "全选本类"}</Button>}
           {canBatch && <Button size="sm" variant="ghost" disabled={count(scope) === 0} onClick={() => toggle(scope, false, group, path.join("/"))}>取消所选</Button>}

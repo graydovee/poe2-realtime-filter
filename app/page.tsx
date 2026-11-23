@@ -3,6 +3,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { explain, fileToBase64, isDesktop, local, readSound, type LocalScheme } from "../lib/desktop";
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Eye, Gauge, Layers2, Save, Sparkles } from "lucide-react";
 
 import { FALLBACK_SNAPSHOT } from "../lib/data";
 import type { FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot } from "../lib/types";
@@ -18,6 +19,7 @@ import { ExcludedItemsSection } from "./components/sections/excluded-items-secti
 import { RulesSection } from "./components/sections/rules-section";
 import { SeasonSection } from "./components/sections/season-section";
 import { SummarySidebar } from "./components/sections/summary-sidebar";
+import { EditorActionBar, EditorNavigation, type EditorStep } from "./components/editor-navigation";
 import type { ItemPickerToggle } from "./components/item-picker";
 import { ConfirmDialog } from "./components/ui/confirm-dialog";
 import { TextInput } from "./components/ui/controls";
@@ -28,6 +30,7 @@ const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
 export default function HomePage() {
   const [market, setMarket] = useState<MarketSnapshot>(FALLBACK_SNAPSHOT);
   const [view, setView] = useState<"manager" | "editor">("manager");
+  const [editorStep, setEditorStep] = useState("season");
   const [schemeId, setSchemeId] = useState<string | null>(null);
   const [schemeName, setSchemeName] = useState("");
   const [schemeBusy, setSchemeBusy] = useState(false);
@@ -55,6 +58,17 @@ export default function HomePage() {
   const requestVersion = useRef(0);
   const baseFilterChanged = useRef(false);
   useEffect(() => { window.scrollTo(0, 0); }, [view]);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("poe2-filter.editor-step");
+    if (saved === "excluded") {
+      setEditorStep("base");
+      return;
+    }
+    if (saved && ["season", "base", "rules"].includes(saved)) setEditorStep(saved);
+  }, []);
+  useEffect(() => {
+    window.localStorage.setItem("poe2-filter.editor-step", editorStep);
+  }, [editorStep]);
 
   const base = profile.baseFilter;
   useEffect(() => {
@@ -240,6 +254,7 @@ export default function HomePage() {
     setSaveError(missing.size ? `请在规则中补齐自定义音效：${[...missing].join("、")}` : "");
     setDirty(false);
     setView("editor");
+    setEditorStep("season");
     setSchemeBusy(false);
   }
 
@@ -311,6 +326,22 @@ export default function HomePage() {
     }
   }
 
+  const editorSteps: EditorStep[] = [
+    { id: "season", label: "赛季与行情", description: "选择赛季并刷新报价", icon: Gauge, status: marketError ? "warning" : profile.league ? "ready" : "active" },
+    { id: "base", label: "基础过滤器", description: "选择样式并整理跳过名单", icon: Layers2, status: baseStylesError || profile.baseFilterHint ? "warning" : base ? "ready" : "active", meta: base ? `${profile.skippedItemIds.length} 项跳过` : "" },
+    { id: "rules", label: "自定义规则", description: "按优先级编辑掉落规则", icon: Sparkles, status: profile.rules.length ? "ready" : "warning", meta: `${profile.rules.length} 条` },
+  ];
+  const editorStepIndex = editorSteps.findIndex((step) => step.id === editorStep);
+  const previousStep = editorSteps[Math.max(0, editorStepIndex - 1)]?.id;
+  const nextStep = editorSteps[Math.min(editorSteps.length - 1, editorStepIndex + 1)]?.id;
+
+  function goToEditorStep(id: string) {
+    setEditorStep(id);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`editor-step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <AppShell title={view === "manager" ? "方案管理" : schemeId ? `编辑过滤器：${schemeName}` : "制作过滤器"}>
       <div hidden={view !== "manager"}>
@@ -324,55 +355,104 @@ export default function HomePage() {
         />
       </div>
       {view === "editor" && (
-        <fieldset className="flex min-w-0 flex-col gap-4" disabled={schemeBusy}>
-          <SeasonSection
-            profile={profile}
-            leagueCatalog={leagueCatalog}
-            leaguesLoading={leaguesLoading}
-            marketLoading={marketLoading}
-            marketError={marketError}
-            selectedMarket={matchingMarket ? market : selectedMarket}
-            onLeagueChange={selectLeague}
-            onRefresh={() => void refreshMarket()}
-          />
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(15.5rem,17.5rem)]">
-            <div className="flex min-w-0 flex-col gap-4">
-              <BasicFilterSection
-                profile={profile}
-                onBaseChange={(baseFilter) => {
-                  baseFilterChanged.current = true;
-                  inspectionRequest.current += 1;
-                  setBaseInspection(undefined);
-                  setBaseStylesError("");
-                  setBaseRevision((revision) => revision + 1);
-                  setDirty(true);
-                  setProfile((current) => ({ ...current, baseFilter, baseFilterHint: undefined }));
-                }}
-              />
-              {baseStylesError && <p role="alert" className="text-sm text-ember">{baseStylesError}</p>}
-              {base && <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />}
-              <RulesSection
-                profile={profile}
-                market={selectedMarket}
-                customSounds={customSounds}
-                baseInspection={baseInspection}
-                onRuleChange={updateRule}
-                onRemoveRule={removeRule}
-                onAddRule={addRule}
-                onMoveRule={moveRule}
-                onSound={setRuleSound}
-              />
+        <fieldset className="min-w-0" disabled={schemeBusy}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface/80 px-4 py-3 shadow-panel">
+            <div className="flex min-w-0 items-center gap-3">
+              <button type="button" onClick={() => dirty ? setConfirmCancel(true) : leaveEditor()} className="grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition hover:border-gold/60 hover:text-gold" aria-label="返回方案管理" title="返回方案管理">
+                <ArrowLeft className="size-4" aria-hidden="true" />
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-xs text-ink-muted">正在编辑</p>
+                <h2 className="truncate text-sm font-semibold text-ink">{schemeName || "未命名方案"}</h2>
+              </div>
+              <span className={dirty ? "rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-[11px] text-gold" : "rounded-full border border-sage/35 bg-sage/10 px-2 py-0.5 text-[11px] text-sage"}>
+                {dirty ? "有未保存修改" : "已保存"}
+              </span>
             </div>
-            <SummarySidebar
-              profile={profile}
-              saving={schemeBusy}
-              previewing={busy}
-              error={nameDialog ? "" : saveError}
-              onSave={requestSave}
-              onPreview={() => void generate()}
-              onCancel={() => dirty ? setConfirmCancel(true) : leaveEditor()}
-            />
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
+              <span className="rounded-full border border-line px-2 py-1">{profile.league || "待选赛季"}</span>
+              <span className="rounded-full border border-line px-2 py-1">{profile.rules.length} 条规则</span>
+            </div>
           </div>
+
+          <div className="min-w-0 space-y-5">
+            <EditorNavigation steps={editorSteps} active={editorStep} onChange={goToEditorStep} />
+
+            <div className="editor-workflow">
+              <section id="editor-step-season" className="editor-section">
+                <SeasonSection
+                  profile={profile}
+                  leagueCatalog={leagueCatalog}
+                  leaguesLoading={leaguesLoading}
+                  marketLoading={marketLoading}
+                  marketError={marketError}
+                  selectedMarket={matchingMarket ? market : selectedMarket}
+                  onLeagueChange={selectLeague}
+                  onRefresh={() => void refreshMarket()}
+                />
+              </section>
+
+              <section id="editor-step-base" className="editor-section base-filter-workspace">
+                <BasicFilterSection
+                  profile={profile}
+                  onBaseChange={(baseFilter) => {
+                    baseFilterChanged.current = true;
+                    inspectionRequest.current += 1;
+                    setBaseInspection(undefined);
+                    setBaseStylesError("");
+                    setBaseRevision((revision) => revision + 1);
+                    setDirty(true);
+                    setProfile((current) => ({ ...current, baseFilter, baseFilterHint: undefined }));
+                  }}
+                />
+                {baseStylesError && <p role="alert" className="mt-3 rounded-lg border border-ember/35 bg-ember/8 px-4 py-3 text-sm text-ember">{baseStylesError}</p>}
+                {base && (
+                  <div className="base-filter-dependent">
+                    <div className="base-filter-dependent-heading">
+                      <div>
+                        <p className="eyebrow">OPTIONAL CLEANUP</p>
+                        <h3>跳过物品</h3>
+                      </div>
+                      <span>{profile.skippedItemIds.length} 项已跳过</span>
+                    </div>
+                    <ExcludedItemsSection profile={profile} onToggleItems={toggleSkipped} onClear={clearSkipped} />
+                  </div>
+                )}
+              </section>
+
+              <section id="editor-step-rules" className="editor-section">
+                <RulesSection
+                  profile={profile}
+                  market={selectedMarket}
+                  customSounds={customSounds}
+                  baseInspection={baseInspection}
+                  onRuleChange={updateRule}
+                  onRemoveRule={removeRule}
+                  onAddRule={addRule}
+                  onMoveRule={moveRule}
+                  onSound={setRuleSound}
+                />
+              </section>
+
+              <details className="summary-disclosure">
+                <summary>查看配置摘要</summary>
+                <div className="mt-4"><SummarySidebar profile={profile} saving={schemeBusy} previewing={busy} error={nameDialog ? "" : saveError} onSave={requestSave} onPreview={() => void generate()} onCancel={() => dirty ? setConfirmCancel(true) : leaveEditor()} showActions={false} /></div>
+              </details>
+            </div>
+          </div>
+
+          <EditorActionBar>
+            <div className="flex min-w-0 items-center gap-2">
+              <button type="button" className="grid size-9 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition hover:border-gold/60 hover:text-gold disabled:opacity-40" aria-label="上一步" title="上一步" disabled={editorStepIndex <= 0} onClick={() => goToEditorStep(previousStep)}><ArrowLeft className="size-4" aria-hidden="true" /></button>
+              <span className="hidden text-xs text-ink-muted sm:inline">{editorSteps[editorStepIndex]?.label}</span>
+              <button type="button" className="grid size-9 place-items-center rounded-lg border border-line bg-surface-2 text-ink-muted transition hover:border-gold/60 hover:text-gold disabled:opacity-40" aria-label="下一步" title="下一步" disabled={editorStepIndex >= editorSteps.length - 1} onClick={() => goToEditorStep(nextStep)}><ArrowRight className="size-4" aria-hidden="true" /></button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => void generate()} disabled={schemeBusy || busy}><Eye className="size-4" aria-hidden="true" />预览</Button>
+              <Button variant="ghost" size="sm" onClick={() => dirty ? setConfirmCancel(true) : leaveEditor()} disabled={schemeBusy}>取消</Button>
+              <Button variant="primary" size="sm" onClick={requestSave} disabled={schemeBusy}><Save className="size-4" aria-hidden="true" />{schemeBusy ? "保存中…" : "保存方案"}</Button>
+            </div>
+          </EditorActionBar>
         </fieldset>
       )}
       {previewOpen && (
@@ -411,4 +491,5 @@ export default function HomePage() {
       )}
     </AppShell>
   );
+
 }

@@ -14,6 +14,7 @@ export function SummarySidebar({
   onSave,
   onPreview,
   onCancel,
+  showActions = true,
 }: {
   profile: FilterProfile;
   saving: boolean;
@@ -22,6 +23,7 @@ export function SummarySidebar({
   onSave: () => void;
   onPreview: () => void;
   onCancel: () => void;
+  showActions?: boolean;
 }) {
   const rules = profile.rules ?? [];
   const rows: Array<[string, string]> = [
@@ -46,21 +48,23 @@ export function SummarySidebar({
         </dl>
       </Panel>
 
-      <Button
-        variant="primary"
-        size="lg"
-        className="w-full justify-between"
-        onClick={onSave}
-        disabled={saving}
-      >
-        <span>{saving ? "保存中…" : "保存方案"}</span>
-        <ArrowRight aria-hidden="true" className="size-4" />
-      </Button>
+      {showActions && <>
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full justify-between"
+          onClick={onSave}
+          disabled={saving}
+        >
+          <span>{saving ? "保存中…" : "保存方案"}</span>
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Button>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Button onClick={onPreview} disabled={saving || previewing}>预览</Button>
-        <Button onClick={onCancel} disabled={saving}>取消</Button>
-      </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button onClick={onPreview} disabled={saving || previewing}>预览</Button>
+          <Button onClick={onCancel} disabled={saving}>取消</Button>
+        </div>
+      </>}
 
       {error && <Alert tone="ember">{error}</Alert>}
     </aside>

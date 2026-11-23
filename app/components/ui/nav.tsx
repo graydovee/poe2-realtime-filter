@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
@@ -14,15 +15,27 @@ export function Disclosure({
   defaultOpen,
   className,
   contentClassName,
+  storageKey,
 }: {
   summary: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
   className?: string;
   contentClassName?: string;
+  storageKey?: string;
 }) {
+  const [open, setOpen] = useState(Boolean(defaultOpen));
+  useEffect(() => {
+    if (!storageKey) return;
+    const saved = window.localStorage.getItem(storageKey);
+    if (saved !== null) setOpen(saved === "1");
+  }, [storageKey]);
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (storageKey) window.localStorage.setItem(storageKey, next ? "1" : "0");
+  }
   return (
-    <CollapsiblePrimitive.Root defaultOpen={defaultOpen} className={className}>
+    <CollapsiblePrimitive.Root open={open} onOpenChange={handleOpenChange} className={className}>
       <CollapsiblePrimitive.Trigger className="group flex w-full items-center justify-between gap-3 min-h-9 py-2 text-left text-[13px] font-medium text-ink transition hover:text-gold-bright">
         <span>{summary}</span>
         <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" />

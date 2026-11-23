@@ -6,16 +6,18 @@ mod market;
 mod share_code;
 mod store;
 
+use base64::Engine as _;
 use base_filter::{matching_download, BaseFilter, DownloadOffer};
 use engine::Result;
 use serde_json::{json, Value};
 use std::{
+    fs,
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::{mpsc, Mutex},
     time::Duration,
 };
-use store::{display_directory, writable_directory, Edit, RefreshSettings, Server, Store};
+use store::{display_directory, digest, writable_directory, write_file, Edit, RefreshSettings, Server, Store};
 use tauri::{tray::TrayIconBuilder, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -225,6 +227,83 @@ impl Desktop {
             None => Ok(()),
         }
     }
+}
+
+const ITEM_ICON_HOST: &str = "https://www.poe2wiki.net/images/";
+const ITEM_ICON_MAX_BYTES: usize = 2 * 1024 * 1024;
+
+fn item_icon_mime(url: &str) -> &'static str {
+    match url
+        .split('?')
+        .next()
+        .unwrap_or_default()
+        .rsplit('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        _ => "image/png",
+    }
+}
+
+#[tauri::command]
+async fn item_icon(app: tauri::AppHandle, url: String) -> Result<String> {
+    on_worker(move || {
+        if !url.starts_with(ITEM_ICON_HOST)
+            || url.len() > 512
+            || url.chars().any(char::is_control)
+        {
+            return Err("不允许的物品图标地址".to_owned());
+        }
+
+        let cache_root = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| error.to_string())?
+            .join("item-icons");
+        fs::create_dir_all(&cache_root).map_err(|error| error.to_string())?;
+        let cache_path = cache_root.join(digest(url.as_bytes()));
+        let bytes = match fs::read(&cache_path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let client = reqwest::blocking::Client::builder()
+                    .timeout(Duration::from_secs(20))
+                    .user_agent("PoE2 Realtime Filter")
+                    .build()
+                    .map_err(|error| error.to_string())?;
+                let response = client
+                    .get(&url)
+                    .send()
+                    .map_err(|error| error.to_string())?
+                    .error_for_status()
+                    .map_err(|error| error.to_string())?;
+                let bytes = response.bytes().map_err(|error| error.to_string())?;
+                if bytes.is_empty() || bytes.len() > ITEM_ICON_MAX_BYTES {
+                    return Err("物品图标内容无效或过大".to_owned());
+                }
+                write_file(&cache_path, &bytes, true)?;
+                bytes.to_vec()
+            }
+            Err(error) => return Err(error.to_string()),
+        };
+
+        if bytes.is_empty() || bytes.len() > ITEM_ICON_MAX_BYTES {
+            let _ = fs::remove_file(&cache_path);
+            return Err("本地物品图标缓存无效".to_owned());
+        }
+
+        Ok(format!(
+            "data:{};base64,{}",
+            item_icon_mime(&url),
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -916,6 +995,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            item_icon,
             library,
             local_catalog,
             select_server,

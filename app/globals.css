@@ -1,17 +1,17 @@
 /* PoE2 dark design tokens — mirrored in desktop/src/theme.rs (see docs/design-system.md). */
 :root {
   color-scheme: dark;
-  --color-bg: 18 18 20;
-  --color-surface: 25 25 28;
-  --color-surface-2: 33 33 37;
-  --color-surface-3: 41 41 46;
-  --color-line: 61 60 66;
-  --color-line-strong: 119 116 124;
-  --color-ink: 247 242 233;
-  --color-ink-muted: 196 190 181;
-  --color-gold: 231 194 120;
-  --color-gold-bright: 250 216 150;
-  --color-gold-press: 209 168 93;
+  --color-bg: 11 13 16;
+  --color-surface: 20 23 28;
+  --color-surface-2: 26 30 36;
+  --color-surface-3: 33 38 45;
+  --color-line: 48 55 64;
+  --color-line-strong: 77 87 99;
+  --color-ink: 244 241 234;
+  --color-ink-muted: 161 169 178;
+  --color-gold: 215 170 83;
+  --color-gold-bright: 239 199 117;
+  --color-gold-press: 190 142 57;
   --color-ember: 255 158 148;
   --color-sage: 161 210 149;
   --color-rarity-normal: 200 200 200;
@@ -108,7 +108,7 @@
 
 @layer components {
   .app-vignette {
-    background: radial-gradient(ellipse at 50% 0, rgb(55 43 30 / 0.38), transparent 34rem), rgb(var(--color-bg));
+    background: radial-gradient(ellipse at 50% -8%, rgb(116 84 36 / 0.14), transparent 34rem), linear-gradient(180deg, rgb(var(--color-bg)) 0%, rgb(9 11 14) 100%);
   }
 
   .ui-switch {
@@ -561,3 +561,53 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid rg
 .scheme-row + .scheme-row { margin-top: 6px; }
 .more-menu-popover { border-radius: 4px; }
 .sync-link input { border-radius: 4px; }
+
+
+@layer components {
+  .app-topbar { box-shadow: 0 1px 0 rgb(255 255 255 / 0.025), 0 14px 30px rgb(0 0 0 / 0.12); }
+  .page-heading { position: relative; }
+  .page-heading::after { content: ""; position: absolute; bottom: -1px; left: 0; width: 4.25rem; height: 2px; border-radius: 999px; background: rgb(var(--color-gold)); }
+  .eyebrow { color: rgb(var(--color-gold) / 0.78); letter-spacing: 0.18em; }
+  .ui-panel { position: relative; overflow: hidden; background: linear-gradient(145deg, rgb(var(--color-surface) / 0.98), rgb(var(--color-surface) / 0.82)); box-shadow: 0 16px 34px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.028); }
+  .ui-panel::before { content: ""; position: absolute; inset: 0 0 auto; height: 1px; background: linear-gradient(90deg, rgb(var(--color-gold) / 0.26), transparent 42%); pointer-events: none; }
+  .manager-card { border-color: rgb(var(--color-line) / 0.88); }
+  .workspace-card { background: linear-gradient(135deg, rgb(var(--color-surface-2) / 0.92), rgb(var(--color-surface) / 0.78)); }
+  .workspace-card::after { content: ""; position: absolute; top: 0; right: 2.5rem; width: 8rem; height: 100%; opacity: 0.28; pointer-events: none; background: linear-gradient(90deg, transparent, rgb(var(--color-gold) / 0.06)); transform: skewX(-18deg); }
+  .disclosure-card { background: rgb(var(--color-surface) / 0.58); }
+  .schemes-card { background: linear-gradient(145deg, rgb(var(--color-surface) / 0.98), rgb(var(--color-surface-2) / 0.72)); }
+  .secondary-card { background: rgb(var(--color-surface) / 0.62); }
+  .league-group > div:first-child { padding: 0.35rem 0.2rem 0.5rem; border-bottom: 1px solid rgb(var(--color-line) / 0.7); }
+  .league-group > div:first-child h3 { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .league-group > div:first-child h3::before { content: ""; display: inline-block; width: 0.42rem; height: 0.42rem; border-radius: 999px; background: rgb(var(--color-gold)); box-shadow: 0 0 0 4px rgb(var(--color-gold) / 0.1); }
+  .scheme-row { border-color: rgb(var(--color-line) / 0.8); border-left: 2px solid rgb(var(--color-line-strong) / 0.75); transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
+  .scheme-row:hover { border-left-color: rgb(var(--color-gold)); background: rgb(var(--color-surface-3) / 0.72); transform: translateX(2px); }
+  .editor-stepper { position: sticky; top: 4.5rem; z-index: 20; padding: 0.9rem; border: 1px solid rgb(var(--color-line) / 0.9); border-radius: 0.9rem; background: rgb(var(--color-surface) / 0.92); box-shadow: 0 18px 38px rgb(0 0 0 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.03); backdrop-filter: blur(18px); }
+  .editor-stepper-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0 0.25rem 0.75rem; }
+  .editor-stepper-title { margin-top: 0.15rem; color: rgb(var(--color-ink)); font-size: 0.83rem; font-weight: 650; }
+  .editor-stepper-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem; }
+  .editor-step { position: relative; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-width: 0; padding: 0.65rem 0.7rem; border: 1px solid transparent; border-radius: 0.6rem; color: rgb(var(--color-ink-muted)); text-align: left; transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease; }
+  .editor-step:hover { border-color: rgb(var(--color-line-strong) / 0.7); background: rgb(var(--color-surface-2) / 0.75); color: rgb(var(--color-ink)); transform: translateY(-1px); }
+  .editor-step.is-active { border-color: rgb(var(--color-gold) / 0.55); background: linear-gradient(135deg, rgb(var(--color-gold) / 0.16), rgb(var(--color-surface-2) / 0.8)); color: rgb(var(--color-ink)); }
+  .editor-step-index { color: rgb(var(--color-ink-muted) / 0.65); font-family: "JetBrains Mono", monospace; font-size: 0.65rem; }
+  .editor-step.is-active .editor-step-index { color: rgb(var(--color-gold)); }
+  .editor-step-icon { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border: 1px solid rgb(var(--color-line)); border-radius: 0.5rem; background: rgb(var(--color-bg) / 0.45); }
+  .editor-step.is-active .editor-step-icon { border-color: rgb(var(--color-gold) / 0.62); background: rgb(var(--color-gold) / 0.14); color: rgb(var(--color-gold-bright)); }
+  .editor-step-copy { min-width: 0; }
+  .editor-step-label, .editor-step-description { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-step-label { font-size: 0.78rem; font-weight: 650; }
+  .editor-step-description { margin-top: 0.12rem; color: rgb(var(--color-ink-muted) / 0.78); font-size: 0.68rem; }
+  .editor-step-status { display: grid; place-items: center; }
+  .editor-workflow { display: grid; gap: 1.25rem; }
+  .base-filter-workspace { display: grid; gap: 0.8rem; }
+  .base-filter-dependent { display: grid; gap: 0.7rem; padding: 0.9rem; border: 1px solid rgb(var(--color-line) / 0.78); border-radius: 0.85rem; background: linear-gradient(135deg, rgb(var(--color-surface-2) / 0.72), rgb(var(--color-surface) / 0.54)); }
+  .base-filter-dependent-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 0.1rem 0.2rem 0.2rem; }
+  .base-filter-dependent-heading h3 { margin-top: 0.15rem; color: rgb(var(--color-ink)); font-size: 0.93rem; font-weight: 650; }
+  .base-filter-dependent-heading > span { color: rgb(var(--color-ink-muted)); font-size: 0.72rem; }
+  .base-filter-dependent > section { border-color: rgb(var(--color-line) / 0.7); background: rgb(var(--color-bg) / 0.22); box-shadow: none; }
+  .editor-section { scroll-margin-top: 8rem; }
+  .empty-workspace { display: grid; min-height: 10rem; place-items: center; border: 1px dashed rgb(var(--color-line-strong) / 0.75); border-radius: 0.8rem; background: rgb(var(--color-surface) / 0.58); color: rgb(var(--color-ink-muted)); font-size: 0.88rem; }
+  .summary-disclosure { padding: 1rem 1.1rem; border: 1px solid rgb(var(--color-line)); border-radius: 0.8rem; background: rgb(var(--color-surface) / 0.74); }
+  .summary-disclosure > summary { cursor: pointer; color: rgb(var(--color-ink)); font-size: 0.86rem; font-weight: 650; }
+  @media (max-width: 900px) { .editor-stepper { top: 4rem; } .editor-stepper-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .editor-stepper-head { padding-bottom: 0.5rem; } .editor-step-description { display: none; } .editor-step { padding: 0.55rem; } }
+}

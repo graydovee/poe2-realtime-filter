@@ -1,8 +1,10 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import type { FilterProfile, LeagueCatalog, MarketSnapshot } from "../../../lib/types";
 import { Select, type SelectGroup } from "../ui/controls";
-import { Button, Panel, Skeleton, StatusDot } from "../ui/primitives";
+import { Panel, Skeleton, StatusBadge, StatusDot } from "../ui/primitives";
+import { IconButton } from "../ui/actions";
 
 export function SeasonSection({
   profile,
@@ -65,16 +67,14 @@ export function SeasonSection({
                 placeholder="等待赛季列表"
               />
             </div>
-            <Button size="sm" disabled={loading} onClick={onRefresh}>刷新行情</Button>
+            <IconButton label="刷新行情" variant="secondary" disabled={loading} onClick={onRefresh}><RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} aria-hidden="true" /></IconButton>
           </div>
           <div className="mt-2 flex items-center gap-2">
             <StatusDot tone={tone} className={loading ? "animate-pulse" : undefined} />
             {loading && !marketError ? (
               <Skeleton className="h-3 w-40" />
             ) : (
-              <p className="truncate text-xs leading-relaxed text-ink-muted" role="status">
-                {statusText}
-              </p>
+              <StatusBadge tone={tone} className="max-w-full truncate">{statusText}</StatusBadge>
             )}
           </div>
           {profile.originalLeague && profile.originalLeague !== profile.league && (

@@ -10,6 +10,7 @@ import { currencyPriceTiers, formatPrice } from "../../../lib/pricing";
 import type { FilterProfile, FilterRule, MarketSnapshot, RuleEffects } from "../../../lib/types";
 import { RuleEditor } from "../rule-editor";
 import { Button, Panel } from "../ui/primitives";
+import { Disclosure } from "../ui/nav";
 
 function ruleSummary(rule: FilterRule) {
   const { itemIds, itemEnabled, priceEnabled, range } = rule.target;
@@ -93,29 +94,31 @@ export function RulesSection({ profile, market, customSounds, baseInspection, on
         </aside>
 
         {active && <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-1 rounded-sm border border-line bg-surface-2 px-2 py-1" role="group" aria-label="复制规则设置">
-            <Button size="sm" variant="ghost" onClick={() => {
-              setCopiedTarget({ target: structuredClone(active.target), autoRange: active.autoRange });
-              setNotice("已复制条件");
-            }}>复制条件</Button>
-            <Button size="sm" variant="ghost" disabled={!copiedTarget} onClick={() => {
-              if (!copiedTarget) return;
-              onRuleChange(active.id, structuredClone(copiedTarget));
-              setNotice("已应用条件");
-            }}>粘贴条件</Button>
-            <Button size="sm" variant="ghost" onClick={() => {
-              const effects = active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects;
-              setCopiedEffects({ effects: structuredClone(effects), file: effects.sound?.type === "custom" ? customSounds[active.id] : undefined });
-              setNotice("已复制特效");
-            }}>复制特效</Button>
-            <Button size="sm" variant="ghost" disabled={!copiedEffects} onClick={() => {
-              if (!copiedEffects) return;
-              onSound(active.id, copiedEffects.file);
-              onRuleChange(active.id, { effects: structuredClone(copiedEffects.effects), effectPresetId: undefined, followBaseline: Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, active.id) ? false : undefined });
-              setNotice("已应用特效");
-            }}>粘贴特效</Button>
-            <span className="ml-auto pr-2 text-xs text-ink-muted" role="status">{notice}</span>
-          </div>
+          <Disclosure summary={<span className="flex items-center gap-2"><span>批量操作</span><span className="text-xs font-normal text-ink-muted">复制或粘贴条件与特效</span></span>} className="rounded-lg border border-line bg-surface-2/55 px-3" contentClassName="pb-2" storageKey="ui.rules.batch-actions">
+            <div className="flex flex-wrap items-center gap-1" role="group" aria-label="复制规则设置">
+              <Button size="sm" variant="ghost" onClick={() => {
+                setCopiedTarget({ target: structuredClone(active.target), autoRange: active.autoRange });
+                setNotice("已复制条件");
+              }}>复制条件</Button>
+              <Button size="sm" variant="ghost" disabled={!copiedTarget} onClick={() => {
+                if (!copiedTarget) return;
+                onRuleChange(active.id, structuredClone(copiedTarget));
+                setNotice("已应用条件");
+              }}>粘贴条件</Button>
+              <Button size="sm" variant="ghost" onClick={() => {
+                const effects = active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects;
+                setCopiedEffects({ effects: structuredClone(effects), file: effects.sound?.type === "custom" ? customSounds[active.id] : undefined });
+                setNotice("已复制特效");
+              }}>复制特效</Button>
+              <Button size="sm" variant="ghost" disabled={!copiedEffects} onClick={() => {
+                if (!copiedEffects) return;
+                onSound(active.id, copiedEffects.file);
+                onRuleChange(active.id, { effects: structuredClone(copiedEffects.effects), effectPresetId: undefined, followBaseline: Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, active.id) ? false : undefined });
+                setNotice("已应用特效");
+              }}>粘贴特效</Button>
+              <span className="ml-auto pr-2 text-xs text-ink-muted" role="status">{notice}</span>
+            </div>
+          </Disclosure>
           <RuleEditor key={active.id} rule={active} index={index} locale="cn" base={profile.baseFilter} inherited={baseInspection?.styles[active.id]}
             presets={baseInspection?.presets ?? []} market={market} customFile={active.effects.sound?.type === "custom" ? customSounds[active.id] : undefined}
             onChange={(patch) => onRuleChange(active.id, patch)} onRemove={() => { onRemoveRule(active.id); setActiveId(profile.rules[index + 1]?.id ?? profile.rules[index - 1]?.id); }}

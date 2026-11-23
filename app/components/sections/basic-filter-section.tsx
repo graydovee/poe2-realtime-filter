@@ -5,6 +5,7 @@ import { useState } from "react";
 import { displayDirectory, explain, local } from "../../../lib/desktop";
 import type { BaseFilter, FilterProfile } from "../../../lib/types";
 import { Alert, Button, Panel } from "../ui/primitives";
+import { Disclosure } from "../ui/nav";
 import { Switch } from "../ui/controls";
 import { ConfirmDialog } from "../ui/confirm-dialog";
 
@@ -98,16 +99,20 @@ export function BasicFilterSection({ profile, onBaseChange }: {
             {locationLabel(base)}
           </p>}
           {!base && profile.baseFilterHint && <p className="mt-1 break-all text-xs text-ink-muted">分享方案引用「{profile.baseFilterHint}」</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" disabled={busy} onClick={() => void scan()}><FileSearch aria-hidden="true" className="size-4" />选择游戏内过滤器</Button>
-            <Button size="sm" disabled={busy} onClick={() => void pickFile()}><FolderOpen aria-hidden="true" className="size-4" />选择本地文件</Button>
-            <Button size="sm" disabled={busy} onClick={() => { setOptions([]); setError(""); setNotice(""); setPicker({ kind: "source" }); }}>
-              <Download aria-hidden="true" className="size-4" />下载过滤器
-            </Button>
-            {(base || profile.baseFilterHint) && <Button size="sm" disabled={busy} onClick={() => {
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="primary" disabled={busy} onClick={() => void scan()}><FileSearch aria-hidden="true" className="size-4" />选择游戏内过滤器</Button>
+            {(base || profile.baseFilterHint) && <Button size="sm" variant="ghost" disabled={busy} onClick={() => {
               onBaseChange();
               setError("");
             }}>清除基础过滤器</Button>}
+            <Disclosure summary="其他来源" className="min-w-[8rem]" contentClassName="pt-1" storageKey="ui.basic-filter.sources">
+              <div className="flex flex-wrap gap-2 pb-1">
+                <Button size="sm" disabled={busy} onClick={() => void pickFile()}><FolderOpen aria-hidden="true" className="size-4" />选择本地文件</Button>
+                <Button size="sm" disabled={busy} onClick={() => { setOptions([]); setError(""); setNotice(""); setPicker({ kind: "source" }); }}>
+                  <Download aria-hidden="true" className="size-4" />下载过滤器
+                </Button>
+              </div>
+            </Disclosure>
           </div>
         </div>
       </div>

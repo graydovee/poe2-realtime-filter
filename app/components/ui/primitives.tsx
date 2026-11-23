@@ -14,7 +14,7 @@ export function Panel({ title, description, action, children, className, ...rest
   const hasHeading = Boolean(title || description);
   return (
     <section
-      className={cn("rounded border border-line bg-surface p-5 shadow-panel sm:p-6", className)}
+      className={cn("ui-panel rounded-xl border border-line bg-surface/95 p-5 shadow-panel sm:p-6", className)}
       {...rest}
     >
       {hasHeading && (
@@ -34,14 +34,14 @@ export function Panel({ title, description, action, children, className, ...rest
 }
 
 const buttonStyles = cva(
-  "inline-flex select-none items-center justify-center gap-2 rounded-sm font-semibold transition duration-150 ease-out disabled:pointer-events-none disabled:opacity-60",
+  "inline-flex select-none items-center justify-center gap-2 rounded-md font-semibold transition duration-150 ease-out disabled:pointer-events-none disabled:opacity-60",
   {
     variants: {
       variant: {
-        primary: "bg-gold text-[#0b0805] shadow-[0_6px_20px_rgba(200,164,92,0.18)] hover:bg-gold-bright active:bg-gold-press",
-        secondary: "border border-line-strong bg-surface-3 text-ink hover:border-gold hover:bg-surface-2",
-        ghost: "text-ink-muted hover:bg-surface-3 hover:text-ink",
-        danger: "border border-ember/45 bg-ember/5 text-ember hover:border-ember/80 hover:bg-ember/10",
+        primary: "bg-gold text-[#17130d] shadow-[0_5px_18px_rgba(215,170,83,0.14)] hover:bg-gold-bright active:bg-gold-press",
+        secondary: "border border-line-strong bg-surface-3/75 text-ink hover:border-gold/70 hover:bg-surface-2",
+        ghost: "text-ink-muted hover:bg-surface-3/80 hover:text-ink",
+        danger: "border border-ember/45 bg-ember/6 text-ember hover:border-ember/80 hover:bg-ember/12",
       },
       size: {
         sm: "min-h-9 px-3 text-[13px]",
@@ -61,7 +61,7 @@ export function Button({ className, variant, size, type = "button", ...rest }: B
 }
 
 const badgeStyles = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 font-medium text-xs leading-tight",
+  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium text-xs leading-tight",
   {
     variants: {
       tone: {
@@ -189,6 +189,23 @@ export function Mono({ children, className }: { children: ReactNode; className?:
   return <span className={cn("font-mono text-xs tracking-tight text-ink/90", className)}>{children}</span>;
 }
 
+export function StatusBadge({
+  tone = "muted",
+  children,
+  className,
+}: {
+  tone?: "gold" | "sage" | "ember" | "muted";
+  children: ReactNode;
+  className?: string;
+}) {
+  const styles = {
+    gold: "border-gold/35 bg-gold/10 text-gold",
+    sage: "border-sage/35 bg-sage/10 text-sage",
+    ember: "border-ember/35 bg-ember/10 text-ember",
+    muted: "border-line bg-surface-2 text-ink-muted",
+  }[tone];
+  return <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium", styles, className)}>{children}</span>;
+}
 export function StatusDot({ tone = "muted", className }: { tone?: "gold" | "sage" | "ember" | "muted"; className?: string }) {
   const color = { gold: "bg-gold", sage: "bg-sage", ember: "bg-ember", muted: "bg-ink-muted/60" }[tone];
   return <span aria-hidden="true" className={cn("block size-1.5 rounded-full", color, className)} />;

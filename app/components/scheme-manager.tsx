@@ -2,11 +2,14 @@
 
 import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw, MoreHorizontal } from "lucide-react";
 import { explain, isDesktop, local, SERVER_LABELS, type Library, type LocalScheme } from "../../lib/desktop";
 import type { GameServer, LeagueCatalog } from "../../lib/types";
 import { Select, Switch, TextInput } from "./ui/controls";
 import { ConfirmDialog } from "./ui/confirm-dialog";
 import { Badge, Button, Panel } from "./ui/primitives";
+import { IconButton } from "./ui/actions";
+import { Disclosure } from "./ui/nav";
 
 type Props = {
   revision: number;
@@ -179,7 +182,7 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
 
   return (
     <div className="grid min-w-0 gap-4">
-      <Panel title="游戏服务器">
+      <Panel title="工作区" description="选择服务器后，方案列表和行情会自动切换到对应环境。" className="manager-card workspace-card">
         <Select value={library?.server ?? "international"} ariaLabel="游戏服务器" disabled={busy || !library}
           className="max-w-xs" options={Object.entries(SERVER_LABELS).map(([value, label]) => ({ value, label }))}
           onValueChange={(server) => void run(async () => {
@@ -207,27 +210,30 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         </details>
       </Panel>
 
-      <Panel title="导入分享码">
-        <form className="grid gap-3" onSubmit={(event) => {
-          event.preventDefault();
-          void run(async () => {
-            if (!library) return;
-            const target = await local<ShareDetails>("inspect_share", { code: shareCode, server: library.server });
-            const matching = target.catalog.leagues.some((season) => season.id === target.league);
-            if (target.server !== library.server || (!target.hasServer && !matching)) {
-              setImportLeague(!target.hasServer ? target.catalog.defaultLeague : "");
-              setImportTarget(target);
-            } else await importShare(target.server);
-          });
-        }}>
-          <textarea aria-label="分享码" className="min-h-24 w-full rounded border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1404096} onChange={(event) => setShareCode(event.target.value)} />
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="max-w-full text-xs text-ink-muted">导入名称
-              <TextInput className="mt-1 w-64 max-w-full" placeholder="默认使用分享码中的名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
-            </label>
-            <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !shareCode.trim()}>导入方案</Button>
-          </div>
-        </form>
+      <Panel className="manager-card disclosure-card border-dashed p-4 sm:p-5">
+        <Disclosure summary={<span className="flex items-center gap-2"><span className="text-base font-semibold text-ink">导入分享码</span><span className="text-xs font-normal text-ink-muted">从其他设备创建方案</span></span>} contentClassName="pt-3" storageKey="ui.scheme.share-import">
+          <form className="grid gap-3" onSubmit={(event) => {
+            event.preventDefault();
+            void run(async () => {
+              if (!library) return;
+              const target = await local<ShareDetails>("inspect_share", { code: shareCode, server: library.server });
+              const matching = target.catalog.leagues.some((season) => season.id === target.league);
+              if (target.server !== library.server || (!target.hasServer && !matching)) {
+                setImportLeague(!target.hasServer ? target.catalog.defaultLeague : "");
+                setImportTarget(target);
+              } else await importShare(target.server);
+            });
+          }}>
+            <p className="text-xs leading-relaxed text-ink-muted">粘贴分享码后创建一个新的本地方案。</p>
+            <textarea aria-label="分享码" className="min-h-24 w-full rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted" placeholder="粘贴 POE2F1. 开头的分享码" value={shareCode} maxLength={1404096} onChange={(event) => setShareCode(event.target.value)} />
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="max-w-full text-xs text-ink-muted">导入名称
+                <TextInput className="mt-1 w-64 max-w-full" placeholder="默认使用分享码中的名称" value={importName} maxLength={80} onChange={(event) => setImportName(event.target.value)} />
+              </label>
+              <Button type="submit" size="sm" variant="primary" disabled={busy || !library || !shareCode.trim()}>导入方案</Button>
+            </div>
+          </form>
+        </Disclosure>
       </Panel>
 
       <div aria-live="polite" className="empty:hidden">
@@ -235,7 +241,7 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
           : feedback && <p className="rounded border border-line bg-surface px-4 py-3 text-sm text-ink" role="status">{feedback}</p>}
       </div>
 
-      <Panel title="我的方案" action={<Button size="sm" variant="primary" disabled={busy || !library} onClick={() => library && onNew(library.server)}>新建方案</Button>}>
+      <Panel title="我的方案" description="按赛季整理本地方案，常用操作直接显示在每一行。" className="manager-card schemes-card" action={<Button size="sm" variant="primary" disabled={busy || !library} onClick={() => library && onNew(library.server)}>新建方案</Button>}>
         {!library && !error && <p className="text-sm text-ink-muted">正在读取本地方案…</p>}
         {library && !library.schemes.length && <p className="text-sm text-ink-muted">新建方案，或粘贴分享码导入。</p>}
         {shareOutput && (
@@ -247,17 +253,17 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
           </div>
         )}
         {[...byLeague].map(([league, schemes]) => (
-          <section key={league} className="mb-5 last:mb-0" aria-label={league}>
+          <section key={league} className="league-group mb-5 last:mb-0" aria-label={league}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-ink">{league || "待选赛季"}</h3>
-              <Button size="sm" disabled={busy} onClick={() => void run(async () => {
+              <IconButton label={`${league || "当前赛季"}刷新行情`} variant="ghost" disabled={busy} onClick={() => void run(async () => {
                 await local("refresh_market", { server: library?.server, league: league || null });
                 setFeedback("行情已刷新");
-              })}>刷新行情</Button>
+              })}><RefreshCw className="size-4" aria-hidden="true" /></IconButton>
             </div>
             <ul className="grid gap-2">
               {schemes.map((scheme) => (
-                <li key={scheme.id} className="grid min-w-0 gap-3 rounded border border-line bg-surface-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <li key={scheme.id} className="scheme-row grid min-w-0 gap-3 rounded-lg border border-line bg-surface-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <strong className="min-w-0 break-words text-sm text-ink">{scheme.name}</strong>
@@ -301,7 +307,7 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
                         setExpandedMenu(undefined);
                       }
                     }}>
-                      <Button size="sm" variant="ghost" disabled={busy} aria-expanded={expandedMenu === scheme.id} onClick={() => setExpandedMenu(expandedMenu === scheme.id ? undefined : scheme.id)}>更多</Button>
+                      <IconButton label="更多操作" variant="ghost" disabled={busy} aria-expanded={expandedMenu === scheme.id} onClick={() => setExpandedMenu(expandedMenu === scheme.id ? undefined : scheme.id)}><MoreHorizontal className="size-4" aria-hidden="true" /></IconButton>
                       {expandedMenu === scheme.id && (
                         <div className="absolute right-0 top-full z-20 mt-1 grid w-32 rounded border border-line-strong bg-surface-2 p-1 shadow-panel">
                           <Button size="sm" variant="ghost" onClick={() => openDialog("rename", scheme)}>重命名</Button>
@@ -336,22 +342,24 @@ export function SchemeManager({ revision, saveNotice, busy, onBusy, onOpen, onNe
         ))}
       </Panel>
 
-      <Panel title="刷新设置" description="托盘会定时检查下载的基础过滤器和行情。已安装且开启自动刷新的方案会自动更新游戏里的过滤器。">
-        <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => {
-          event.preventDefault();
-          if (library) void run(async () => {
-            await updateSettings(Number(interval ?? library.settings.intervalMinutes), library.settings.paused);
-            setInterval(undefined);
-          });
-        }}>
-          <label className="text-xs text-ink-muted">刷新间隔（分钟）
-            <TextInput className="mt-1 w-28" type="number" min="1" max="1440" required disabled={!library || busy} value={interval ?? library?.settings.intervalMinutes ?? ""} onChange={(event) => setInterval(event.target.value)} />
-          </label>
-          <Button type="submit" size="sm" disabled={!library || busy}>应用间隔</Button>
-          <Switch label="暂停后台刷新" checked={library?.settings.paused ?? false} disabled={!library || busy} onCheckedChange={(paused) => {
-            if (library) void run(() => updateSettings(library.settings.intervalMinutes, paused));
-          }} />
-        </form>
+      <Panel title="刷新设置" description="托盘会定时检查下载的基础过滤器和行情。已安装且开启自动刷新的方案会自动更新游戏里的过滤器。" className="manager-card secondary-card bg-surface/70">
+        <Disclosure summary="展开刷新设置" contentClassName="pt-3" storageKey="ui.scheme.refresh-settings">
+          <form className="flex flex-wrap items-end gap-3" onSubmit={(event) => {
+            event.preventDefault();
+            if (library) void run(async () => {
+              await updateSettings(Number(interval ?? library.settings.intervalMinutes), library.settings.paused);
+              setInterval(undefined);
+            });
+          }}>
+            <label className="text-xs text-ink-muted">刷新间隔（分钟）
+              <TextInput className="mt-1 w-28" type="number" min="1" max="1440" required disabled={!library || busy} value={interval ?? library?.settings.intervalMinutes ?? ""} onChange={(event) => setInterval(event.target.value)} />
+            </label>
+            <Button type="submit" size="sm" disabled={!library || busy}>应用间隔</Button>
+            <Switch label="暂停后台刷新" checked={library?.settings.paused ?? false} disabled={!library || busy} onCheckedChange={(paused) => {
+              if (library) void run(() => updateSettings(library.settings.intervalMinutes, paused));
+            }} />
+          </form>
+        </Disclosure>
       </Panel>
 
       {importTarget && (

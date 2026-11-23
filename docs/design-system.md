@@ -42,10 +42,12 @@ Windows 客户端使用深色调色板。炭灰底区分页面、卡片与输入
 
 ## 组件层
 
-- `app/components/ui/primitives.tsx`：Panel / Button / Badge / Chip / Field / Divider / Alert / Skeleton / EmptyState / Mono / StatusDot
+- `app/components/ui/primitives.tsx`：Panel / Button / Badge / Chip / Field / Divider / Alert / Skeleton / EmptyState / Mono / StatusDot / StatusBadge
+- `app/components/ui/actions.tsx`：IconButton / TooltipButton / MoreButton
 - `app/components/ui/controls.tsx`：Select / Switch / Slider / TextInput / SearchInput / FileInput（Radix 无样式原语 + CVA 变体）
 - `app/components/ui/nav.tsx`：Disclosure / Tooltip / ScrollArea
-- `app/components/app-shell.tsx`：品牌头、标题区、页脚
+- `app/components/app-shell.tsx`：品牌头、工作区标题、页脚
+- `app/components/editor-navigation.tsx`：编辑步骤导航和固定操作栏
 - `app/components/sections/`：season / basic-filter / excluded-items / rules
 - `app/components/`：`item-picker`、`rule-editor`、`scheme-manager`、`preview-view`
 
@@ -63,10 +65,10 @@ Windows 客户端使用深色调色板。炭灰底区分页面、卡片与输入
 - 当前分类顶部有一条汇总条（本类 N 项 / 已选 M）与「选择本类 / 取消本类」，适合一次性把整套装备槽位或整个玩法拉进规则或跳过名单。
 - 已选区按条目展示：整类条目显示为「深渊骨骸 · 11 项」，单件显示物品名，都可以整条移除。
 
-`app/page.tsx` 组织方案管理、编辑与预览之间的状态和数据流。
+`app/page.tsx` 组织方案管理、编辑与预览之间的状态和数据流。编辑器按赛季与行情、基础过滤器、跳过物品、自定义规则切换工作区，当前步骤偏好保存在本地浏览器 UI 状态中。
 
 ### 复合组件（方案管理）
 
-`app/components/scheme-manager.tsx` 使用同一套 Panel、Button、TextInput 组件呈现本地方案、分享码和后台刷新设置。
+`app/components/scheme-manager.tsx` 使用同一套 Panel、Button、TextInput 和 IconButton 组件呈现本地方案、分享码和后台刷新设置。高级操作收进更多菜单，目录和刷新设置保持折叠入口。
 
 > Tailwind 的 preflight 被关闭（`corePlugins.preflight = false`），以免重置影响这些复合组件；`app/globals.css` 的 `@layer base` 里只保留必要的底色、按钮归零与滚动条样式。
