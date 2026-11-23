@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ArrowDown, ArrowUp, Check, Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 
 import { DEFAULT_EFFECT_ITEMS, type InheritedStyle } from "../../lib/baseline-effects";
 import { formatPrice, toExalted } from "../../lib/pricing";
@@ -18,6 +18,7 @@ import type {
   RuleFont,
 } from "../../lib/types";
 import { cn } from "../../lib/cn";
+import { DropConditionsEditor } from "./drop-conditions-editor";
 import { ItemPicker, type ItemPickerToggle } from "./item-picker";
 import { SoundPreviewButton } from "./sound-preview";
 import { FileInput, SearchInput, Select, Switch, TextInput } from "./ui/controls";
@@ -229,7 +230,6 @@ function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active
 export function RuleEditor({
   rule,
   index,
-  total,
   locale,
   presets,
   base,
@@ -238,12 +238,10 @@ export function RuleEditor({
   customFile,
   onChange,
   onRemove,
-  onMove,
   onSound,
 }: {
   rule: FilterRule;
   index: number;
-  total: number;
   locale: Locale;
   presets: EffectPreset[];
   base?: BaseFilter;
@@ -252,7 +250,6 @@ export function RuleEditor({
   customFile?: File;
   onChange: (patch: Partial<FilterRule>) => void;
   onRemove: () => void;
-  onMove: (delta: number) => void;
   onSound: (file: File | undefined) => void;
 }) {
   const canFollow = Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, rule.id);
@@ -309,12 +306,6 @@ export function RuleEditor({
         <Switch checked={rule.enabled} onCheckedChange={(enabled) => onChange({ enabled })} label="启用规则" />
         <Switch checked={rule.hidden} onCheckedChange={(hidden) => onChange({ hidden })} label="隐藏物品" />
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="上移规则" disabled={index === 0} onClick={() => onMove(-1)}>
-            <ArrowUp aria-hidden="true" className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="下移规则" disabled={index === total - 1} onClick={() => onMove(1)}>
-            <ArrowDown aria-hidden="true" className="size-3.5" />
-          </Button>
           <Button variant="danger" size="icon" aria-label={"删除 " + rule.name} onClick={onRemove}>
             <Trash2 aria-hidden="true" className="size-3.5" />
           </Button>
@@ -327,7 +318,9 @@ export function RuleEditor({
         </p>
       )}
 
-      <div className="grid gap-3 p-3 sm:p-4 xl:grid-cols-2">
+      <section className="space-y-3 border-b border-line p-3 sm:p-4" aria-label="匹配条件">
+        <h3 className="text-sm font-semibold text-ink">匹配条件</h3>
+        <div className="grid gap-3 2xl:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-3 rounded-sm border border-line bg-surface-2 p-3">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <h3 className="text-sm font-semibold text-ink">物品条件</h3>
@@ -351,9 +344,13 @@ export function RuleEditor({
                       if (toggle.checked) current.add(id);
                       else current.delete(id);
                     }
-                    editTarget({ itemIds: [...current] });
+                    editTarget({ itemIds: [...current], ...(toggle.checked ? { itemEnabled: true } : {}) });
                   }}
                   onRemoveEntry={() => editTarget({ itemIds: [] })}
+                  onGemLevel={(id, level) => editTarget({
+                    itemIds: [...new Set([...rule.target.itemIds, id])], itemEnabled: true,
+                    dropConditions: { ...rule.target.dropConditions, gemLevel: { enabled: true, bounds: [{ op: "=", value: level }] } },
+                  })}
                 />
               </div>
             </Disclosure>
@@ -404,7 +401,11 @@ export function RuleEditor({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
+        <DropConditionsEditor rule={rule} onChange={editTarget} />
+      </section>
+
+      <section className="flex flex-col gap-3 p-3 sm:p-4" aria-label="显示与特效">
+        <h3 className="text-sm font-semibold text-ink">显示与特效</h3>
         {canFollow && <div className="rounded-sm border border-line bg-surface-2 p-3">
           <Switch checked={Boolean(rule.followBaseline)} onCheckedChange={(followBaseline) => onChange({ followBaseline })} label="跟随基础过滤器" />
           {rule.followBaseline && <p className="mt-2 text-xs text-ink-muted">
@@ -436,7 +437,7 @@ export function RuleEditor({
                 ))}
                 {filtered.length === 0 && <p className="col-span-full py-4 text-center text-xs text-ink-muted">{query && presets.length ? "试试其他特效关键词。" : base ? "当前没有可用预设。" : "选择基础过滤器后可以套用它的特效。"}</p>}
               </div>
-              <p className="text-xs leading-relaxed text-ink-muted">应用预设后，可展开「自定义外观」调整单项特效。</p>
+              <p className="text-xs leading-relaxed text-ink-muted">应用预设后，可展开「高级外观设置」调整单项特效。</p>
             </div>
           )}
         </div>
@@ -445,7 +446,7 @@ export function RuleEditor({
           <AppearancePreview effects={shownEffects} name={rule.name || "示例物品"} file={customFile} base={base} />
         </div>
 
-        <Disclosure summary="自定义外观" className="border-t border-line pt-1">
+        <Disclosure summary="高级外观设置" className="border-t border-line pt-1">
           <div className="grid gap-3 pt-3 sm:grid-cols-2">
             <Field label="光柱">
               <TextInput aria-label={rule.name + " 光柱"} placeholder={`PlayEffect，留空使用${defaultStyleLabel === "沿用基础" ? "基础样式" : "游戏默认样式"}`} value={shownEffects.beam ?? ""} onChange={(event) => editEffects({ beam: event.target.value })} />
@@ -519,7 +520,7 @@ export function RuleEditor({
             </Field>
           </div>
         </Disclosure>
-      </div>
+      </section>
     </div>
   );
 }

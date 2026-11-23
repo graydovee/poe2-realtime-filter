@@ -1,4 +1,5 @@
 import catalogData from "../data/item-catalog.json";
+import dropData from "../data/item-drop-metadata.json";
 import rulesData from "../data/default-rules.json";
 import mechanicsData from "../data/item-mechanics.json";
 import type { FilterRule, ItemDefinition, Locale, MarketSnapshot, Strictness } from "./types";
@@ -50,7 +51,63 @@ export const TAXONOMY = mechanicsData as {
   items: Record<string, { mechanic: string; evidence: string }>;
 };
 
-export const ITEM_CATALOG = catalogData.items as ItemDefinition[];
+const itemMetadata: Record<string, { icon?: string; dropLevel?: number | null }> = dropData.items;
+const uniqueNames: Record<string, Record<string, string | null>> = dropData.uniques;
+const localizedUniqueNames: Record<string, { cn: string; tw: string }> = dropData.localizedUniqueNames;
+const stackableNames = new Set(dropData.stackable);
+const wikiImage = (path?: string | null) => path ? `https://www.poe2wiki.net/images/${path}` : undefined;
+
+export const ITEM_CATALOG: ItemDefinition[] = (catalogData.items as ItemDefinition[]).map((item) => ({
+  ...item,
+  stackable: stackableNames.has(item.name),
+  dropLevel: itemMetadata[item.name]?.dropLevel ?? undefined,
+  iconUrl: wikiImage(itemMetadata[item.name]?.icon),
+}));
+
+function equipmentPath(item: ItemDefinition, group: "normal-bases" | "unique-equipment") {
+  const [, kind, type] = item.categoryPath;
+  const oneHand = new Set(["one-hand-maces", "wands", "sceptres", "spears"]);
+  const category = kind === "weapons" ? oneHand.has(type) ? "one-hand" : "two-hand" : kind;
+  return ["equipment", group, category, ...(type ? [type] : [])];
+}
+
+const equipment = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "equipment" && !item.ambiguous && item.matcher.baseType);
+const equipmentIds = new Set(equipment.map((item) => item.id));
+const baseVariants = equipment.map((item): ItemDefinition => ({
+  ...item,
+  id: `base:${item.id}`,
+  marketItemId: item.id,
+  categoryPath: equipmentPath(item, "normal-bases"),
+  matcher: { ...item.matcher, nonUnique: true },
+}));
+const uniqueVariants = equipment.flatMap((item): ItemDefinition[] => {
+  const names = uniqueNames[item.name];
+  if (!names || !item.matcher.baseType) return [];
+  const variants = Object.keys(names).sort();
+  const label = variants.join(" / ");
+  return [{
+    ...item,
+    id: `unique:${item.id}`,
+    name: label,
+    localeNames: {
+      cn: variants.map((name) => localizedUniqueNames[name]?.cn ?? name).join(" / "),
+      tw: variants.map((name) => localizedUniqueNames[name]?.tw ?? name).join(" / "),
+      us: label,
+    },
+    searchNames: Object.values(item.localeNames),
+    category: "unique",
+    categoryPath: equipmentPath(item, "unique-equipment"),
+    matcher: { ...item.matcher, rarity: "Unique" },
+    priceable: false,
+    dropLevel: undefined,
+    iconUrl: (variants.length === 1 ? wikiImage(names[variants[0]]) : undefined) ?? item.iconUrl,
+  }];
+});
+
+export const FILTER_ITEMS = [...ITEM_CATALOG, ...baseVariants, ...uniqueVariants];
+export const FILTER_ITEMS_BY_ID = new Map(FILTER_ITEMS.map((item) => [item.id, item]));
+export const PICKER_ITEMS = [...ITEM_CATALOG.filter((item) => !equipmentIds.has(item.id)), ...baseVariants, ...uniqueVariants];
+export const marketItemId = (item: ItemDefinition) => item.marketItemId ?? item.id;
 
 const craftingItemIds = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "crafting").map((item) => item.id);
 

@@ -1,5 +1,6 @@
 import { inspectBaseStyles } from "./baseline-effects";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "./data";
+import { FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId } from "./data";
+import { DROP_KEYS, dropInterval, dropLines, rarityInterval, type Interval } from "./drop-conditions";
 import { resolveAutoRanges, toExalted } from "./pricing";
 import type {
   FilterProfile,
@@ -45,11 +46,12 @@ function quote(value: string): string {
   return '"' + value.replace(/"/g, '\\"') + '"';
 }
 
-export function matcherLines(item: ItemDefinition): string[] {
+export function matcherLines(item: ItemDefinition, withRarity = true): string[] {
   const lines: string[] = [];
   if (item.matcher.class) lines.push("\tClass == " + quote(item.matcher.class));
   if (item.matcher.baseType) lines.push("\tBaseType == " + quote(item.matcher.baseType));
-  if (item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
+  if (withRarity && item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
+  if (withRarity && item.matcher.nonUnique) lines.push("\tRarity < Unique");
   return lines;
 }
 
@@ -87,7 +89,44 @@ function effectLines(rule: FilterRule, distinguishCustom: boolean): string[] {
 
 function ruleBlock(rule: FilterRule, item: ItemDefinition, actions: string[]): string {
   const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.id + " / " + item.name;
-  return [head, ...matcherLines(item), ...actions].join("\n");
+  const drop = rule.target.dropConditions;
+  return [head, ...matcherLines(item, !(drop?.rarity?.enabled || drop?.unidentifiedTier?.enabled)), ...dropLines(drop), ...actions].join("\n");
+}
+
+function encloses(outer: Interval, inner: Interval): boolean {
+  return outer[0] <= inner[0] && inner[1] <= outer[1];
+}
+
+type Candidate = { rule: FilterRule; item: ItemDefinition };
+
+function candidateRarity({ item, rule }: Candidate): Interval {
+  const drop = rule.target.dropConditions;
+  return rarityInterval(item, drop?.rarity?.enabled ? drop.rarity.value : drop?.unidentifiedTier?.enabled ? "Rare" : undefined);
+}
+
+function covers(earlier: Candidate, current: Candidate): boolean {
+  const outer = earlier.item.matcher;
+  const inner = current.item.matcher;
+  if (outer.baseType && outer.baseType !== inner.baseType) return false;
+  if (outer.class && outer.class !== inner.class) return false;
+  if (!encloses(candidateRarity(earlier), candidateRarity(current))) return false;
+  return DROP_KEYS.every((field) => {
+    const previous = earlier.rule.target.dropConditions?.[field];
+    if (!previous?.enabled) return true;
+    const next = current.rule.target.dropConditions?.[field];
+    return Boolean(next?.enabled && encloses(dropInterval(field, previous.bounds), dropInterval(field, next.bounds)));
+  });
+}
+
+function overlapsSkipped(item: ItemDefinition, skipped: ItemDefinition[]): boolean {
+  return skipped.some((other) => {
+    if (other.id === item.id) return true;
+    if (!other.matcher.baseType || other.matcher.baseType !== item.matcher.baseType) return false;
+    if (item.matcher.class && other.matcher.class && item.matcher.class !== other.matcher.class) return false;
+    const [lo, hi] = rarityInterval(item);
+    const [otherLo, otherHi] = rarityInterval(other);
+    return lo <= otherHi && otherLo <= hi;
+  });
 }
 
 function withinRange(exaltedValue: number | undefined, range: PriceRange | undefined, snapshot: MarketSnapshot): boolean {
@@ -110,9 +149,8 @@ function conditionUse(rule: FilterRule) {
 }
 
 function matches(rule: FilterRule, item: ItemDefinition, exaltedValue: number | undefined, snapshot: MarketSnapshot): boolean {
-  const { itemIds, useItems, usePrice } = conditionUse(rule);
+  const { useItems, usePrice } = conditionUse(rule);
   if (!useItems && !usePrice) return false;
-  if (useItems && !itemIds.includes(item.id)) return false;
   if (usePrice && !withinRange(exaltedValue, rule.target.range, snapshot)) return false;
   return true;
 }
@@ -127,6 +165,7 @@ function validateSafety(
   hidden: Array<{ item: ItemDefinition; exaltedValue?: number }>,
   skipped: Set<string>,
   warnings: string[],
+  coveredRules: SafetyReport["coveredRules"],
   divineToExalted?: number,
 ): SafetyReport {
   const baseTypes = new Set<string>();
@@ -151,6 +190,7 @@ function validateSafety(
     hiddenHighValueItems,
     exclusionViolations,
     warnings,
+    coveredRules,
     passed: hiddenHighValueItems.length === 0 && exclusionViolations.length === 0,
   };
 }
@@ -179,33 +219,51 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   });
   if (standalone && followsBaseline) warnings.push("跟随基础过滤器的规则使用游戏默认样式。");
   const soundFiles = new Set<string>();
-  let unpriced = 0;
-  let ambiguous = 0;
-
-  for (const item of ITEM_CATALOG) {
+  const exaltedValues = new Map(ITEM_CATALOG.map((item) => {
     const price = item.priceable ? snapshot.prices[item.id] : undefined;
-    const exaltedValue = price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined;
-    if (item.ambiguous) ambiguous += 1;
-    if (item.priceable && exaltedValue === undefined) unpriced += 1;
-    if (item.ambiguous || skipped.has(item.id)) continue;
+    return [item.id, price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined];
+  }));
+  const unpriced = ITEM_CATALOG.filter((item) => item.priceable && exaltedValues.get(item.id) === undefined).length;
+  const ambiguous = ITEM_CATALOG.filter((item) => item.ambiguous).length;
+  const exclusions = [...skipped].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item));
+  const priorByBase = new Map<string, Candidate[]>();
+  const coveredRules: SafetyReport["coveredRules"] = [];
 
-    for (const rule of rules) {
-      if (!rule.enabled) continue;
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    const { itemIds, useItems } = conditionUse(rule);
+    const items = useItems ? [...new Set(itemIds)].map((id) => FILTER_ITEMS_BY_ID.get(id)) : ITEM_CATALOG;
+    const actions = rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false);
+    let eligibleCount = 0;
+    let emittedCount = 0;
+    for (const item of items) {
+      if (!item || item.ambiguous || overlapsSkipped(item, exclusions)) continue;
+      const exaltedValue = item.priceable ? exaltedValues.get(marketItemId(item)) : undefined;
       if (!matches(rule, item, exaltedValue, snapshot)) continue;
-      overrides.push(ruleBlock(rule, item, rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false)));
+      eligibleCount += 1;
+      const key = item.matcher.baseType ?? "";
+      const prior = priorByBase.get(key) ?? [];
+      const candidate = { rule, item };
+      if (prior.some((earlier) => covers(earlier, candidate)) || (key && priorByBase.get("")?.some((earlier) => covers(earlier, candidate)))) continue;
+      if (!prior.length) priorByBase.set(key, prior);
+      prior.push(candidate);
+      overrides.push(ruleBlock(rule, item, actions));
       matched.add(item.id);
+      emittedCount += 1;
       if (rule.hidden) hidden.push({ item, exaltedValue });
+    }
+    if (emittedCount) {
+      applied.set(rule.id, { rule, count: emittedCount });
       if (!rule.followBaseline && rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
-      const current = applied.get(rule.id);
-      applied.set(rule.id, { rule, count: (current?.count ?? 0) + 1 });
-      break;
+    } else if (eligibleCount) {
+      coveredRules.push({ ruleId: rule.id, ruleName: rule.name });
     }
   }
 
   const defaultDisplay = standalone ? "使用游戏默认显示" : "沿用基础过滤器规则";
   if (!rawRules.some((rule) => rule.enabled)) warnings.push("当前未启用规则，所有物品" + defaultDisplay + "。");
   if (autoDisabled.length) warnings.push(autoDisabled.join("、") + " 跟随市价的价格档因缺少锚点行情被禁用。");
-  const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id)).map((rule) => rule.name);
+  const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id) && !coveredRules.some((entry) => entry.ruleId === rule.id)).map((rule) => rule.name);
   if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
     warnings.push("当前赛季缺少有效报价或汇率，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
@@ -214,7 +272,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项" + defaultDisplay + "。");
   if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
 
-  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, snapshot.rates?.divineToExalted);
+  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, coveredRules, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
     standalone ? "# Mode: custom rules" : "# Mode: overlay",

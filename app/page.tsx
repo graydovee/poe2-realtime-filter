@@ -132,21 +132,20 @@ export default function HomePage() {
   }
 
   function addRule() {
+    const id = `rule-${globalThis.crypto.randomUUID()}`;
     setDirty(true);
     setProfile((current) => ({
       ...current,
-      rules: [
-        ...current.rules,
-        {
-          id: "rule-" + Date.now().toString(36),
-          name: "新规则 " + (current.rules.length + 1),
-          enabled: true,
-          hidden: false,
-          target: { itemIds: [], itemEnabled: true, priceEnabled: true, range: { min: { amount: 1, currency: "exalted" } } },
-          effects: {},
-        },
-      ],
+      rules: [...current.rules, {
+        id,
+        name: "新规则 " + (current.rules.length + 1),
+        enabled: true,
+        hidden: false,
+        target: { itemIds: [], itemEnabled: true, priceEnabled: false },
+        effects: {},
+      }],
     }));
+    return id;
   }
 
   function removeRule(id: string) {
@@ -190,7 +189,15 @@ export default function HomePage() {
   }
 
   function setRuleSound(id: string, file: File | undefined) {
-    if (!file) return;
+    if (!file) {
+      setCustomSounds((current) => {
+        if (!(id in current)) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
     setCustomSounds((current) => ({ ...current, [id]: file }));
     updateRule(id, { followBaseline: profile.rules.find((rule) => rule.id === id)?.followBaseline === undefined ? undefined : false, effects: { ...(profile.rules.find((rule) => rule.id === id)?.effects ?? {}), sound: { type: "custom", fileName: safeSoundName(file.name) } } });
   }

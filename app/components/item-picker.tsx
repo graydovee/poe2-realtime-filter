@@ -1,239 +1,150 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight, SearchX } from "lucide-react";
+import { ChevronRight, Coins, Gem, Package, SearchX, Shield, X } from "lucide-react";
 
 import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, searchCatalog } from "../../lib/catalog";
 import { cn } from "../../lib/cn";
-import { ITEM_CATALOG } from "../../lib/data";
+import { FILTER_ITEMS_BY_ID, PICKER_ITEMS } from "../../lib/data";
 import type { ItemDefinition, Locale } from "../../lib/types";
 import { SearchInput } from "./ui/controls";
-import { Button, Chip, EmptyState } from "./ui/primitives";
+import { Button, EmptyState } from "./ui/primitives";
 
 export type ItemPickerEntry = { id: string; label: string; itemIds: string[] };
+export type ItemPickerToggle = { ids: string[]; checked: boolean; label: string; key: string };
 
-export type ItemPickerToggle = {
-  ids: string[];
-  checked: boolean;
-  label: string;
-  key: string;
-};
-
-function selectionOf(items: ItemDefinition[], selected: Set<string>) {
-  let count = 0;
-  for (const item of items) if (selected.has(item.id)) count += 1;
-  return { count, total: items.length, all: items.length > 0 && count === items.length, partial: count > 0 && count < items.length };
+function ItemImage({ item }: { item: ItemDefinition }) {
+  const [failed, setFailed] = useState(false);
+  const group = item.categoryPath[0];
+  const Icon = group === "gems" ? Gem : group === "equipment" ? Shield : item.stackable ? Coins : Package;
+  return (
+    <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-line/60 bg-surface">
+      {item.iconUrl && !failed ? (
+        // The catalog uses the source's image cache with an item-category fallback.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={item.iconUrl} alt="" width={36} height={36} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-9 object-contain" />
+      ) : <Icon className="size-5 text-ink-muted" />}
+    </span>
+  );
 }
 
-export function ItemPicker({
-  locale,
-  entries,
-  onToggle,
-  onRemoveEntry,
-}: {
+export function ItemPicker({ locale, entries, onToggle, onRemoveEntry, onGemLevel }: {
   locale: Locale;
   entries: ItemPickerEntry[];
   onToggle: (toggle: ItemPickerToggle) => void;
   onRemoveEntry: (entryId: string) => void;
+  onGemLevel?: (id: string, level: number) => void;
 }) {
   const [query, setQuery] = useState("");
   const [path, setPath] = useState<string[]>([]);
-  const matchingItems = useMemo(() => searchCatalog(ITEM_CATALOG, query), [query]);
-  const tree = useMemo(() => buildCatalogTree(matchingItems), [matchingItems]);
-  const current = catalogNode(tree, path);
+  const [selectedOnly, setSelectedOnly] = useState(false);
+  const [limit, setLimit] = useState(60);
+  const [gemLevel, setGemLevel] = useState(20);
+  const search = query.trim();
+  const matching = useMemo(() => searchCatalog(PICKER_ITEMS, query), [query]);
+  const tree = useMemo(() => buildCatalogTree(PICKER_ITEMS), []);
+  const current = catalogNode(tree, path) ?? tree;
   const selected = useMemo(() => new Set(entries.flatMap((entry) => entry.itemIds)), [entries]);
-  const selectedCount = entries.reduce((total, entry) => total + entry.itemIds.length, 0);
-  const currentItems = current ? catalogItems(current) : [];
-  const childNodes = current ? [...current.children].sort((left, right) => groupOrder(left.key) - groupOrder(right.key)) : [];
-  const currentSelection = selectionOf(currentItems, selected);
+  const classified = catalogItems(current);
+  const count = (items: ItemDefinition[]) => items.filter((item) => selected.has(item.id)).length;
+  const childNodes = [...current.children].sort((a, b) => groupOrder(a.key) - groupOrder(b.key));
+  const selectedItems = [...selected].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item));
+  const visibleItems = selectedOnly ? searchCatalog(selectedItems, query) : search ? matching : current.items;
+  const scope = search ? matching : classified;
+  const stackables = scope.filter((item) => item.stackable);
+  const canBatch = Boolean(search || path.length);
+  const group = search ? "搜索结果" : groupName(current.key, locale);
 
   function toggle(items: ItemDefinition[], checked: boolean, label: string, key: string) {
     onToggle({ ids: items.map((item) => item.id), checked, label, key });
   }
 
+  function navigate(nextPath: string[]) {
+    setPath(nextPath);
+    setLimit(60);
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <SearchInput
-        value={query}
-        aria-label="搜索物品"
-        placeholder="搜索中文、繁中或英文名称"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setPath([]);
-        }}
-      />
-
-      <nav className="flex flex-wrap items-center gap-1 text-xs" aria-label="物品分类路径">
-        <button
-          type="button"
-          onClick={() => setPath([])}
-          aria-current={path.length === 0 ? "location" : undefined}
-          className={cn("rounded-sm px-1.5 py-1 transition", path.length === 0 ? "font-semibold text-ink" : "text-ink-muted hover:text-ink")}
-        >
-          全部种类
-        </button>
-        {path.map((key, index) => (
-          <span key={path.slice(0, index + 1).join("/")} className="flex items-center gap-1 text-ink-muted">
-            <span aria-hidden="true">/</span>
-            <button
-              type="button"
-              onClick={() => setPath(path.slice(0, index + 1))}
-              aria-current={index === path.length - 1 ? "location" : undefined}
-              className={cn("rounded-sm px-1.5 py-1 transition", index === path.length - 1 ? "font-semibold text-ink" : "hover:text-ink")}
-            >
-              {groupName(key, locale)}
-            </button>
-          </span>
-        ))}
-      </nav>
-
-      {current && (
-        <>
-          {path.length > 0 && currentItems.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-line/70 bg-surface-2/40 px-3.5 py-2.5">
-              <span className="text-[11px] text-ink-muted">
-                本类 {currentSelection.total} 项 · 已选 <b className="font-mono font-normal text-ink">{currentSelection.count}</b>
-              </span>
-              <div className="flex gap-1.5">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={currentSelection.all}
-                  onClick={() => toggle(currentItems, true, groupName(path[path.length - 1], locale), path.join("/"))}
-                >
-                  选择本类
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={currentSelection.count === 0}
-                  onClick={() => toggle(currentItems, false, groupName(path[path.length - 1], locale), path.join("/"))}
-                >
-                  取消本类
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {current.children.length > 0 && (
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-2" role="group" aria-label="物品种类">
-              {childNodes.map((child) => {
-                const items = catalogItems(child);
-                const state = selectionOf(items, selected);
-                const name = groupName(child.key, locale);
-                return (
-                  <div
-                    key={child.key}
-                    className="flex min-h-[3.75rem] min-w-0 items-stretch overflow-hidden rounded-sm border border-line bg-surface-2/60 transition duration-150 ease-out hover:border-gold/50"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPath(child.path)}
-                      className="group flex min-w-0 flex-1 items-center gap-1.5 px-2.5 py-3 text-left focus-visible:-outline-offset-2"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] text-ink">{name}</span>
-                        <small className="mt-1 block text-xs text-ink-muted">
-                          {items.length} 项{state.count > 0 ? " · 已选 " + state.count : ""}
-                        </small>
-                      </span>
-                      <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-ink-muted transition group-hover:text-gold" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={state.all ? true : state.partial ? "mixed" : false}
-                      aria-label={`选择分类 ${name}`}
-                      onClick={() => toggle(items, !state.all, name, child.path.join("/"))}
-                      className={cn("shrink-0 border-l border-line/70 px-2 text-xs transition hover:bg-gold/10 focus-visible:-outline-offset-2", state.all || state.partial ? "text-gold-bright" : "text-ink-muted")}
-                    >
-                      {state.all ? "已选" : state.partial ? "部分" : "全选"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {current.items.length > 0 && (
-            <div className="overflow-hidden rounded-sm border border-line bg-surface-2/30" aria-label="当前分类物品">
-              <div className="max-h-[26rem] overflow-auto">
-                {current.items.map((item) => {
-                  const checked = selected.has(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-pressed={checked}
-                      onClick={() => toggle([item], !checked, item.localeNames[locale] || item.name, item.id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 border-b border-line/60 px-3.5 py-2.5 text-left transition last:border-b-0 hover:bg-surface-3/60 focus-visible:-outline-offset-2",
-                        checked && "bg-gold/[0.08]",
-                      )}
-                    >
-                      <span className={cn("shrink-0 rounded-sm border px-1.5 py-0.5 text-xs", checked ? "border-gold/50 text-gold-bright" : "border-line text-ink-muted")} aria-hidden="true">
-                        {checked ? "已选" : "选择"}
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <b className="truncate text-[11px] font-medium leading-tight text-ink">{item.localeNames[locale]}</b>
-                        <small className="truncate text-xs leading-tight text-ink-muted">{item.name}</small>
-                      </span>
-                      <em className="shrink-0 text-xs not-italic text-ink-muted">
-                        {item.ambiguous ? "沿用原始规则" : checked ? "已选中" : ""}
-                      </em>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {current.children.length === 0 && current.items.length === 0 && (
-            <EmptyState
-              className="min-h-[12rem] rounded-sm border border-line bg-surface-2/30"
-              icon={<SearchX aria-hidden="true" className="size-5" />}
-              title="没有匹配的物品"
-              description="请返回上级分类或修改搜索词。"
-            />
-          )}
-        </>
-      )}
-
-      {!current && (
-        <EmptyState
-          className="min-h-[12rem] rounded-sm border border-line bg-surface-2/30"
-          icon={<SearchX aria-hidden="true" className="size-5" />}
-          title="这个分类下没有匹配的物品"
-          description="请返回上级分类或修改搜索词。"
-        />
-      )}
-
-      <p className="font-mono text-xs tracking-tight text-ink-muted">
-        {query.trim()
-          ? "搜索匹配 " + matchingItems.length + " 项，可按分类整类勾选。"
-          : "按 poe.ninja 的分组逐级选择，整类或单件都可以直接勾选，共 " + ITEM_CATALOG.length + " 项。"}
-      </p>
-
-      <div className="border-t border-line/70 pt-4">
-        <h3 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
-          已选物品
-          <span className="font-mono text-[11px] font-normal text-ink-muted">{selectedCount}</span>
-        </h3>
-        {entries.length === 0 ? (
-          <p className="mt-2 text-[11px] text-ink-muted">勾选整类或单件物品后，会显示在这里。</p>
-        ) : (
-          <div className="mt-3 flex max-h-44 flex-wrap gap-2 overflow-auto pr-1">
-            {entries.map((entry) => (
-              <Chip key={entry.id} onRemove={() => onRemoveEntry(entry.id)} removeLabel={"移除：" + entry.label}>
-                {entry.label}
-                {entry.itemIds.length > 1 ? <span className="ml-1 font-mono text-ink-muted">· {entry.itemIds.length} 项</span> : null}
-              </Chip>
-            ))}
-          </div>
-        )}
-        <p className="mt-3 text-xs leading-relaxed text-ink-muted">
-          整类条目会展开成对应的 BaseType 列表写进过滤器；单件物品按单条规则写入，两者可以混用。
-        </p>
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SearchInput className="min-w-40 flex-1" value={query} aria-label="搜索物品" placeholder="搜索中文或英文物品名" onChange={(event) => { setQuery(event.target.value); setLimit(60); }} />
+        <Button size="sm" variant={selectedOnly ? "secondary" : "ghost"} aria-pressed={selectedOnly} onClick={() => { setSelectedOnly(!selectedOnly); setLimit(60); }}>
+          已选 {selected.size} 项
+        </Button>
       </div>
+      {!selectedOnly && !search && (
+        <nav className="flex flex-wrap items-center gap-1 text-xs text-ink-muted" aria-label="物品分类路径">
+          <button type="button" className="rounded-sm px-1.5 py-1 hover:text-ink" aria-current={!path.length ? "location" : undefined} onClick={() => navigate([])}>全部分类</button>
+          {path.map((key, index) => (
+            <span key={key} className="flex items-center gap-1">
+              <ChevronRight className="size-3" aria-hidden="true" />
+              <button type="button" className="rounded-sm px-1.5 py-1 hover:text-ink" aria-current={index === path.length - 1 ? "location" : undefined} onClick={() => navigate(path.slice(0, index + 1))}>{groupName(key, locale)}</button>
+            </span>
+          ))}
+        </nav>
+      )}
+      {!selectedOnly && (canBatch || stackables.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-line bg-surface-2 px-2 py-1.5">
+          {canBatch && <span className="mr-auto px-1 text-xs text-ink-muted">已选 {count(scope)} / {scope.length}</span>}
+          {canBatch && <Button size="sm" variant="ghost" disabled={scope.length === count(scope)} onClick={() => toggle(scope, true, group, search ? "search" : path.join("/"))}>{search ? "全选搜索结果" : "全选本类"}</Button>}
+          {canBatch && <Button size="sm" variant="ghost" disabled={count(scope) === 0} onClick={() => toggle(scope, false, group, path.join("/"))}>取消所选</Button>}
+          {stackables.length > 0 && <Button size="sm" variant="ghost" disabled={stackables.length === count(stackables)} onClick={() => toggle(stackables, true, "可堆叠物品", `${path.join("/")}/stackable`)}>全选可堆叠物品</Button>}
+        </div>
+      )}
+      {!selectedOnly && !search && childNodes.length > 0 && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-2" role="group" aria-label="物品分类">
+          {childNodes.map((child) => {
+            const items = catalogItems(child);
+            const chosen = count(items);
+            const name = groupName(child.key, locale);
+            return (
+              <div key={child.key} className="flex min-w-0 rounded-sm border border-line bg-surface-2/60">
+                <button type="button" onClick={() => navigate(child.path)} className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2.5 py-2 text-left hover:text-gold-bright">
+                  <span className="min-w-0"><span className="block truncate text-sm">{name}</span><span className="text-xs text-ink-muted">已选 {chosen} / {items.length}</span></span>
+                  <ChevronRight className="size-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                </button>
+                <button type="button" aria-label={`选择分类 ${name}`} aria-pressed={chosen === items.length ? true : chosen > 0 ? "mixed" : false} onClick={() => toggle(items, chosen !== items.length, name, child.path.join("/"))} className={cn("shrink-0 border-l border-line px-2 text-xs hover:bg-gold/10", chosen ? "text-gold-bright" : "text-ink-muted")}>
+                  {chosen === items.length ? "已选" : chosen > 0 ? "部分" : "全选"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {visibleItems.length > 0 && (
+        <div className="max-h-[29rem] overflow-auto rounded-sm border border-line bg-surface-2/30 p-2" aria-label={selectedOnly ? "已选物品" : "物品网格"}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2">
+            {visibleItems.slice(0, limit).map((item) => {
+              const checked = selected.has(item.id);
+              const label = item.localeNames[locale] || item.name;
+              const gemShortcut = onGemLevel && ["uncut-skill-gem", "uncut-spirit-gem"].includes(item.id);
+              return (
+                <div key={item.id} className={cn("min-w-0 rounded-sm border", checked ? "border-gold/60 bg-gold/[0.08]" : "border-line bg-surface-2")}>
+                  <button type="button" aria-pressed={checked} aria-label={selectedOnly ? `移除 ${label}` : label} onClick={() => toggle([item], !checked, label, item.id)} className="flex min-h-14 w-full items-center gap-2 p-2 text-left hover:bg-surface-3/60">
+                    <ItemImage item={item} />
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 break-words text-xs font-medium text-ink">{label}</span>
+                      {item.category === "unique" && <span className="block text-xs text-gold">传奇 · {item.matcher.baseType}</span>}
+                      {item.matcher.nonUnique && <span className="block text-xs text-ink-muted">{groupName(item.categoryPath.at(-1) ?? "equipment", locale)}{item.dropLevel ? ` · 掉落等级 ${item.dropLevel}` : ""}</span>}
+                      {label !== item.name && <span className="block truncate text-xs text-ink-muted">{item.name}</span>}
+                    </span>
+                    {selectedOnly && <X className="size-4 shrink-0 text-ink-muted" aria-hidden="true" />}
+                  </button>
+                  {gemShortcut && <div className="flex items-center gap-1 border-t border-line p-1.5">
+                    <label className="flex min-w-0 items-center gap-1 text-xs text-ink-muted">等级 <select aria-label={`${label}等级`} value={gemLevel} onChange={(event) => setGemLevel(Number(event.target.value))} className="rounded-sm border border-line bg-surface px-1 py-1 text-ink">{Array.from({ length: 20 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}</select></label>
+                    <Button size="sm" variant="ghost" onClick={() => onGemLevel(item.id, gemLevel)}>应用等级</Button>
+                  </div>}
+                </div>
+              );
+            })}
+          </div>
+          {visibleItems.length > limit && <Button className="mt-2 w-full" size="sm" variant="ghost" onClick={() => setLimit(limit + 60)}>加载更多 · {limit} / {visibleItems.length}</Button>}
+        </div>
+      )}
+      {visibleItems.length === 0 && (selectedOnly || search || childNodes.length === 0) && (
+        <EmptyState className="min-h-28 rounded-sm border border-line" icon={<SearchX className="size-5" aria-hidden="true" />} title={selectedOnly && !search ? "选中的物品显示在这里" : "试试其他物品名称"} />
+      )}
+      {selectedOnly && entries.length > 0 && <Button size="sm" variant="ghost" onClick={() => entries.forEach((entry) => onRemoveEntry(entry.id))}>清空选择</Button>}
     </div>
   );
 }

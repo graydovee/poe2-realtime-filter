@@ -13,6 +13,7 @@ execFileSync(
     "lib/filter-engine.ts",
     "lib/catalog.ts",
     "lib/default-profile.ts",
+    "lib/profile-validation.ts",
     "worker/tencent-market.ts",
     "--outDir", output,
     "--module", "commonjs",
@@ -30,6 +31,8 @@ export const engine = { ...core, generateFilter: (profile, snapshot, options) =>
 };
 export const { inspectBaseStyles: baseStyles, inspectBaseFilter } = require(path.join(output, "lib/baseline-effects.js"));
 export const generateOnBase = core.generateFilter;
+export const { validateProfile } = require(path.join(output, "lib/profile-validation.js"));
+export const { searchCatalog } = require(path.join(output, "lib/catalog.js"));
 export const pricing = require(path.join(output, "lib/pricing.js"));
 export const data = require(path.join(output, "lib/data.js"));
 export const DEFAULT_PROFILE = require(path.join(output, "lib/default-profile.js")).DEFAULT_PROFILE;

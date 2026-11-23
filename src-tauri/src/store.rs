@@ -1636,6 +1636,89 @@ mod tests {
     }
 
     #[test]
+    fn stack_ranges_share_and_generate_identical_filter_across_file_operations() {
+        use std::io::Read;
+
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut draft = profile(&store);
+        draft.as_object_mut().unwrap().remove("baseFilter");
+        draft["rules"] = json!([
+            {"id": "small", "name": "小堆叠", "enabled": true, "hidden": true,
+             "target": {"itemIds": ["gold", "exalted-orb"], "dropConditions": {
+                 "stackSize": {"enabled": true, "bounds": [{"op": "<", "value": 5}]}
+             }}, "effects": {}},
+            {"id": "large", "name": "大堆叠", "enabled": true, "hidden": false,
+             "target": {"itemIds": ["gold", "exalted-orb"], "dropConditions": {
+                 "stackSize": {"enabled": true, "bounds": [{"op": ">=", "value": 5}]}
+             }}, "effects": {"beam": "Yellow"}},
+            {"id": "priced", "name": "混沌石数量与价格", "enabled": true, "hidden": false,
+             "target": {"itemIds": ["chaos-orb"], "range": {
+                 "min": {"amount": 6, "currency": "exalted"}
+             }, "dropConditions": {
+                 "stackSize": {"enabled": true, "bounds": [{"op": ">=", "value": 12}]}
+             }}, "effects": {}}
+        ]);
+        let mut market = json!({
+            "server": "international", "league": "Standard", "source": "fixture",
+            "capturedAt": "2026-03-01T00:00:00Z", "expiresAt": "2099-01-01T00:00:00Z",
+            "rates": {"divineToExalted": 100, "divineToChaos": 10},
+            "prices": {"chaos-orb": {"amount": 8, "currency": "exalted"}}
+        });
+        let preview = store.preview(draft.clone(), Some(market.clone())).unwrap();
+        let id = store
+            .add(&mut library, "堆叠方案", draft, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        assert_eq!(scheme.profile["schemaVersion"], 3);
+        let (text, assets) = store.prepare_filter(scheme, Some(market.clone())).unwrap();
+        assert_eq!(preview["filterFile"], text);
+        assert!(text.contains("BaseType == \"Exalted Orb\"\n\tStackSize >= 5"));
+        assert!(text.contains("BaseType == \"Chaos Orb\"\n\tStackSize >= 12"));
+        let zip = filter_zip(&scheme.name, &text, assets).unwrap();
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(zip)).unwrap();
+        let mut zipped = String::new();
+        archive
+            .by_name("堆叠方案.filter")
+            .unwrap()
+            .read_to_string(&mut zipped)
+            .unwrap();
+        assert_eq!(zipped, text);
+        let code = Store::share(scheme).unwrap();
+        assert_eq!(
+            share_code::decode(&code).unwrap().profile["rules"],
+            scheme.profile["rules"]
+        );
+        store.install(scheme, Some(market.clone()), None).unwrap();
+        let installed = store.default_game.join("堆叠方案.filter");
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        let written = fs::metadata(&installed).unwrap().modified().unwrap();
+        market["capturedAt"] = json!("2026-03-01T02:00:00Z");
+        store.install(scheme, Some(market.clone()), None).unwrap();
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        assert_eq!(
+            fs::metadata(&installed).unwrap().modified().unwrap(),
+            written
+        );
+        assert!(store.install(scheme, None, None).is_err());
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        scheme.profile["rules"][0]["target"]["itemIds"] = json!(["base:omen-crest-shield"]);
+        assert!(store.install(scheme, Some(market), None).is_err());
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
+        let import_dir = tempfile::tempdir().unwrap();
+        let receiving_store = fixture(import_dir.path());
+        let mut receiving_library = receiving_store.load().unwrap();
+        let imported = receiving_store
+            .import(&mut receiving_library, &code, None)
+            .unwrap();
+        assert_eq!(
+            Store::get(&receiving_library, &imported).unwrap().profile["schemaVersion"],
+            3
+        );
+    }
+
+    #[test]
     fn standalone_install_refresh_and_zip_apply_rules_and_check_assets() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());

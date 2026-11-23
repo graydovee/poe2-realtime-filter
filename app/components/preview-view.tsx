@@ -12,6 +12,7 @@ export type Generated = {
   safetyReport: {
     passed: boolean;
     warnings: string[];
+    coveredRules?: Array<{ ruleId: string; ruleName: string }>;
     unknownItems: number;
     unpricedItems: number;
     ambiguousItems: number;
@@ -41,7 +42,7 @@ export function PreviewView({ generated }: { generated: Generated }) {
           </Alert>
         )}
 
-        <pre className="filter-code">{generated.filterFile.slice(0, 16000)}</pre>
+        <pre className="filter-code">{generated.filterFile}</pre>
       </Panel>
 
       <aside className="flex flex-col gap-4">
@@ -52,7 +53,7 @@ export function PreviewView({ generated }: { generated: Generated }) {
             <dt className="text-ink-muted">赛季</dt>
             <dd className="text-right text-ink/90">{generated.market.league}</dd>
             <dt className="text-ink-muted">市场来源</dt>
-            <dd className="text-right text-ink/90">{generated.market.rates ? "poe.ninja" : "暂无可用行情"}</dd>
+            <dd className="text-right text-ink/90">{generated.market.rates ? generated.market.source : "暂无可用行情"}</dd>
             <dt className="text-ink-muted">抓取时间</dt>
             <dd className="text-right text-ink/90">
               {generated.market.rates ? new Date(generated.market.capturedAt).toLocaleString("zh-CN") : "尚未更新"}
@@ -65,6 +66,12 @@ export function PreviewView({ generated }: { generated: Generated }) {
             </dd>
           </dl>
         </Panel>
+
+        {Boolean(generated.safetyReport.coveredRules?.length) && <Panel title="被上方规则覆盖" className="p-4">
+          <ul className="space-y-1 text-xs text-ink-muted">
+            {generated.safetyReport.coveredRules?.map((rule) => <li key={rule.ruleId}>{rule.ruleName}</li>)}
+          </ul>
+        </Panel>}
 
         <Panel className="p-4">
           <Disclosure summary="数据说明">

@@ -2,7 +2,7 @@ import { currencyPriceTiers, toExalted } from "../lib/pricing";
 import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
 import { inspectBaseFilter } from "../lib/baseline-effects";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
+import { FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
 import type { LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
@@ -54,10 +54,10 @@ const api = {
           break;
         }
         if (rule.autoRange) continue;
-        const missing = rule.target.itemEnabled !== false && rule.target.itemIds.find((id) =>
-          !valid.skippedItemIds.includes(id) && ITEM_CATALOG.some((item) => item.id === id && item.priceable && !item.ambiguous) && !quote.prices[id]);
+        const missing = rule.target.itemEnabled !== false && rule.target.itemIds.map((id) => FILTER_ITEMS_BY_ID.get(id)).find((item) =>
+          item?.priceable && !item.ambiguous && !valid.skippedItemIds.includes(item.id) && !quote.prices[marketItemId(item)]);
         if (missing) {
-          marketIssue = `「${rule.name}」缺少 ${ITEM_CATALOG.find((item) => item.id === missing)?.name ?? missing} 的有效报价`;
+          marketIssue = `「${rule.name}」缺少 ${missing.name} 的有效报价`;
           break;
         }
       }

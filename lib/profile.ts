@@ -9,13 +9,14 @@ export function normalizeProfile(input: unknown): FilterProfile {
   if (server !== undefined && server !== "international" && server !== "tencent") throw new Error("无效游戏服务器");
   const season = (value: unknown) => normalizeLeague(value, server === "tencent");
   const league = server === "tencent" && raw.league === "" ? "" : season(raw.league ?? DEFAULT_PROFILE.league);
-  if (raw.schemaVersion !== 2) throw new Error("不支持的方案格式版本");
+  if (raw.schemaVersion !== 2 && raw.schemaVersion !== 3) throw new Error("不支持的方案格式版本");
   const rules = raw.rules.map((rule) => {
     const candidate = (rule ?? {}) as FilterRule;
     return {
       ...candidate,
       target: {
         itemIds: Array.isArray(candidate.target?.itemIds) ? candidate.target!.itemIds : [],
+        ...(candidate.target?.dropConditions !== undefined ? { dropConditions: candidate.target.dropConditions } : {}),
         ...(candidate.target?.range ? { range: candidate.target.range } : {}),
         ...(candidate.target?.itemEnabled === false ? { itemEnabled: false } : {}),
         ...(candidate.target?.priceEnabled === false ? { priceEnabled: false } : {}),
@@ -23,6 +24,11 @@ export function normalizeProfile(input: unknown): FilterProfile {
       effects: candidate.effects ?? {},
     } as FilterRule;
   });
+  const skippedItemIds = Array.isArray(raw.skippedItemIds) ? raw.skippedItemIds : [];
+  const variantId = (id: unknown) => typeof id === "string" && /^(base|unique):/.test(id);
+  const version3 = raw.schemaVersion === 3 || skippedItemIds.some(variantId) || rules.some((rule) =>
+    rule.target.dropConditions !== undefined || rule.target.itemIds.some(variantId),
+  );
   return {
     ...DEFAULT_PROFILE,
     ...(server ? { server } : {}),
@@ -31,11 +37,11 @@ export function normalizeProfile(input: unknown): FilterProfile {
     strictness: raw.strictness ?? DEFAULT_PROFILE.strictness,
     style: raw.style ?? DEFAULT_PROFILE.style,
     locale: raw.locale ?? DEFAULT_PROFILE.locale,
-    schemaVersion: 2,
+    schemaVersion: version3 ? 3 : 2,
     league,
     originalLeague: typeof raw.originalLeague === "string" && raw.originalLeague.trim() ? season(raw.originalLeague) : league,
     rules,
-    skippedItemIds: Array.isArray(raw.skippedItemIds) ? raw.skippedItemIds : [],
+    skippedItemIds,
   };
 }
 

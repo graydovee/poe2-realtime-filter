@@ -1,5 +1,6 @@
 import { DEFAULT_EFFECT_ITEMS } from "./baseline-effects";
-import { ITEM_CATALOG, STYLE_LABELS } from "./data";
+import { FILTER_ITEMS_BY_ID, STYLE_LABELS } from "./data";
+import { dropConditionsIssue } from "./drop-conditions";
 import { CURRENCY_ANCHORS } from "./pricing";
 import { normalizeProfile } from "./profile";
 import type { BuiltinSound, FilterProfile, FilterRule, PricePoint } from "./types";
@@ -10,7 +11,7 @@ const iconPattern=/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|B
 const colorPattern=/^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/;
 const number=(value:unknown,min:number,max:number)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max;
 const validBuiltinSound=(sound:BuiltinSound)=>sound.type==='builtin'&&Number.isInteger(sound.id)&&number(sound.id,1,16)&&number(sound.volume,0,300)&&(sound.positional===undefined||typeof sound.positional==='boolean');
-const catalogIds=new Set(ITEM_CATALOG.map(i=>i.id));
+
 
 function validatePoint(point:PricePoint,label:string){
  if(!point||typeof point!=='object')throw new Error(label+'无效');
@@ -28,7 +29,7 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  if(rule.effectPresetId!==undefined&&(typeof rule.effectPresetId!=='string'||rule.effectPresetId.length>60||!/^[a-zA-Z0-9_-]+$/.test(rule.effectPresetId)))throw new Error('无效特效预设');
  if(!rule.target||typeof rule.target!=='object')throw new Error('规则缺少适用物品');
  const itemIds=rule.target.itemIds;
- if(!Array.isArray(itemIds)||itemIds.length>2000||itemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new Error('规则物品无效');
+ if(!Array.isArray(itemIds)||itemIds.length>2000||itemIds.some(id=>typeof id!=='string'||!FILTER_ITEMS_BY_ID.has(id)))throw new Error('规则物品无效');
  const range=rule.target.range;
  if(range){
   if(typeof range!=='object')throw new Error('无效价格区间');
@@ -41,6 +42,8 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  const useItems=rule.target.itemEnabled!==false&&itemIds.length>0;
  const usePrice=rule.target.priceEnabled!==false&&Boolean(range);
  if(rule.enabled&&!useItems&&!usePrice)throw new Error('规则至少要选择物品或价格区间');
+ const dropIssue = dropConditionsIssue(rule);
+ if (dropIssue) throw new Error(`「${rule.name}」${dropIssue}`);
  const effects=rule.effects??{};
  if(effects.beam!==undefined&&!beamPattern.test(effects.beam))throw new Error('无效光柱');
  if(effects.icon!==undefined&&!iconPattern.test(effects.icon))throw new Error('无效地图图标');
@@ -75,6 +78,6 @@ export function validateProfile(input:unknown):FilterProfile {
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');
  const ids=new Set<string>();
  for(const rule of p.rules)validateRule(rule,ids);
- if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!catalogIds.has(id)))throw new Error('跳过名单无效');
+ if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!FILTER_ITEMS_BY_ID.has(id)))throw new Error('跳过名单无效');
  return JSON.parse(JSON.stringify(p));
 }

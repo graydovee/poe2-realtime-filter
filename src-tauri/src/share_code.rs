@@ -34,6 +34,7 @@ enum Codec {
     Poe2,
     ServerBrotliJson,
     ServerPoe2,
+    DropConditionsJson,
 }
 
 impl Codec {
@@ -41,6 +42,7 @@ impl Codec {
         match (header.alg.as_str(), header.p) {
             ("br", 1) => Ok(Self::BrotliJson),
             ("poe2", 1) => Ok(Self::Poe2),
+            ("br", 3) => Ok(Self::DropConditionsJson),
             ("br", 2) => Ok(Self::ServerBrotliJson),
             ("poe2", 2) => Ok(Self::ServerPoe2),
             _ => Err("不支持的分享码算法或参数档位，请升级客户端".into()),
@@ -49,6 +51,7 @@ impl Codec {
 
     fn header(self) -> Header {
         let (alg, p) = match self {
+            Self::DropConditionsJson => ("br", 3),
             Self::BrotliJson => ("br", 1),
             Self::Poe2 => ("poe2", 1),
             Self::ServerBrotliJson => ("br", 2),
@@ -64,6 +67,9 @@ pub fn encode(share: &Share) -> Result<String> {
         return Err("方案过大，无法生成分享码".into());
     }
     let server = share.profile.get("server").map(server_byte).transpose()?;
+    if share.profile["schemaVersion"].as_u64() == Some(3) {
+        return encode_payload(Codec::DropConditionsJson, &json);
+    }
     let generic = encode_payload(
         if server.is_some() {
             Codec::ServerBrotliJson
@@ -138,6 +144,16 @@ pub fn decode(code: &str) -> Result<Share> {
             let bytes = inflate(&decode_base64(payload, MAX_PAYLOAD)?)?;
             match codec {
                 Codec::BrotliJson => parse_json(&bytes),
+                Codec::DropConditionsJson => {
+                    let share = parse_json(&bytes)?;
+                    if share.profile["schemaVersion"].as_u64() != Some(3) {
+                        return Err("分享码方案格式无效".into());
+                    }
+                    if let Some(server) = share.profile.get("server") {
+                        server_byte(server)?;
+                    }
+                    Ok(share)
+                }
                 Codec::ServerBrotliJson => {
                     let share = parse_json(&bytes)?;
                     server_byte(&share.profile["server"])?;
@@ -239,6 +255,22 @@ mod tests {
     // Produced independently with Node zlib, including CRC32 framing.
     const BROTLI_VECTOR: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjF9.8d8ILRt2AGAchXGzE562KCuun6YtDsEGHBAH2WATDzpE3lK__kVpH7IJb_9GgJmmdVi6-urkwOkgv35BC0vCADTwkJUo2IMqwGJgsBpuPkIrfOIA3kYKlAD3QShIFnKJYNwTrs-pLr6QOtaW27dJCytSJPsB";
     const POE2_VECTOR: &str = "POE2F1.eyJhbGciOiJwb2UyIiwicCI6MX0.tG4EFQsXgCoAAABbIuaJk-WunSIsWzM4NywyLCJTdGFuZGFyZCIsW10sWzAsMSwwLDFdXV0kAw";
+
+    #[test]
+    fn drop_conditions_share_uses_brotli_profile_three() {
+        let share = Share {
+            name: "通货数量档".into(),
+            profile: json!({"schemaVersion": 3, "server": "international", "rules": [{
+                "target": {"itemIds": ["exalted-orb"], "dropConditions": {
+                    "stackSize": {"enabled": true, "bounds": [{"op": ">=", "value": 5}]},
+                    "itemLevel": {"enabled": false, "bounds": [{"op": "<", "value": 80}]}
+                }}
+            }]}),
+        };
+        let encoded = encode(&share).unwrap();
+        assert!(encoded.starts_with("POE2F1.eyJhbGciOiJiciIsInAiOjN9."));
+        assert_eq!(decode(&encoded).unwrap(), share);
+    }
 
     #[test]
     fn share_protocol_vectors() {

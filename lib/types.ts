@@ -19,7 +19,8 @@ export type ItemCategory =
 export type ItemMatcher = {
   baseType?: string;
   class?: string;
-  rarity?: "Normal" | "Magic" | "Rare" | "Unique";
+  rarity?: ItemRarity;
+  nonUnique?: boolean;
 };
 
 export type ItemDefinition = {
@@ -35,6 +36,11 @@ export type ItemDefinition = {
   priceable: boolean;
   ambiguous: boolean;
   matcher: ItemMatcher;
+  stackable?: boolean;
+  dropLevel?: number;
+  iconUrl?: string;
+  searchNames?: string[];
+  marketItemId?: string;
 };
 
 export type MarketPrice = {
@@ -85,7 +91,14 @@ export type PresetSound =
   | { type: "baseline"; fileName: string; volume?: number; optional?: boolean; fallback?: BuiltinSound }
   | { type: "custom"; fileName: string };
 
-/** 规则适用物品：物品集合与价格区间可单独启用或同时启用，同时启用时取交集。 */
+export type ItemRarity = "Normal" | "Magic" | "Rare" | "Unique";
+export type DropOperator = ">=" | ">" | "=" | "<" | "<=";
+export type DropBound = { op: DropOperator; value: number };
+export type DropNumber = { enabled: boolean; bounds: DropBound[] };
+export type DropField = "stackSize" | "gemLevel" | "itemLevel" | "sockets" | "unidentifiedTier";
+export type DropConditions = Partial<Record<DropField, DropNumber>> & { rarity?: { enabled: boolean; value: ItemRarity } };
+
+/** 同时启用的物品、单件价格和掉落条件取交集。 */
 export type RuleTarget = {
   itemIds: string[];
   /** 关闭时忽略 itemIds（保留已选内容）。 */
@@ -93,6 +106,7 @@ export type RuleTarget = {
   range?: PriceRange;
   /** 关闭时忽略 range（保留区间内容）。 */
   priceEnabled?: boolean;
+  dropConditions?: DropConditions;
 };
 
 export type RuleFont = {
@@ -132,7 +146,7 @@ export type FilterProfile = {
   server?: GameServer;
   baseFilter?: BaseFilter;
   baseFilterHint?: string;
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   league: string;
   originalLeague?: string;
   strictness: Strictness;
@@ -170,6 +184,7 @@ export type SafetyReport = {
   hiddenHighValueItems: string[];
   exclusionViolations: string[];
   warnings: string[];
+  coveredRules: Array<{ ruleId: string; ruleName: string }>;
   passed: boolean;
 };
 

@@ -1,95 +1,131 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
 
-import type { BaseInspection } from "../../../lib/baseline-effects";
+import { DEFAULT_EFFECT_ITEMS, type BaseInspection } from "../../../lib/baseline-effects";
+import { cn } from "../../../lib/cn";
+import { summarizeDrop } from "../../../lib/drop-conditions";
 import { currencyPriceTiers, formatPrice } from "../../../lib/pricing";
-import type { FilterProfile, FilterRule, MarketSnapshot } from "../../../lib/types";
+import type { FilterProfile, FilterRule, MarketSnapshot, RuleEffects } from "../../../lib/types";
 import { RuleEditor } from "../rule-editor";
 import { Button, Panel } from "../ui/primitives";
 
-export function RulesSection({
-  profile,
-  market,
-  customSounds,
-  baseInspection,
-  onRuleChange,
-  onRemoveRule,
-  onAddRule,
-  onMoveRule,
-  onSound,
-}: {
+function ruleSummary(rule: FilterRule) {
+  const { itemIds, itemEnabled, priceEnabled, range } = rule.target;
+  const parts = [];
+  if (itemIds.length && itemEnabled !== false) parts.push(`${itemIds.length} 项物品`);
+  if (range && priceEnabled !== false) {
+    const min = range.min ? `≥ ${formatPrice(range.min)}` : "";
+    const max = range.max ? `< ${formatPrice(range.max)}` : "";
+    parts.push([rule.autoRange ? "跟随市价" : "单件价格", min, max].filter(Boolean).join(" "));
+  }
+  parts.push(...summarizeDrop(rule.target.dropConditions));
+  return parts.join(" · ") || "选择匹配条件";
+}
+
+export function RulesSection({ profile, market, customSounds, baseInspection, onRuleChange, onRemoveRule, onAddRule, onMoveRule, onSound }: {
   profile: FilterProfile;
   market: MarketSnapshot;
   customSounds: Record<string, File>;
   baseInspection?: BaseInspection;
   onRuleChange: (id: string, patch: Partial<FilterRule>) => void;
   onRemoveRule: (id: string) => void;
-  onAddRule: () => void;
+  onAddRule: () => string;
   onMoveRule: (id: string, delta: number) => void;
   onSound: (id: string, file: File | undefined) => void;
 }) {
+  const [activeId, setActiveId] = useState<string>();
+  const [dragId, setDragId] = useState<string>();
+  const [dropId, setDropId] = useState<string>();
+  const [copiedTarget, setCopiedTarget] = useState<Pick<FilterRule, "target" | "autoRange">>();
+  const [copiedEffects, setCopiedEffects] = useState<{ effects: RuleEffects; file?: File }>();
+  const [notice, setNotice] = useState("");
+  const active = profile.rules.find((rule) => rule.id === activeId) ?? profile.rules[0];
+  const index = active ? profile.rules.indexOf(active) : -1;
   const tiers = currencyPriceTiers(market);
-  const enabled = profile.rules.filter((rule) => rule.enabled).length;
-  const hidden = profile.rules.filter((rule) => rule.enabled && rule.hidden).length;
+
+  function selectRule(id: string) {
+    setActiveId(id);
+    setNotice("");
+  }
 
   return (
-    <Panel
-      title="自定义过滤规则"
-      description="规则从上到下匹配，第一条命中的规则生效。可以按物品、价格或两项同时筛选。"
-    >
-      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {tiers.length ? (
-          tiers.map((tier) => (
-            <div key={tier.itemId} className="flex flex-col gap-1.5 rounded-sm border border-line bg-surface-2 px-3 py-2.5">
-              <span className="truncate text-xs text-ink-muted">{tier.name}</span>
-              <strong className="font-mono text-[13px] font-medium text-gold">{formatPrice({ amount: tier.exaltedValue, currency: "exalted" })}</strong>
-            </div>
-          ))
-        ) : (
-          <p className="col-span-2 text-xs leading-relaxed text-ink-muted sm:col-span-4">
-            跟随市价的价格档需要通货报价。请刷新本赛季行情，也可以用物品条件设置静态规则。
-          </p>
-        )}
-      </div>
+    <Panel title="自定义过滤规则" description="按列表顺序匹配，首条命中的规则生效。">
+      <div className="grid items-start gap-3 xl:grid-cols-[minmax(13rem,1fr)_minmax(0,2.3fr)]">
+        <aside className="min-w-0 space-y-2" aria-label="规则顺序">
+          <ol className="m-0 list-none space-y-2 p-0">
+            {profile.rules.map((rule, currentIndex) => (
+              <li key={rule.id} className={cn("min-w-0 rounded-sm border bg-surface-2", active?.id === rule.id ? "border-gold/60" : "border-line", dropId === rule.id && dragId !== rule.id && "ring-1 ring-gold")}
+                onDragOver={(event) => { if (dragId) { event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropId(rule.id); } }}
+                onDrop={(event) => {
+                  if (!dragId) return;
+                  event.preventDefault();
+                  const from = profile.rules.findIndex((entry) => entry.id === dragId);
+                  if (from >= 0 && from !== currentIndex) onMoveRule(dragId, currentIndex - from);
+                  setDragId(undefined);
+                  setDropId(undefined);
+                }}>
+                <div className="flex items-stretch">
+                  <span draggable aria-hidden="true" className="cursor-grab self-center p-2 text-ink-muted active:cursor-grabbing"
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", rule.id); setDragId(rule.id); }}
+                    onDragEnd={() => { setDragId(undefined); setDropId(undefined); }}>
+                    <GripVertical className="size-4" />
+                  </span>
+                  <button type="button" aria-current={active?.id === rule.id ? "true" : undefined} className="flex min-w-0 flex-1 flex-col gap-1 py-2 pr-2 text-left" onClick={() => selectRule(rule.id)}>
+                    <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                      <span className="font-mono text-ink-muted">{currentIndex + 1}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium text-ink">{rule.name || "规则名称"}</span>
+                      <span className={rule.hidden ? "text-ember" : "text-ink-muted"}>{rule.hidden ? "隐藏" : "显示"}</span>
+                      <span className="text-ink-muted">{rule.enabled ? "启用" : "停用"}</span>
+                    </span>
+                    <span className="line-clamp-2 text-xs text-ink-muted">{ruleSummary(rule)}</span>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {active && <div className="flex justify-end gap-1" role="group" aria-label="移动当前规则">
+            <Button variant="ghost" size="sm" disabled={index === 0} onClick={() => onMoveRule(active.id, -1)}><ArrowUp className="size-4" aria-hidden="true" />上移</Button>
+            <Button variant="ghost" size="sm" disabled={index === profile.rules.length - 1} onClick={() => onMoveRule(active.id, 1)}><ArrowDown className="size-4" aria-hidden="true" />下移</Button>
+          </div>}
+          <Button variant="secondary" className="w-full border-dashed" disabled={profile.rules.length >= 100} onClick={() => selectRule(onAddRule())}><Plus className="size-4" aria-hidden="true" />新增规则</Button>
+        </aside>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
-        <span>
-          共 <b className="font-mono font-normal text-ink">{profile.rules.length}</b> 条规则，启用 <b className="font-mono font-normal text-ink">{enabled}</b> 条
-          {hidden > 0 ? <>，其中隐藏规则 <b className="font-mono font-normal text-ember">{hidden}</b> 条</> : null}
-        </span>
+        {active && <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-1 rounded-sm border border-line bg-surface-2 px-2 py-1" role="group" aria-label="复制规则设置">
+            <Button size="sm" variant="ghost" onClick={() => {
+              setCopiedTarget({ target: structuredClone(active.target), autoRange: active.autoRange });
+              setNotice("已复制条件");
+            }}>复制条件</Button>
+            <Button size="sm" variant="ghost" disabled={!copiedTarget} onClick={() => {
+              if (!copiedTarget) return;
+              onRuleChange(active.id, structuredClone(copiedTarget));
+              setNotice("已应用条件");
+            }}>粘贴条件</Button>
+            <Button size="sm" variant="ghost" onClick={() => {
+              const effects = active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects;
+              setCopiedEffects({ effects: structuredClone(effects), file: effects.sound?.type === "custom" ? customSounds[active.id] : undefined });
+              setNotice("已复制特效");
+            }}>复制特效</Button>
+            <Button size="sm" variant="ghost" disabled={!copiedEffects} onClick={() => {
+              if (!copiedEffects) return;
+              onSound(active.id, copiedEffects.file);
+              onRuleChange(active.id, { effects: structuredClone(copiedEffects.effects), effectPresetId: undefined, followBaseline: Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, active.id) ? false : undefined });
+              setNotice("已应用特效");
+            }}>粘贴特效</Button>
+            <span className="ml-auto pr-2 text-xs text-ink-muted" role="status">{notice}</span>
+          </div>
+          <RuleEditor key={active.id} rule={active} index={index} locale="cn" base={profile.baseFilter} inherited={baseInspection?.styles[active.id]}
+            presets={baseInspection?.presets ?? []} market={market} customFile={active.effects.sound?.type === "custom" ? customSounds[active.id] : undefined}
+            onChange={(patch) => onRuleChange(active.id, patch)} onRemove={() => { onRemoveRule(active.id); setActiveId(profile.rules[index + 1]?.id ?? profile.rules[index - 1]?.id); }}
+            onSound={(file) => onSound(active.id, file)} />
+          {active.autoRange && <div className="flex flex-wrap gap-2" aria-label="市场价格档">
+            {tiers.map((tier) => <span key={tier.itemId} className="rounded-sm border border-line bg-surface-2 px-2 py-1.5 text-xs text-ink-muted">{tier.name} <strong className="font-mono font-medium text-gold">{formatPrice({ amount: tier.exaltedValue, currency: "exalted" })}</strong></span>)}
+            {!tiers.length && <p className="text-xs text-ink-muted">刷新当前赛季行情以计算价格档。</p>}
+          </div>}
+        </div>}
       </div>
-
-      <div className="flex flex-col gap-3">
-        {profile.rules.length === 0 && (
-          <p className="rounded-sm border border-dashed border-line bg-surface-2/40 px-4 py-6 text-center text-xs text-ink-muted">
-            点击「新增规则」设置物品的显示效果。
-          </p>
-        )}
-        {profile.rules.map((rule, index) => (
-          <RuleEditor
-            key={rule.id}
-            rule={rule}
-            index={index}
-            total={profile.rules.length}
-            locale="cn"
-            base={profile.baseFilter}
-            inherited={baseInspection?.styles[rule.id]}
-            presets={baseInspection?.presets ?? []}
-            market={market}
-            customFile={customSounds[rule.id]}
-            onChange={(patch) => onRuleChange(rule.id, patch)}
-            onRemove={() => onRemoveRule(rule.id)}
-            onMove={(delta) => onMoveRule(rule.id, delta)}
-            onSound={(file) => onSound(rule.id, file)}
-          />
-        ))}
-      </div>
-
-      <Button variant="secondary" className="mt-4 w-full border-dashed" onClick={onAddRule}>
-        <Plus aria-hidden="true" className="size-4" />
-        新增规则
-      </Button>
     </Panel>
   );
 }
