@@ -187,6 +187,8 @@ export type SafetyReport = {
   ambiguousItems: number;
   hiddenHighValueItems: string[];
   exclusionViolations: string[];
+  /** 基础过滤器里让游戏拒绝加载的问题（例如用了已改名的物品类别），带着最终文本里的行号。 */
+  baselineIssues: string[];
   warnings: string[];
   coveredRules: Array<{ ruleId: string; ruleName: string }>;
   passed: boolean;

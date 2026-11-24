@@ -1154,6 +1154,15 @@ impl Store {
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         let baseline = self.baseline(&scheme.profile)?;
         let result = self.generate(&scheme.profile, baseline.as_ref(), market)?;
+        // 基础过滤器用了游戏已经改名的类别时，游戏会拒绝加载整份过滤器。把原因直接告诉用户，
+        // 而不是笼统的「未通过安全检查」。
+        let baseline_issues: Vec<&str> = result["safetyReport"]["baselineIssues"]
+            .as_array()
+            .map(|issues| issues.iter().filter_map(|issue| issue.as_str()).collect())
+            .unwrap_or_default();
+        if let Some(reason) = baseline_issues.first() {
+            return Err((*reason).into());
+        }
         if let Some(reason) = result["marketIssue"].as_str() {
             return Err(reason.into());
         }
@@ -1816,6 +1825,58 @@ mod tests {
         let (text, _) = store.prepare_filter(scheme, None).unwrap();
         assert!(text.contains("Class == \"Omen\""));
         assert!(text.contains("Class == \"Waystones\""));
+    }
+
+    #[test]
+    fn stale_base_filter_with_renamed_class_is_reported_and_not_installed() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        // 游戏在 2025 年 12 月把 Socketable 改名成了 Augment，旧版 NeverSink 里还在用旧名字，
+        // 游戏会因此拒绝加载整份过滤器。
+        let source = store.root.join("stale.filter");
+        fs::create_dir_all(&store.root).unwrap();
+        fs::write(
+            &source,
+            "# VERSION:  0.8.3\n\nShow\n\tClass == \"Socketable\"\n\tSetFontSize 40\n",
+        )
+        .unwrap();
+        let base = BaseFilter::from_file(&source).unwrap();
+        let mut draft = profile(&store);
+        draft["baseFilter"] = json!(base);
+        draft["rules"] = json!([{
+            "id": "orb", "name": "崇高石", "enabled": true, "hidden": false,
+            "target": {"itemIds": ["divine-orb"]},
+            "effects": {"beam": "Blue"}
+        }]);
+        let preview = store.preview(draft.clone(), None).unwrap();
+        let issues = preview["safetyReport"]["baselineIssues"]
+            .as_array()
+            .unwrap();
+        assert_eq!(issues.len(), 1, "{preview}");
+        let issue = issues[0].as_str().unwrap();
+        assert!(issue.contains("Socketable") && issue.contains("Augment"), "{issue}");
+        assert_eq!(preview["safetyReport"]["passed"], json!(false));
+        // 报出的行号就是最终文本里那条条件所在的行，和游戏报错里的行号是同一个数。
+        let text = preview["filterFile"].as_str().unwrap();
+        let line: usize = issue
+            .split('第')
+            .nth(1)
+            .and_then(|rest| rest.split('行').next())
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        assert!(
+            text.lines().nth(line - 1).unwrap().contains("Socketable"),
+            "{issue}"
+        );
+        let id = store
+            .add(&mut library, "旧基础过滤器", draft, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        let error = store.prepare_filter(scheme, None).unwrap_err();
+        assert!(error.contains("Socketable") && error.contains("Augment"), "{error}");
     }
 
     #[test]

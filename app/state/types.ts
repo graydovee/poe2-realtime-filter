@@ -37,6 +37,8 @@ export type Generated = {
     unpricedItems: number;
     ambiguousItems: number;
     hiddenHighValueItems: string[];
+    /** 基础过滤器里让游戏拒绝加载的问题，带着最终文本里的行号。 */
+    baselineIssues: string[];
     coveredItems: number;
     catalogSize: number;
   };

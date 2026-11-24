@@ -137,6 +137,11 @@ function RulesTab({ generated }: { generated: Generated }) {
         {report.warnings.map((warning) => (
           <Alert key={warning} tone="gold">{warning}</Alert>
         ))}
+        {(report.baselineIssues ?? []).map((issue) => (
+          <Alert key={issue} tone="ember" title="基础过滤器与当前游戏版本不兼容">
+            <p className="break-words">{issue}</p>
+          </Alert>
+        ))}
         {report.hiddenHighValueItems.length > 0 && (
           <Alert tone="ember" title="以下高价值物品被隐藏规则命中">
             <p className="break-words">{report.hiddenHighValueItems.join("、")}</p>
@@ -156,6 +161,12 @@ export function PreviewView({ generated }: { generated: Generated }) {
     <div className="grid gap-4">
       {report.passed ? (
         <Alert tone="sage" role="status" title="安全检查通过" />
+      ) : (report.baselineIssues ?? []).length > 0 ? (
+        // 基础过滤器的问题是改规则解决不了的，横幅直接说原因和办法，别让人去查规则。
+        <Alert tone="ember" title="基础过滤器与当前游戏版本不兼容，无法安装">
+          <p className="break-words">{report.baselineIssues[0]}</p>
+          <p>换成当前版本的基础过滤器后重新生成。</p>
+        </Alert>
       ) : (
         <Alert tone="ember" title="生成结果存在规则冲突">
           请检查自定义规则与隐藏规则后重新生成。

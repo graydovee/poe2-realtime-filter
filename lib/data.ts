@@ -141,9 +141,13 @@ export type ClassMatch = { path: string[]; item: ItemDefinition; members: ItemDe
  * 登记了的整类条目可以被生成器输出；没登记的照旧跳过：
  * - Stackable Currency：它的范围比「通货与材料」小（符文、灵魂核心不属于这个类别）；
  * - 「其他」、通货与材料根分类下的几个标记，和那里的逐件物品不是一回事；
- * - Instance Local Items：不是任务物品，和 Quest Items 挤在同一个分类里。
+ * - Instance Local Items：不是任务物品，和 Quest Items 挤在同一个分类里；
+ * - Augment：目录把它放在石板分类下，但它是符文、灵魂核心那一类（游戏在 2025 年 12 月把 Socketable
+ *   改名成了 Augment，见 GGG 的过滤器更新公告；NeverSink 0.10.4 里 Class == "Augment" 搭配的也是符文
+ *   和灵魂核心）。石板对应的是 Tablet，这里不登记，石板照旧逐件输出。
+ * 类别和物品的对应关系由 tests/class-matches.test.mjs 对照内置的 NeverSink 过滤器核对。
  */
-const UNREGISTERED_CLASSES = new Set(["Instance Local Items"]);
+const UNREGISTERED_CLASSES = new Set(["Instance Local Items", "Augment"]);
 export const CLASS_MATCHES: ClassMatch[] = [
   ...classEntries
     .filter((item) => !isEquipmentType(item.categoryPath) && !UNREGISTERED_CLASSES.has(item.name))

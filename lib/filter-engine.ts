@@ -184,6 +184,58 @@ function snapshotUsable(snapshot: MarketSnapshot): boolean {
   return snapshot.source !== FALLBACK_SNAPSHOT.source && Date.parse(snapshot.expiresAt) >= Date.now();
 }
 
+/**
+ * 游戏已经改名的物品类别（旧名 → 现名）。过滤器里再用旧名字，游戏会拒绝加载整份过滤器，报的是
+ * 「无法分析规则 Class 参数：找不到与 "Socketable" 完全相符的物品种类」。
+ * 依据：GGG 的过滤器更新公告（2025-12，Path of Exile 2: The Last of the Druids）的 Updated Keywords 一节。
+ */
+export const RENAMED_ITEM_CLASSES: Record<string, string> = { Socketable: "Augment" };
+
+/** 仓库内置的 NeverSink 版本。本地的基础过滤器比它旧时提醒用户；tests 保证它和 vendor 里的文件头一致。 */
+export const NEVERSINK_REFERENCE_VERSION = "0.10.4";
+
+/** 过滤器里生效的 Class 条件用到的类名 → 出现的行号（从 1 数）。注释行不算，`Class == "A" "B"` 和 `Class A` 两种写法都算。 */
+function classLineNumbers(filterFile: string): Map<string, number[]> {
+  const lines = new Map<string, number[]>();
+  filterFile.split("\n").forEach((line, index) => {
+    if (!/^\s*Class\b/.test(line)) return;
+    const rest = line.replace(/^\s*Class\s*(?:==|!=|<=|>=|=|!|<|>)?/, "");
+    const quoted = [...rest.matchAll(/"([^"\n]+)"/g)].map((match) => match[1]);
+    for (const name of quoted.length ? quoted : rest.trim().split(/\s+/).filter(Boolean)) {
+      const found = lines.get(name) ?? [];
+      found.push(index + 1);
+      lines.set(name, found);
+    }
+  });
+  return lines;
+}
+
+/** 在最终文本上查已改名的类别，这样报出的行号和游戏报的行号是同一个数。 */
+function renamedClassIssues(filterFile: string): string[] {
+  const used = classLineNumbers(filterFile);
+  return Object.entries(RENAMED_ITEM_CLASSES).flatMap(([previous, current]) => {
+    const found = used.get(previous);
+    if (!found) return [];
+    return [`第 ${found[0]} 行：物品类别 "${previous}" 已被游戏改名为 "${current}"，游戏会拒绝加载整份过滤器。基础过滤器需要更新到当前游戏版本。`
+      + (found.length > 1 ? `（共 ${found.length} 行用了旧名字）` : "")];
+  });
+}
+
+/** NeverSink 的过滤器文件头写着版本号（# VERSION:  0.10.4）。 */
+function neversinkVersion(text: string): number[] | undefined {
+  const match = /^#\s*VERSION:\s*(\d+(?:\.\d+)+)/m.exec(text);
+  return match ? match[1].split(".").map(Number) : undefined;
+}
+
+function olderVersion(left: number[], right: number[]): boolean {
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const a = left[index] ?? 0;
+    const b = right[index] ?? 0;
+    if (a !== b) return a < b;
+  }
+  return false;
+}
+
 function validateSafety(
   baselineFile: string,
   baseline: string,
@@ -191,7 +243,8 @@ function validateSafety(
   skipped: Set<string>,
   warnings: string[],
   coveredRules: SafetyReport["coveredRules"],
-  divineToExalted?: number,
+  divineToExalted: number | undefined,
+  baselineIssues: string[],
 ): SafetyReport {
   const baseTypes = new Set<string>();
   const classes = new Set<string>();
@@ -214,9 +267,10 @@ function validateSafety(
     ambiguousItems: ITEM_CATALOG.filter((item) => item.ambiguous && !item.matcher.class).length,
     hiddenHighValueItems,
     exclusionViolations,
+    baselineIssues,
     warnings,
     coveredRules,
-    passed: hiddenHighValueItems.length === 0 && exclusionViolations.length === 0,
+    passed: hiddenHighValueItems.length === 0 && exclusionViolations.length === 0 && baselineIssues.length === 0,
   };
 }
 
@@ -318,8 +372,13 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项" + defaultDisplay + "。");
   if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
+  if (baseline !== null) {
+    const version = neversinkVersion(baseline);
+    if (version && olderVersion(version, NEVERSINK_REFERENCE_VERSION.split(".").map(Number))) {
+      warnings.push("基础过滤器是 NeverSink " + version.join(".") + "，比应用内置的参考版本 " + NEVERSINK_REFERENCE_VERSION + " 旧。游戏更新后，旧版里可能有已经改名或删除的类别和物品。");
+    }
+  }
 
-  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, coveredRules, snapshot.rates?.divineToExalted);
   const header = [
     "# poe2-filter generated overlay",
     standalone ? "# Mode: custom rules" : "# Mode: overlay",
@@ -332,6 +391,9 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   ].join("\n");
   const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + (baseline ?? "Show\n");
   for (const match of filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)) soundFiles.add(match[1]);
+  // 基础过滤器可能和当前游戏版本不兼容。在拼好的最终文本上查，报出的行号才和游戏报的行号一致。
+  const baselineIssues = baseline === null ? [] : renamedClassIssues(filterFile);
+  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, coveredRules, snapshot.rates?.divineToExalted, baselineIssues);
   return {
     filterFile,
     baselineFile,

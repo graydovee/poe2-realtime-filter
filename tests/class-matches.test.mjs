@@ -35,7 +35,7 @@ test("整类条目不是可选物品", () => {
 });
 
 test("登记表里的每条整类匹配对应选择器里的一个分类", () => {
-  assert.equal(data.CLASS_MATCHES.length, 57);
+  assert.equal(data.CLASS_MATCHES.length, 56);
   for (const entry of data.CLASS_MATCHES) {
     const key = entry.path.join("/");
     const inCategory = data.PICKER_ITEMS.filter((item) => pathOf(item) === key && !item.matcher.class);
@@ -44,7 +44,7 @@ test("登记表里的每条整类匹配对应选择器里的一个分类", () =>
   }
   const nonEquipment = data.CLASS_MATCHES.filter((entry) => !/^(base|unique):class-/.test(entry.item.id));
   assert.deepEqual(nonEquipment.map((entry) => entry.item.id), [
-    "class-augment", "class-charms", "class-expedition-logbook", "class-incubators", "class-life-flasks", "class-mana-flasks",
+    "class-charms", "class-expedition-logbook", "class-incubators", "class-life-flasks", "class-mana-flasks",
     "class-omen", "class-pinnacle-keys", "class-quest-items", "class-skill-gems", "class-support-gems", "class-vault-keys", "class-waystones",
   ]);
   assert.equal(memberIds("class-omen").length, 37);
@@ -60,16 +60,84 @@ test("登记表里的每条整类匹配对应选择器里的一个分类", () =>
     assert.deepEqual(entry.item.matcher, group === "base" ? { class: entry.item.matcher.class, nonUnique: true } : { class: entry.item.matcher.class, rarity: "Unique" });
   }
   // 这几个整类条目不代表任何选择器分类，保持不可用。
-  for (const id of ["class-stackable-currency", "class-map-fragments", "class-tablet", "class-fishing-rods", "class-instance-local-items", "class-amulets", "class-jewels"]) {
+  for (const id of ["class-stackable-currency", "class-map-fragments", "class-tablet", "class-fishing-rods", "class-instance-local-items", "class-amulets", "class-jewels", "class-augment"]) {
     assert.equal(data.CLASS_MATCH_BY_ID.has(id), false, id + " 不该登记");
   }
 });
 
+// 内置的 NeverSink 过滤器：拆成规则块，取出每个块里的 Class 条件和 BaseType 名单。
+// Class == "A" "B" 和 Class "A" "B" 两种写法都算，注释行不算。
+const reference = readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8")
+  .split(/(?=^(?:Show|Hide|Minimal)\b)/m)
+  .filter((block) => /^(?:Show|Hide|Minimal)\b/.test(block))
+  .map((block) => {
+    const lines = block.split("\n").filter((line) => /^\s*[A-Za-z]/.test(line));
+    const quoted = (line) => [...line.matchAll(/"([^"]+)"/g)].map(([, name]) => name);
+    return { classes: lines.filter((line) => /^\s*Class\b/.test(line)).flatMap(quoted), baseTypes: lines.filter((line) => /^\s*BaseType\b/.test(line)).flatMap(quoted) };
+  });
+const referenceClasses = new Set(reference.flatMap((block) => block.classes));
+/** NeverSink 在带某个类别的块里点过名的物品。 */
+const pairedWith = (className) => reference.filter((block) => block.classes.includes(className)).flatMap((block) => block.baseTypes);
+
 test("整类块用的类名都是游戏里真实存在的类名", () => {
   // NeverSink 的过滤器是现成的参照：它用 Class 条件写过的类名才是游戏认的类名。
-  const baseline = readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8");
-  const used = new Set([...baseline.matchAll(/^\s*Class\s*==?\s*([^\n]+)/gm)].flatMap(([, line]) => [...line.matchAll(/"([^"]+)"/g)].map(([, name]) => name)));
-  for (const entry of data.CLASS_MATCHES) assert.ok(used.has(entry.item.matcher.class), entry.item.matcher.class + " 没有在基础过滤器里出现过");
+  for (const entry of data.CLASS_MATCHES) assert.ok(referenceClasses.has(entry.item.matcher.class), entry.item.matcher.class + " 没有在基础过滤器里出现过");
+  // 游戏在 2025 年 12 月把 Socketable 改名成了 Augment（GGG 的过滤器更新公告）。
+  assert.equal(referenceClasses.has("Socketable"), false);
+  assert.equal(referenceClasses.has("Augment"), true);
+});
+
+test("登记的类别确实对应它所代表分类里的物品", () => {
+  // NeverSink 会把物品名单和 Class 条件写在同一个块里。如果它在某个类别下点过不少物品，
+  // 而我们登记给这个类别的分类一件都不在其中，对应关系就是错的：Augment 曾经被登记成石板，就是这样错的。
+  // 只有名字能看出对应的装备类型不在这里核对（类别名就是物品类型名）。
+  const byClass = (className) => data.CLASS_MATCHES.filter((entry) => !/^(base|unique):class-/.test(entry.item.id) && entry.item.matcher.class === className);
+  const tablets = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "endgame/tablets" && !item.matcher.class);
+  assert.ok(tablets.length >= 8);
+  assert.ok(pairedWith("Augment").length >= 20 && !tablets.some((item) => pairedWith("Augment").includes(item.name)), "NeverSink 在 Augment 下点名的是别的物品，不是石板");
+  assert.equal(byClass("Augment").length, 0, "Augment 不该登记给任何分类");
+
+  // 这几类在 NeverSink 里没法用物品名单核对，依据写在本测试后半部分：
+  // 药剂只写了档位名；符文宝石只按名字匹配、Skill Gems 和 Support Gems 写在同一个条件里；
+  // 巅峰钥匙和宝库钥匙用的是不带物品名单的整类块。
+  const unverifiableInReference = new Set(["class-life-flasks", "class-mana-flasks", "class-skill-gems", "class-pinnacle-keys", "class-vault-keys"]);
+  for (const entry of data.CLASS_MATCHES) {
+    if (/^(base|unique):class-/.test(entry.item.id) || !entry.members.length || unverifiableInReference.has(entry.item.id)) continue;
+    const paired = pairedWith(entry.item.matcher.class);
+    const overlap = entry.members.filter((item) => paired.includes(item.name)).map((item) => item.name);
+    assert.ok(overlap.length > 0, entry.item.matcher.class + "：NeverSink 在这个类别下点过 " + paired.length + " 件物品，没有一件属于「" + entry.path.join("/") + "」");
+  }
+  // NeverSink 点名的物品和分类成员完全重合的几类。
+  for (const [className, id] of [["Omen", "class-omen"], ["Charms", "class-charms"], ["Incubators", "class-incubators"]]) {
+    assert.deepEqual(memberIds(id).map((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name).filter((name) => !pairedWith(className).includes(name)), [], className);
+  }
+  // 下面几类在 NeverSink 里没法用物品名单核对，依据逐条写在这里。按名字查目录，不凭印象写 id。
+  const catalogId = (name) => {
+    const item = data.ITEM_CATALOG.find((entry) => entry.name === name);
+    assert.ok(item, "目录里找不到 " + name);
+    return item.id;
+  };
+  // GGG 的过滤器更新公告（2025-12）把 Atziri's Communion 列在 Item class: Support Gems 下，它在目录里是血脉宝石。
+  assert.ok(memberIds("class-support-gems").includes(catalogId("Atziri's Communion")));
+  // wiki 上 Frostflame Nova 的物品类别是 Skill Gem，它在目录里是符文宝石。
+  assert.ok(memberIds("class-skill-gems").includes(catalogId("Frostflame Nova")));
+  // wiki 上 Origin Spark 是 Pinnacle Key、Olroth's Reliquary Key 是 Vault Key；NeverSink 对这两类只用不带物品名单的整类块。
+  assert.ok(memberIds("class-pinnacle-keys").includes(catalogId("Origin Spark")));
+  assert.ok(memberIds("class-vault-keys").includes(catalogId("Olroth's Reliquary Key")));
+  assert.ok(memberIds("class-vault-keys").every((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name.endsWith(" Reliquary Key")));
+  // NeverSink 点名药剂时只写档位（"Gargantuan"），和全名对不上；类别和物品类型同名。
+  for (const [id, suffix] of [["class-life-flasks", " Life Flask"], ["class-mana-flasks", " Mana Flask"]]) {
+    assert.ok(memberIds(id).every((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name.endsWith(suffix)), id);
+  }
+});
+
+test("石板照旧逐件输出，不生成 Class 条件", () => {
+  const tablets = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "endgame/tablets" && !item.matcher.class);
+  assert.equal(tablets.length, 8);
+  const output = generateOnBase(build([itemRule("tablets", tablets.map((item) => item.id))]), null, snapshot);
+  assert.equal(classLines(output.filterFile).length, 0);
+  assert.ok(!output.filterFile.includes("Augment"));
+  assert.equal(ruleBlocks(output.filterFile).length, 8);
 });
 
 test("全选一个分类时输出一条整类块，不再逐件输出", () => {

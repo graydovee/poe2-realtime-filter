@@ -43,6 +43,8 @@ const matcherPaths = {
   "Skill Gems": classPaths[18], "Support Gems": classPaths[19], Jewels: classPaths[42],
   "Quest Items": classPaths[31], "Instance Local Items": classPaths[31],
   "Expedition Logbook": classPaths[74], "Vault Keys": classPaths[90], "Pinnacle Keys": classPaths[117],
+  // Augment 在这里被放到石板分类下，但它是符文、灵魂核心那一类（游戏把 Socketable 改名成了 Augment），
+  // 石板对应的是 Tablet。lib/data.ts 的整类匹配登记表按名字排除了它，石板照旧逐件输出。
   Waystones: ["endgame", "waystones"], Omen: classPaths[108], Augment: classPaths[107],
   Incubators: classPaths[76], "Stackable Currency": ["crafting", "currency"],
 };

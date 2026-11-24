@@ -54,6 +54,29 @@ const LOCAL_BASE: BaseFilter = {
   name: "NeverSink's filter 2 - 6-UBER-PLUS-STRICT.filter",
 };
 
+/**
+ * 上面那份本地文件的缩影：一份过期的 NeverSink。游戏在 2025 年 12 月把物品类别 Socketable 改名成了 Augment，
+ * 0.8.3 还在用旧名字，游戏会拒绝加载。选了它的方案，预览里就能看到「基础过滤器与当前游戏版本不兼容」。
+ */
+const STALE_BASE_TEXT = [
+  "# NeverSink's Indepth Loot Filter - for Path of Exile 2 (fixture)",
+  "# VERSION:  0.8.3",
+  "",
+  "Show # $type->currency $tier->high",
+  "\tClass == \"Stackable Currency\"",
+  "\tBaseType == \"Divine Orb\" \"Exalted Orb\"",
+  "\tSetFontSize 45",
+  "",
+  "Show # $type->sockets->general $tier->s",
+  "\tClass == \"Socketable\"",
+  "\tBaseType == \"Amanamu's Gaze\"",
+  "\tSetFontSize 45",
+  "",
+  "Show",
+  "\tSetFontSize 32",
+  "",
+].join("\n");
+
 const BASES: BaseFilter[] = [
   BASE,
   {
@@ -240,7 +263,9 @@ const handlers: Record<string, Handler> = {
   base_styles: () => inspection(),
   preview: ({ profile: value }) => {
     const profile = value as FilterProfile;
-    return { ...generateFilter(profile, null, market(profile.league, profile.server ?? "international")), market: market(profile.league) };
+    // 选了那份过期的本地文件时，带着它的正文生成，用来演示基础过滤器与游戏版本不兼容的提示。
+    const baseline = JSON.stringify(profile.baseFilter) === JSON.stringify(LOCAL_BASE) ? STALE_BASE_TEXT : null;
+    return { ...generateFilter(profile, baseline, market(profile.league, profile.server ?? "international")), market: market(profile.league) };
   },
   scheme_save: ({ edit }) => {
     const value = edit as { id: string | null; name: string; profile: FilterProfile };
