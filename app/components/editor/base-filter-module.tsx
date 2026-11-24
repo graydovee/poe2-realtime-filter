@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, Download, FileSearch, FolderOpen, PackageSearch, Trash2 } from "lucide-react";
 
+import { itemLabel as itemName } from "../../../lib/catalog";
 import { displayDirectory, explain, local } from "../../../lib/desktop";
 import { FILTER_ITEMS_BY_ID } from "../../../lib/data";
 import type { BaseFilter } from "../../../lib/types";
@@ -48,7 +49,7 @@ function filterSource(base: BaseFilter) {
 
 function itemLabel(id: string) {
   const item = FILTER_ITEMS_BY_ID.get(id);
-  return item ? item.localeNames.cn || item.name : id;
+  return item ? itemName(item, "cn") : id;
 }
 
 /** 选择基础过滤器的对话框：扫描游戏目录，或选一个下载来源再选版本。 */

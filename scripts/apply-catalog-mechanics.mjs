@@ -24,12 +24,15 @@ for (const [name, entry] of Object.entries(mapping)) {
   if (!executable.has(entry?.mechanic)) throw new Error("data/item-mechanics.json 里有未知玩法：" + name + " -> " + entry?.mechanic);
 }
 
-// 整类匹配（Stackable Currency / Omen）只是「保持原始规则」的标记，不归属任何玩法。
+// Stackable Currency 只是「保持原始规则」的标记，不归属任何玩法。
 for (const item of catalog.items) {
-  if (item.categoryPath[0] === "crafting" && item.categoryPath[item.categoryPath.length - 1] === "class-selection") {
+  if (item.categoryPath[0] === "crafting" && item.categoryPath[item.categoryPath.length - 1] === "class-selection" && item.name === "Stackable Currency") {
     item.categoryPath = ["crafting", "class-selection"];
   }
 }
+// 预兆的整类条目留在预兆分类里：全选预兆时，生成器把它换成一条 Class 条件。
+const omenClass = catalog.items.find((item) => item.matcher?.class === "Omen");
+if (omenClass) omenClass.categoryPath = ["crafting", "omens", "class-selection"];
 
 const unmapped = [];
 const stale = new Set(Object.keys(mapping));
@@ -39,7 +42,7 @@ for (const item of catalog.items) {
   const entry = mapping[item.name];
   if (!entry) {
     const path = item.categoryPath ?? [];
-    if (path[0] === "crafting" && path.length > 1 && !UNMANAGED_GROUPS.has(path[1])) unmapped.push(item.name);
+    if (path[0] === "crafting" && path.length > 1 && !UNMANAGED_GROUPS.has(path[1]) && !item.matcher?.class) unmapped.push(item.name);
     continue;
   }
   stale.delete(item.name);

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronDown, ChevronRight, Coins, Gem, Package, SearchX, Shield, X } from "lucide-react";
 
-import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, searchCatalog, type CatalogNode } from "../../lib/catalog";
+import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, itemLabel, searchCatalog, type CatalogNode } from "../../lib/catalog";
 import { cn } from "../../lib/cn";
 import { FILTER_ITEMS_BY_ID, PICKER_ITEMS } from "../../lib/data";
 import type { ItemDefinition, Locale } from "../../lib/types";
@@ -43,7 +43,7 @@ function itemMeta(item: ItemDefinition) {
   if (item.matcher.nonUnique) {
     parts.push(groupName(item.categoryPath.at(-1) ?? "equipment", LOCALE) + (item.dropLevel ? ` · 掉落等级 ${item.dropLevel}` : ""));
   }
-  if ((item.localeNames[LOCALE] || item.name) !== item.name) parts.push(item.name);
+  if (itemLabel(item, LOCALE) !== item.name) parts.push(item.name);
   return parts.join(" · ");
 }
 
@@ -55,7 +55,7 @@ function ItemCard({ item, selected, selectedOnly, onToggle }: {
 }) {
   // 「仅看已选」视图里每一项都是已选状态，点击即移除。
   const checked = selected || selectedOnly;
-  const label = item.localeNames[LOCALE] || item.name;
+  const label = itemLabel(item, LOCALE);
   return (
     <div
       className={cn(
@@ -376,14 +376,20 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
                 const item = visibleItems[row.index];
                 if (!item) return null;
                 const checked = selected.has(item.id);
-                const label = item.localeNames[LOCALE] || item.name;
+                const label = itemLabel(item, LOCALE);
                 return (
                   <div
                     key={item.id}
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: ROW_HEIGHT, transform: `translateY(${row.start}px)` }}
-                    className="grid gap-2 pr-1"
+                    style={{
+                      position: "absolute", top: 0, left: 0, width: "100%", height: ROW_HEIGHT, transform: `translateY(${row.start}px)`,
+                      // 每行是独立的 grid，必须写死等宽列，否则两列会按各自内容分宽而错位。
+                      gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                    }}
+                    // 每个格子是一条独立的虚拟行，都铺满整行；后面那条（右列）会盖住前面那条，
+                    // 所以行容器不接收鼠标事件，只有自己的那一格可以点。
+                    className="pointer-events-none grid gap-2 pr-1"
                   >
-                    <div style={{ gridColumn: row.lane + 1 }} className="h-full">
+                    <div style={{ gridColumn: row.lane + 1 }} className="pointer-events-auto h-full">
                       <ItemCard item={item} selected={checked} selectedOnly={selectedOnly} onToggle={() => toggle([item], !checked, label, item.id)} />
                     </div>
                   </div>

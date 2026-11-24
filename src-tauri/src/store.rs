@@ -1778,6 +1778,47 @@ mod tests {
     }
 
     #[test]
+    fn whole_categories_generate_class_blocks_in_the_desktop_engine() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut draft = profile(&store);
+        draft.as_object_mut().unwrap().remove("baseFilter");
+        let catalog: Value =
+            serde_json::from_str(include_str!("../../data/item-catalog.json")).unwrap();
+        let mut items: Vec<Value> = catalog["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|item| item["categoryPath"] == json!(["crafting", "omens"]))
+            .map(|item| item["id"].clone())
+            .collect();
+        assert_eq!(items.len(), 37);
+        // 换界石没有逐件物品，直接选中整类条目。
+        items.push(json!("class-waystones"));
+        draft["rules"] = json!([{
+            "id": "whole", "name": "整类", "enabled": true, "hidden": false,
+            "target": {"itemIds": items},
+            "effects": {"beam": "Blue"}
+        }]);
+        let preview = store.preview(draft.clone(), None).unwrap();
+        let filter = preview["filterFile"].as_str().unwrap();
+        assert!(filter.contains("Class == \"Omen\"\n\tPlayEffect Blue"), "{filter}");
+        assert!(
+            filter.contains("Class == \"Waystones\"\n\tPlayEffect Blue"),
+            "{filter}"
+        );
+        assert!(!filter.contains("BaseType == \"Omen of"), "{filter}");
+        let id = store
+            .add(&mut library, "整类方案", draft, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        let (text, _) = store.prepare_filter(scheme, None).unwrap();
+        assert!(text.contains("Class == \"Omen\""));
+        assert!(text.contains("Class == \"Waystones\""));
+    }
+
+    #[test]
     fn directory_changes_only_affect_new_installs_and_uninstall_keeps_scheme() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());

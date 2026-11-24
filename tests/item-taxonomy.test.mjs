@@ -21,7 +21,7 @@ test("通货与材料分组跟随 poe.ninja 标签页", () => {
 test("每件通货与材料都有可追溯的分组归属", () => {
   const keys = new Set(Object.keys(mechanics.groups));
   const unmapped = catalog.items.filter(
-    (item) => item.categoryPath[0] === "crafting" && keys.has(item.categoryPath[1]) && !mechanics.items[item.name],
+    (item) => item.categoryPath[0] === "crafting" && keys.has(item.categoryPath[1]) && !item.matcher.class && !mechanics.items[item.name],
   );
   assert.deepEqual(unmapped.map((item) => item.name), []);
   for (const [name, entry] of Object.entries(mechanics.items)) {
@@ -80,7 +80,9 @@ test("分组词条齐全，且展示顺序覆盖所有分组", () => {
 });
 
 test("整类匹配标记不归属任何玩法", () => {
-  const markers = catalog.items.filter((item) => item.categoryPath[0] === "crafting" && item.categoryPath[1] === "class-selection");
-  assert.ok(markers.length > 0);
-  for (const marker of markers) assert.equal(marker.categoryPath.join("/"), "crafting/class-selection");
+  const classItems = catalog.items.filter((item) => item.categoryPath[0] === "crafting" && item.matcher.class);
+  assert.deepEqual(classItems.map((item) => item.name).sort(), ["Omen", "Stackable Currency"]);
+  // Stackable Currency 的范围比「通货与材料」小，只是个标记；预兆的整类条目留在预兆分类里，全选预兆时由生成器使用。
+  assert.equal(pathOf("Stackable Currency"), "crafting/class-selection");
+  assert.equal(pathOf("Omen"), "crafting/omens/class-selection");
 });

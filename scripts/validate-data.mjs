@@ -62,8 +62,9 @@ for (const item of catalog.items || []) {
   const mechanic = item.categoryPath[1];
   const known = mechanicKeys.includes(mechanic) || ["essences", "socketables", "class-selection"].includes(mechanic);
   if (!known) problems.push("catalog: unknown crafting group '" + mechanic + "' on " + item.id);
-  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2) problems.push("catalog: unexpected extra level under " + mechanic + " on " + item.id);
-  if (mechanicKeys.includes(mechanic) && !mapped.has(item.name)) unmapped.push(item.name);
+  // 整类条目不是逐件物品，不归属玩法：它留在所代表分类的末尾（如预兆 › class-selection）。
+  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2 && !item.matcher?.class) problems.push("catalog: unexpected extra level under " + mechanic + " on " + item.id);
+  if (mechanicKeys.includes(mechanic) && !mapped.has(item.name) && !item.matcher?.class) unmapped.push(item.name);
 }
 for (const [name, entry] of Object.entries(mapping)) {
   if (!mechanicKeys.includes(entry?.mechanic)) problems.push("item mechanics: unknown mechanic " + entry?.mechanic + " for " + name);

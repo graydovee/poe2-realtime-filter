@@ -1,4 +1,4 @@
-import { TAXONOMY } from "./data";
+import { CLASS_MATCH_BY_ID, TAXONOMY } from "./data";
 import type { ItemDefinition, Locale } from "./types";
 
 const GROUP_NAMES: Record<string, [string, string, string]> = {
@@ -29,7 +29,7 @@ const GROUP_NAMES: Record<string, [string, string, string]> = {
   "pinnacle-keys": ["巅峰钥匙", "巔峰鑰匙", "Pinnacle Keys"], logbooks: ["远征日志", "遠征日誌", "Expedition Logbooks"],
   incubators: ["孕育器", "孕育器", "Incubators"], tablets: ["石板", "碑牌", "Tablets"], waystones: ["换界石", "換界石", "Waystones"],
   other: ["其他", "其他", "Other"], "quest-items": ["任务物品", "任務物品", "Quest Items"], "special-items": ["特殊物品", "特殊物品", "Special Items"],
-  "class-selection": ["整类匹配", "整類匹配", "Class Matches"], "other-items": ["其他物品", "其他物品", "Other Items"],
+  "other-items": ["其他物品", "其他物品", "Other Items"],
 };
 
 const LOCALE_INDEX: Record<Locale, number> = { cn: 0, tw: 1, us: 2 };
@@ -40,13 +40,11 @@ const GROUP_ORDER = [...TAXONOMY.order, ...EXTRA_ORDER];
 
 /**
  * 分类菜单的展示顺序：通货与材料跟随 poe.ninja 侧栏（基础通货、碎片、深渊骨骸、
- * 精华、预兆、探险…），其余分支保持原本的插入顺序，整类匹配固定放最后。
+ * 精华、预兆、探险…），其余分支保持原本的插入顺序。
  */
 export function groupOrder(key: string): number {
   const index = GROUP_ORDER.indexOf(key);
-  if (index >= 0) return index;
-  if (key === "class-selection") return 1000;
-  return 500;
+  return index >= 0 ? index : 500;
 }
 
 /** 分组名优先取数据文件里的玩法词条（通货与材料），其余回落到内置装备词条。 */
@@ -69,6 +67,15 @@ export function buildCatalogTree(items: ItemDefinition[]): CatalogNode {
     node.items.push(item);
   }
   return root;
+}
+
+/**
+ * 物品在选择器里的名字。换界石、远征日志、任务物品这类条目代表它所在的整个分类，目录里只有英文类名，
+ * 所以按分类名来叫（「换界石」）；界面上把它当成普通物品，不区分整类还是逐件。
+ */
+export function itemLabel(item: ItemDefinition, locale: Locale): string {
+  const match = CLASS_MATCH_BY_ID.get(item.id);
+  return match ? groupName(match.path[match.path.length - 1], locale) : item.localeNames[locale] || item.name;
 }
 
 export function catalogNode(root: CatalogNode, path: string[]): CatalogNode | undefined {

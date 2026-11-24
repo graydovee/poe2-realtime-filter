@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { PackageSearch, Trash2 } from "lucide-react";
 
+import { itemLabel } from "../../../lib/catalog";
 import { FILTER_ITEMS_BY_ID } from "../../../lib/data";
 import { PRICE_UNITS, formatPrice, toExalted } from "../../../lib/pricing";
 import type { BaseFilter, EffectPreset, FilterRule, MarketSnapshot, PriceCurrency, PricePoint } from "../../../lib/types";
@@ -23,7 +24,7 @@ function ItemChips({ ids, onRemove }: { ids: string[]; onRemove: (id: string) =>
     <div className="mt-2 flex flex-wrap gap-1.5" aria-label="已选物品">
       {ids.slice(0, CHIPS_LIMIT).map((id) => {
         const item = FILTER_ITEMS_BY_ID.get(id);
-        const label = item ? item.localeNames.cn || item.name : id;
+        const label = item ? itemLabel(item, "cn") : id;
         return (
           <Chip key={id} tone="gold" className="max-w-56" onRemove={() => onRemove(id)} removeLabel={`移除 ${label}`}>
             {label}

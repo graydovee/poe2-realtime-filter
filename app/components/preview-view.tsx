@@ -202,10 +202,6 @@ export function PreviewView({ generated }: { generated: Generated }) {
                 rows={[
                   ["物品目录", `${report.catalogSize} 项`],
                   ["未定价", `${report.unpricedItems} 项`],
-                  [
-                    generated.baselineFile ? "沿用基础规则" : "使用游戏默认显示",
-                    `${report.ambiguousItems} 项`,
-                  ],
                   ["未能识别", `${report.unknownItems} 项`],
                 ]}
               />

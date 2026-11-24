@@ -78,7 +78,8 @@ test('presets are deduplicated by effect and include combinations reached throug
 });
 
 test('new price tiers cover all crafting items, skipping equipment and unquoted crafting items', () => {
-  const crafting = data.ITEM_CATALOG.filter((item) => item.categoryPath[0] === 'crafting');
+  // 整类条目没有行情，不在默认价格档的物品范围里。
+  const crafting = data.ITEM_CATALOG.filter((item) => item.categoryPath[0] === 'crafting' && !item.matcher.class);
   const equipment = data.ITEM_CATALOG.find((item) => item.categoryPath[0] === 'equipment' && item.priceable && !item.ambiguous);
   for (const rule of DEFAULT_PROFILE.rules) {
     assert.deepEqual(rule.target.itemIds, crafting.map((item) => item.id));

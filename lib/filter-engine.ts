@@ -1,5 +1,5 @@
 import { inspectBaseStyles } from "./baseline-effects";
-import { FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId } from "./data";
+import { CLASS_MATCHES, CLASS_MATCH_BY_ID, CLASS_OF_ITEM, FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId, type ClassMatch } from "./data";
 import { DROP_KEYS, dropInterval, dropLines, rarityInterval, type Interval } from "./drop-conditions";
 import { toExalted } from "./pricing";
 import type {
@@ -111,7 +111,10 @@ function covers(earlier: Candidate, current: Candidate): boolean {
   const inner = current.item.matcher;
   if (outer.baseType && outer.baseType !== inner.baseType) return false;
   if (outer.gemLevel !== inner.gemLevel) return false;
-  if (outer.class && outer.class !== inner.class) return false;
+  // 逐件物品自己不带 Class 条件，它属于哪个类别记在登记表里。
+  const outerClass = outer.class ?? CLASS_OF_ITEM.get(earlier.item.id)?.item.matcher.class;
+  const innerClass = inner.class ?? CLASS_OF_ITEM.get(current.item.id)?.item.matcher.class;
+  if (outerClass && outerClass !== innerClass) return false;
   if (!encloses(candidateRarity(earlier), candidateRarity(current))) return false;
   return DROP_KEYS.every((field) => {
     const previous = earlier.rule.target.dropConditions?.[field];
@@ -159,6 +162,24 @@ function matches(rule: FilterRule, item: ItemDefinition, exaltedValue: number | 
   return true;
 }
 
+function classMatchBlock(rule: FilterRule, match: ClassMatch, actions: string[]): string {
+  // 和逐件块一样用条目自己的名字（Omen、Waystones、Amulets）作注释。
+  const head = (rule.hidden ? "Hide" : "Show") + " # poe2-filter rule: " + rule.id + " / " + match.item.name;
+  return [head, ...matcherLines(match.item), ...dropLines(rule.target.dropConditions), ...actions].join("\n");
+}
+
+/**
+ * 规则把某个分类的逐件物品全部选中时，换成登记表里对应的整类条目（嵌套时只取最大的那个）。
+ * 带价格条件的规则不合并：整类条目没有行情，表达不了价格区间。
+ * 这一类里有物品在跳过名单里时也不合并，否则整类块会盖掉基础过滤器对那件物品的处理。
+ */
+function compactClassMatches(selected: Set<string>, skipped: Set<string>): ClassMatch[] {
+  const full = CLASS_MATCHES.filter((match) =>
+    match.members.length > 0 && match.members.every((item) => selected.has(item.id) && !skipped.has(item.id)));
+  return full.filter((match) => !full.some((other) => other !== match && other.members.length > match.members.length
+    && match.members.every((item) => other.members.some((member) => member.id === item.id))));
+}
+
 function snapshotUsable(snapshot: MarketSnapshot): boolean {
   return snapshot.source !== FALLBACK_SNAPSHOT.source && Date.parse(snapshot.expiresAt) >= Date.now();
 }
@@ -190,7 +211,7 @@ function validateSafety(
     coveredItems: baseTypes.size + classes.size,
     unknownItems: ITEM_CATALOG.filter((item) => !item.known).length,
     unpricedItems: 0,
-    ambiguousItems: ITEM_CATALOG.filter((item) => item.ambiguous).length,
+    ambiguousItems: ITEM_CATALOG.filter((item) => item.ambiguous && !item.matcher.class).length,
     hiddenHighValueItems,
     exclusionViolations,
     warnings,
@@ -227,19 +248,34 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     return [item.id, price && snapshot.rates ? toExalted({ amount: price.amount, currency: price.currency }, snapshot.rates) : undefined];
   }));
   const unpriced = ITEM_CATALOG.filter((item) => item.priceable && exaltedValues.get(item.id) === undefined).length;
-  const ambiguous = ITEM_CATALOG.filter((item) => item.ambiguous).length;
+  // 整类条目不算歧义项：它们要么由全选换出来，要么不可选。
+  const ambiguous = ITEM_CATALOG.filter((item) => item.ambiguous && !item.matcher.class).length;
   const exclusions = [...skipped].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item));
   const priorByBase = new Map<string, Candidate[]>();
   const coveredRules: SafetyReport["coveredRules"] = [];
 
   for (const rule of rules) {
-    const { itemIds, useItems } = conditionUse(rule);
-    const items = useItems ? [...new Set(itemIds)].map((id) => FILTER_ITEMS_BY_ID.get(id)) : ITEM_CATALOG;
+    const { itemIds, useItems, usePrice } = conditionUse(rule);
+    // 没选物品时规则作用于整个目录，但整类条目只在被选中（或由全选换出来）时才生成规则。
+    const selectedItems = useItems
+      ? [...new Set(itemIds)].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item))
+      : ITEM_CATALOG.filter((item) => !item.matcher.class);
     const actions = rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false);
+    // 整类条目排在它覆盖的逐件物品前面，后面的规则才能判断自己有没有被覆盖。
+    const compacted = useItems && !usePrice ? compactClassMatches(new Set(selectedItems.map((item) => item.id)), skipped) : [];
+    const compactedMembers = new Set(compacted.flatMap((match) => match.members.map((item) => item.id)));
+    // 整类块排在最前面；被它覆盖的逐件物品还要走一遍循环，才能知道这条规则有没有被更早的规则盖住。
+    const items = [
+      ...compacted.map((match) => match.item),
+      ...compacted.flatMap((match) => match.members),
+      ...selectedItems.filter((item) => !compactedMembers.has(item.id)),
+    ];
     let eligibleCount = 0;
     let emittedCount = 0;
     for (const item of items) {
-      if (!item || item.ambiguous || overlapsSkipped(item, exclusions)) continue;
+      if (!item || skipped.has(item.id) || overlapsSkipped(item, exclusions)) continue;
+      // 没登记的整类条目（Stackable Currency 等）不生成任何规则。
+      if (item.matcher.class && !CLASS_MATCH_BY_ID.has(item.id)) continue;
       const exaltedValue = item.priceable ? exaltedValues.get(marketItemId(item)) : undefined;
       if (!matches(rule, item, exaltedValue, snapshot)) continue;
       eligibleCount += 1;
@@ -249,10 +285,20 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
       if (prior.some((earlier) => covers(earlier, candidate)) || (key && priorByBase.get("")?.some((earlier) => covers(earlier, candidate)))) continue;
       if (!prior.length) priorByBase.set(key, prior);
       prior.push(candidate);
-      overrides.push(ruleBlock(rule, item, actions));
-      matched.add(item.id);
-      emittedCount += 1;
-      if (rule.hidden) hidden.push({ item, exaltedValue });
+      const match = CLASS_MATCH_BY_ID.get(item.id);
+      if (match) {
+        overrides.push(classMatchBlock(rule, match, actions));
+        for (const member of match.members.length ? match.members : [match.item]) {
+          matched.add(member.id);
+          if (rule.hidden) hidden.push({ item: member, exaltedValue: member.priceable ? exaltedValues.get(marketItemId(member)) : undefined });
+        }
+        emittedCount += Math.max(match.members.length, 1);
+      } else {
+        overrides.push(ruleBlock(rule, item, actions));
+        matched.add(item.id);
+        emittedCount += 1;
+        if (rule.hidden) hidden.push({ item, exaltedValue });
+      }
     }
     if (emittedCount) {
       applied.set(rule.id, { rule, count: emittedCount });
