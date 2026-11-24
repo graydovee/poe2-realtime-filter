@@ -1,8 +1,8 @@
-import { currencyPriceTiers, toExalted } from "../lib/pricing";
+import { toExalted } from "../lib/pricing";
 import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
 import { inspectBaseFilter } from "../lib/baseline-effects";
-import { FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId } from "../lib/data";
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
 import type { LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
@@ -42,26 +42,15 @@ const api = {
       quote.prices = Object.fromEntries(Object.entries(quote.prices).filter(([, price]) => Date.parse(price.capturedAt) > cutoff));
     }
     const priceRules = valid.rules.filter((rule) => rule.enabled && rule.target.priceEnabled !== false && rule.target.range);
-    let marketIssue: string | undefined;
-    if (priceRules.length && !quote.rates) marketIssue = "等待当前服务器和赛季的有效行情";
-    else if (priceRules.some((rule) => rule.autoRange) && currencyPriceTiers(quote).length !== 4) {
-      marketIssue = "价格档所需的锚点通货行情不完整";
-    } else {
-      for (const rule of priceRules) {
-        const bounds = [rule.target.range?.min, rule.target.range?.max];
-        if (bounds.some((point) => point && toExalted(point, quote.rates, quote.prices) === undefined)) {
-          marketIssue = `「${rule.name}」缺少价格区间所需的报价`;
-          break;
-        }
-        if (rule.autoRange) continue;
-        const missing = rule.target.itemEnabled !== false && rule.target.itemIds.map((id) => FILTER_ITEMS_BY_ID.get(id)).find((item) =>
-          item?.priceable && !item.ambiguous && !valid.skippedItemIds.includes(item.id) && !quote.prices[marketItemId(item)]);
-        if (missing) {
-          marketIssue = `「${rule.name}」缺少 ${missing.name} 的有效报价`;
-          break;
-        }
-      }
-    }
+    // 价格区间的每个端点都要能换算成崇高石；区间里选中的个别物品没有报价不算错误，它们只是不被这条规则命中。
+    const unpricedBound = priceRules
+      .flatMap((rule) => [rule.target.range?.min, rule.target.range?.max].map((point) => ({ rule, point })))
+      .find(({ point }) => point && toExalted(point, quote.rates, quote.prices) === undefined);
+    const marketIssue = priceRules.length && !quote.rates
+      ? "等待当前服务器和赛季的有效行情"
+      : unpricedBound
+        ? `「${unpricedBound.rule.name}」的价格区间按${unpricedBound.point?.currency === "annulment" ? "剥离石" : "所选通货"}计价，但缺少它的行情报价（锚点）`
+        : undefined;
     const bundle = generateFilter(valid, baseline, quote, { includeMarketTimestamp: false, baselineName: baselineName ?? undefined, distinguishCustom: true });
     if (marketIssue) bundle.safetyReport.warnings.push(marketIssue);
     return { ...bundle, market: quote, marketIssue };

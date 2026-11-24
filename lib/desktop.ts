@@ -1,4 +1,4 @@
-﻿import { invoke } from "@tauri-apps/api/core";
+import { invoke, type InvokeArgs, type InvokeOptions } from "@tauri-apps/api/core";
 import type { BaseFilter, FilterProfile, GameServer } from "./types";
 
 export type LocalScheme = {
@@ -20,8 +20,26 @@ export function displayDirectory(path: string): string {
 }
 
 export const explain = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
-export const isDesktop = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-export const local = invoke;
+
+/**
+ * 开发构建下用 ?mock=1 打开时，Tauri 命令交给演示数据（app/dev/mock-bridge.ts），
+ * 这样不启动桌面壳也能在浏览器里走完整套界面。生产构建里这段逻辑会被整体剔除。
+ */
+const mockEnabled = () =>
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("mock");
+
+export const isDesktop = () => typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || (process.env.NODE_ENV === "development" && mockEnabled()));
+
+/** 是否真的运行在桌面壳里。事件订阅只能用它判断：浏览器预览没有 Tauri 运行时，订阅会直接抛错。 */
+export const isTauri = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+export async function local<T>(cmd: string, args?: InvokeArgs, options?: InvokeOptions): Promise<T> {
+  if (process.env.NODE_ENV === "development" && mockEnabled()) {
+    const { mockInvoke } = await import("../app/dev/mock-bridge");
+    return mockInvoke<T>(cmd, args as Record<string, unknown> | undefined);
+  }
+  return invoke<T>(cmd, args, options);
+}
 
 export async function fileToBase64(file: File): Promise<string> {
   if (file.size <= 0 || file.size > 8 * 1024 * 1024) throw new Error("单个音效应为 1 字节至 8 MB");

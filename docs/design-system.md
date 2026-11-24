@@ -1,74 +1,130 @@
 # 设计系统
 
-Windows 客户端使用深色调色板。炭灰底区分页面、卡片与输入框，暖白用于文字，暖金标记选中状态和主要操作。
+Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常驻检查器、三个自上而下堆叠的模块。炭灰底区分应用、面板与卡片，暖白用于文字，暖金只标记主操作、选中态和焦点。
+
+设计依据是 [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 对「开发工具 / 桌面工具」的推理结论：`Dark Mode + Minimalism & Swiss Style`、高密度布局、克制的微动效、命令面板与键盘快捷键；要避免的是浅色默认、过小的字号和缓慢的响应。
 
 ## Token
 
 定义在 `app/globals.css` 的 `:root`（`--color-*`，RGB 三元组，供 Tailwind 的 `rgb(var(--color-x) / <alpha-value>)` 使用），并通过 `tailwind.config.ts` 映射成 `bg-surface`、`text-ink`、`border-line` 这类工具类。
 
-| 语义 | Token | 值 |
-|---|---|---|
-| 背景 | `--color-bg` | 18 18 20 |
-| 面板 | `--color-surface` | 25 25 28 |
-| 面板 2 | `--color-surface-2` | 33 33 37 |
-| 面板 3 | `--color-surface-3` | 41 41 46 |
-| 描边 | `--color-line` | 61 60 66 |
-| 描边-强 | `--color-line-strong` | 119 116 124 |
-| 文字 | `--color-ink` | 247 242 233 |
-| 次要文字 | `--color-ink-muted` | 196 190 181 |
-| 金色 | `--color-gold` | 231 194 120 |
-| 金色-亮 / 按下 | `--color-gold-bright` / `--color-gold-press` | 250 216 150 / 209 168 93 |
-| 血焰 | `--color-ember` | 255 158 148 |
-| 暖绿 | `--color-sage` | 161 210 149 |
-| 稀有度（普通/魔法/稀有/传奇） | `--color-rarity-*` | 200 200 200 / 136 136 255 / 255 255 119 / 175 96 37 |
+| 语义 | Token | 值 | 用在哪 |
+|---|---|---|---|
+| 应用底色 | `--color-bg` | 11 13 16 | 窗口底、代码区 |
+| 面板 | `--color-surface` | 20 23 28 | 模块、顶栏、检查器 |
+| 面板 2 | `--color-surface-2` | 26 30 37 | 卡片、输入框、弹层 |
+| 面板 3 | `--color-surface-3` | 35 40 48 | 悬停、选中底色、提示 |
+| 描边 | `--color-line` | 48 55 64 | 面板、卡片、分隔线（装饰） |
+| 描边-强 | `--color-line-strong` | 86 97 112 | 输入框、按钮、复选框的边框 |
+| 文字 | `--color-ink` | 244 241 234 | 正文、标题 |
+| 次要文字 | `--color-ink-muted` | 161 169 178 | 说明、标签、次级信息 |
+| 提示文字 | `--color-ink-faint` | 135 145 156 | 占位符、字段提示、快捷键提示 |
+| 金色 | `--color-gold` | 215 170 83 | 主按钮、选中态 |
+| 金色-亮 / 按下 | `--color-gold-bright` / `--color-gold-press` | 239 199 117 / 190 142 57 | 悬停、强调文字 / 按下 |
+| 金色上的文字 | `--color-on-gold` | 23 19 13 | 主按钮文字 |
+| 血焰 | `--color-ember` | 255 158 148 | 错误、危险、隐藏规则 |
+| 暖绿 | `--color-sage` | 161 210 149 | 成功、已安装、启用 |
+| 稀有度（普通/魔法/稀有/传奇） | `--color-rarity-*` | 200 200 200 / 136 136 255 / 255 255 119 / 175 96 37 | 物品选择器和掉落预览 |
 
-稀有度使用游戏官方配色，让物品选择器和掉落预览使用与游戏一致的配色。
+稀有度使用游戏官方配色，让物品选择器和掉落预览与游戏一致。
+
+对比度（已按 WCAG 公式核算）：正文、次要文字、提示文字、金色、血焰、暖绿在四档底色上都不低于 4.5:1。控件边框（`line-strong`）相对输入框底色约 2.7:1、相对面板约 2.9:1，低于非文字对比度 3:1 的建议值，靠边框与底色差一起标识控件边界；面板描边（`line`）是装饰性的，不承担标识作用。
 
 ## 排版
 
-- 展示体 `Cinzel`（OFL）：品牌标识。
-- 正文 `Inter`（OFL）+ 中文系统栈：`PingFang SC` / `Microsoft YaHei UI` / `Noto Sans SC`。
-- 等宽 `JetBrains Mono`（OFL）：价格、汇率、修订号、过滤器代码。
-- 三种字体由 `@fontsource/*` 提供，通过 `app/layout.tsx` 打包进客户端。
-- 界面字号以 12 至 16px 为主（大标题 `clamp(1.5rem, 3vw, 2rem)`）。
+- 界面 `Inter`（OFL）+ 中文系统栈：`PingFang SC` / `Microsoft YaHei UI` / `Noto Sans SC`。
+- 等宽 `JetBrains Mono`（OFL）：价格、汇率、序号、过滤器代码。
+- 展示体 `Cinzel`（OFL）：只用于品牌字标。
+- 三种字体由 `@fontsource/*` 提供，通过 `app/layout.tsx` 打包进客户端（CSP 只允许同源资源）。
+- 字号刻度：`xs` 12px、`sm` 13px、`base` 14px，正文行高 1.6；界面里不出现小于 12px 的文字。
+- 界面文案全部中文；英文只保留品牌字标、过滤器语法和专有名词。
 
 ## 形状、层级与动效
 
-- 圆角：控件 6px、卡片 10px。
-- 卡片 = 1px `line` 描边 + `0 10px 26px rgba(0,0,0,.22)` 投影。
-- 标题区使用淡暖色背景渐变（`.app-vignette`）。
-- 动效 120–180ms `ease-out`，只动 transform / opacity / border-color；`prefers-reduced-motion` 全部关闭。
-- 键盘焦点使用 2px 亮金描边。设置项使用切换开关，开关圆点在轨道中垂直居中。禁用开关用虚线边框区分，状态说明保持正常对比度。
+- 圆角：控件 4–6px，卡片 8–10px，对话框 14px。
+- 层级：面板 = 1px `line` 描边 + 顶部 1px 内高光；卡片比面板深/浅一档并用描边分隔；弹层（对话框、菜单、提示）用 `surface-2` + 大投影，永远浮在界面之上。
+- 金色只用于：主按钮（金色渐变 + 内高光）、选中态、焦点环、序号与标题前的小菱形装饰。其余按钮是描边、幽灵、危险三种。
+- 应用底色带一抹极淡的金色光晕和一层细噪点（`.app-frame`），只露出在面板之间的缝隙里。
+- 动效 120–180ms `ease-out`，只动 transform / opacity / 颜色；`prefers-reduced-motion` 下全部关闭。
+- 键盘焦点统一为 2px 亮金描边。设置项使用切换开关，禁用时轨道改为虚线描边，状态说明保持正常对比度。
+- 图标统一使用 `lucide-react`，装饰性图标加 `aria-hidden`，只有图标的按钮必须有可读标签。
+
+## 布局
+
+应用铺满窗口（`h-dvh`），不再有页面级的居中列和页面滚动：
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ 顶栏：品牌 · 视图上下文 · 服务器 · 更新 · 命令面板 · 检查器开关 │
+├──────────────────────────────────────────┬───────────────────┤
+│ 主区（唯一的滚动容器）                    │ 检查器（可拖宽）   │
+├──────────────────────────────────────────┴───────────────────┤
+│ 状态栏：行情状态 · 快捷键提示                                 │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **顶栏**：方案库里可切换服务器；编辑中服务器只读显示。方案名右侧是未保存状态。
+- **检查器**：宽于 1180px 时停靠在右侧（默认 320px，可拖到 280–440px，展开状态记在本地）；更窄时默认收起，用顶栏按钮或 `Ctrl+\` 从侧边滑出。
+- **编辑器**：三个模块自上而下——赛季与行情、基础过滤器（含跳过物品，默认折叠，需要处理时自动展开）、自定义规则。规则模块在内容区宽于 768px 时排成「规则列表 | 规则编辑器」两栏，更窄时规则列表变成一行可横向滚动的标签。
+- **容器查询**：规则模块和规则编辑器的断点按各自内容区宽度计算（`@container` / `@3xl:`），与窗口宽度无关，所以拖动检查器时会自然重排。查询条件相对祖先容器求值，列模板要写在容器的子元素上。
+- 最小窗口 720×600 下所有界面可用。
+
+## 反馈与操作
+
+- 成功的操作用 toast（`sonner`）反馈；错误就近显示在对话框内或列表顶部，不打断操作。
+- 对话框统一用 Radix Dialog（`ConfirmDialog`），菜单用 DropdownMenu，提示用 Tooltip；不使用原生 `<dialog>`、手写下拉或原生 `<select>`。
+- 删除规则后 toast 里提供「撤销」。
+- 拖拽排序（`@dnd-kit`）始终配有等价的按钮操作（上移 / 下移）和键盘操作（手柄上按空格拿起、上下键移动）。
+- 每个视图外层有错误边界，单个模块渲染出错不会拖垮整个窗口。
+- **界面不显示文件路径。** 基础过滤器只显示名字和来源（本地文件 / 订阅类型 / 下载来源和版本），完整路径放在悬停提示里；唯一的例外是「过滤器目录」设置框，因为那里需要编辑它。
+- **列表项必须能收缩。** 网格或弹性布局里的条目要加 `min-w-0`，不换行的文字用 `w-full` 加 `truncate`。只在文字上加 `max-w-full` 不够：浏览器计算最小宽度时百分比不生效，一行长文字会把整行撑到比容器还宽，盖住旁边的按钮并带出横向滚动条。
+
+### 快捷键
+
+| 快捷键 | 作用 |
+|---|---|
+| `Ctrl+K` | 命令面板：执行操作，或搜索规则、方案并跳转 |
+| `Ctrl+S` | 保存方案 |
+| `Ctrl+Enter` | 生成预览 |
+| `Ctrl+\` | 收起 / 展开检查器 |
+| `Alt+←` | 返回方案库（有未保存修改时先确认） |
+| `↑` / `↓` | 在规则模块内切换当前规则 |
+| `Ctrl+↑` / `Ctrl+↓` | 移动当前规则的优先级 |
+
+输入法组字过程中不响应任何快捷键（`isComposing`）。
 
 ## 组件层
 
-- `app/components/ui/primitives.tsx`：Panel / Button / Badge / Chip / Field / Divider / Alert / Skeleton / EmptyState / Mono / StatusDot / StatusBadge
-- `app/components/ui/actions.tsx`：IconButton / TooltipButton / MoreButton
-- `app/components/ui/controls.tsx`：Select / Switch / Slider / TextInput / SearchInput / FileInput（Radix 无样式原语 + CVA 变体）
-- `app/components/ui/nav.tsx`：Disclosure / Tooltip / ScrollArea
-- `app/components/app-shell.tsx`：品牌头、工作区标题、页脚
-- `app/components/editor-navigation.tsx`：编辑步骤导航和固定操作栏
-- `app/components/sections/`：season / basic-filter / excluded-items / rules
-- `app/components/`：`item-picker`、`rule-editor`、`scheme-manager`、`preview-view`
+- `app/components/ui/`：基础组件，Radix 无样式原语 + CVA 变体，写法与 shadcn/ui 一致。
+  - `button`（Button / IconButton）、`input`（Input / Textarea / SearchInput）、`select`、`switch`、`checkbox`、`field`
+  - `dialog`（Dialog / ConfirmDialog / SheetContent）、`dropdown-menu`、`popover`、`collapsible`（Disclosure）、`tabs`、`tooltip`
+  - `badge`（Badge / Chip / StatusDot）、`panel`（Panel / CollapsiblePanel）、`alert`、`empty-state`、`separator`、`kbd`、`segmented`、`error-boundary`、`toast`
+- `app/components/layout/`：`app-frame`、`top-bar`、`status-bar`、`inspector`。
+- `app/components/manager/`：`scheme-library`（按赛季分组的列表）、`scheme-row`、`scheme-dialogs`、`manager-inspector`（方案详情 + 刷新设置 + 过滤器目录）。
+- `app/components/editor/`：`season-module`、`base-filter-module`、`rules-module`、`rule-list`、`rule-editor`、`effect-section`、`preset-gallery`、`appearance-preview`、`editor-inspector`。
+- `app/components/`：`item-picker`（选择物品对话框）、`preview-view`（生成预览）、`sound-preview`、`desktop-update`、`command-palette`。
+- `app/state/`：zustand store，分界面、编辑器、方案库三个切片；`bridge.ts` 负责把 Tauri 事件接到 store。`app/page.tsx` 只负责选择视图。
+- 纯函数放在 `lib/`：`effect-labels.ts`（特效描述与颜色转换）、`filter-highlight.ts`（过滤器语法分词）。
 
-自定义规则编辑器（`rule-editor`）的交互约定：
+自定义规则编辑器的交互约定：
 
-- 每条规则由匹配条件、特效和隐藏开关组成。可以按物品、价格或两项同时筛选。
-- 「完整特效预设」一次应用光柱、地图图标、字体和音效。展开「自定义外观」可以调整单项特效。
-- 规则卡片常驻「实时预览」：光柱、标签配色、地图图标随任意字段改动立即刷新；逐项编辑字段默认折叠在「自定义外观」里，需要微调时再展开。
-- 用开关设置物品是否隐藏，用卡片的上下箭头调整规则优先级。
+- 每条规则由匹配条件、特效和隐藏开关组成。可以按物品、价格或两项同时筛选；物品条件和价格条件至少保留一个启用。
+- 选物品在对话框里完成（`item-picker`），选好的物品以标签形式显示在条件卡片里，可以逐个移除。
+- 「完整特效预设」一次应用光柱、地图图标、字体和音效；预设画廊是非模态弹层，点选即应用，右侧检查器的实时预览跟着更新。展开「高级外观设置」可以调整单项特效。
+- 价格区间的两个端点都是普通的「数值 + 单位」输入，单位下拉来自 `PRICE_UNITS`（崇高石、混沌石、剥离石、神圣石）。四条默认价格规则和其他规则用同一套控件，没有单独的「跟随市价」或「跟随基础过滤器」开关：默认沿用的样式表现为预设卡上的高亮加一行说明，换一个预设或改任意一项就变成规则自己的特效。
+- 价格下限不低于上限时，价格卡下方的说明变成一行红色提示，而不是静默生成一条命中不了的规则。
+- 当前规则在游戏里的掉落效果（光柱、标签、地图图标）始终显示在检查器顶部，可以试听音效。
+- 配置摘要在检查器里，点某一行会跳到对应的模块。
 
 物品选择器（`item-picker`）的交互约定：
 
-- 分类菜单按 poe.ninja 经济侧栏的顺序排列（基础通货、碎片、深渊骨骸、精华、预兆、探险、液化情绪、催化剂、维金，然后是自定义的神庙与试炼钥匙），顺序写在 `data/item-mechanics.json` 的 `order` 字段；其余分支保持原有插入顺序，整类匹配排在最后。
-- 点击分类卡片进入下一级，点击右侧的选择按钮可选中或取消整类物品。按钮使用 `aria-pressed="mixed"` 表示部分选中。
-- 当前分类顶部有一条汇总条（本类 N 项 / 已选 M）与「选择本类 / 取消本类」，适合一次性把整套装备槽位或整个玩法拉进规则或跳过名单。
-- 已选区按条目展示：整类条目显示为「深渊骨骸 · 11 项」，单件显示物品名，都可以整条移除。
+- 左侧是分类树（三态勾选），右侧是当前分类的子类卡片或物品列表（虚拟滚动）。
+- 分类顺序按 poe.ninja 经济侧栏排列，写在 `data/item-mechanics.json` 的 `order` 字段；宝石下的子类（未切割的技能 / 精魂 / 辅助宝石、血脉宝石、符文宝石）按 `lib/catalog.ts` 的 `EXTRA_ORDER` 排列；其余分支保持原有插入顺序，整类匹配排在最后。
+- 顶部有搜索、仅看已选、全选本类 / 取消所选 / 全选可堆叠物品。未切割宝石的每个等级是一件独立物品，直接勾选对应的等级；子类卡片要放得下「未切割的技能宝石」这样的分类名，列宽不小于 `15rem`，名字最多两行。
+- 规则物品和跳过名单共用同一个对话框，改动即时生效，关闭即完成。
 
-`app/page.tsx` 组织方案管理、编辑与预览之间的状态和数据流。编辑器按赛季与行情、基础过滤器、跳过物品、自定义规则切换工作区，当前步骤偏好保存在本地浏览器 UI 状态中。
+## 开发预览
 
-### 复合组件（方案管理）
+开发构建下用 `http://localhost:3000/?mock=1` 打开，可以在不启动桌面壳的浏览器里走完整套界面：界面逻辑是真实的，Tauri 命令由 `app/dev/mock-bridge.ts` 返回演示数据。生产构建不包含这个文件。
 
-`app/components/scheme-manager.tsx` 使用同一套 Panel、Button、TextInput 和 IconButton 组件呈现本地方案、分享码和后台刷新设置。高级操作收进更多菜单，目录和刷新设置保持折叠入口。
-
-> Tailwind 的 preflight 被关闭（`corePlugins.preflight = false`），以免重置影响这些复合组件；`app/globals.css` 的 `@layer base` 里只保留必要的底色、按钮归零与滚动条样式。
+> Tailwind 的 preflight 已启用；`app/globals.css` 只保留 token、基础层和少数无法用工具类表达的组件类（对话框、菜单、掉落预览场景）。

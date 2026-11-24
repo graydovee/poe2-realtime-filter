@@ -73,11 +73,22 @@ test("基底、同基底传奇和宝石从目录生成对应游戏条件", () =>
   assert.match(unique.name, /Machination.*Rise of the Phoenix/);
   assert.ok(searchCatalog(data.PICKER_ITEMS, "烈炎之翼").some((item) => item.id === unique.id));
   assert.match(data.FILTER_ITEMS_BY_ID.get("gold").iconUrl, /Gold_inventory_icon/);
-  const gem = rule("gem", ["uncut-skill-gem", "uncut-spirit-gem"], { gemLevel: { enabled: true, bounds: [{ op: "=", value: 19 }] } });
+  // 未切割宝石每个等级是一件独立物品，生成时用 GemLevel 区分，不需要额外的掉落条件。
+  const gem = rule("gem", ["uncut-skill-gem-19", "uncut-spirit-gem-19", "uncut-support-gem-5"]);
   const gear = rule("gear", [base.id], { itemLevel: { enabled: true, bounds: [{ op: ">=", value: 80 }] }, sockets: { enabled: true, bounds: [{ op: ">=", value: 2 }] }, unidentifiedTier: { enabled: true, bounds: [{ op: ">=", value: 4 }] } });
   const blocks = ruleBlocks(generate(profile(gem, gear, rule("unique", [unique.id]), rule("ordinary", [base.id]))).filterFile);
   assert.equal(blocks.filter((block) => block.includes("GemLevel = 19")).length, 2);
+  assert.match(blocks.find((block) => block.includes("rule: gem / Uncut Skill Gem (Level 19)")), /^Show # poe2-filter rule: gem \/ Uncut Skill Gem \(Level 19\)\n\tBaseType == "Uncut Skill Gem"\n\tGemLevel = 19$/);
+  assert.match(blocks.find((block) => block.includes("rule: gem / Uncut Support Gem (Level 5)")), /\n\tGemLevel = 5$/);
+  assert.match(blocks.find((block) => block.includes("rule: gem / Uncut Spirit Gem (Level 19)")), /\n\tGemLevel = 19$/);
   assert.match(blocks.find((block) => block.includes("rule: gear")), /ItemLevel >= 80\n\tSockets >= 2\n\tUnidentifiedItemTier >= 4\n\tRarity Rare\n\tIdentified False/);
   assert.match(blocks.find((block) => block.includes("rule: unique")), /BaseType == "Omen Crest Shield"\n\tRarity Unique/);
   assert.match(blocks.find((block) => block.includes("rule: ordinary")), /Rarity < Unique/);
+});
+
+test("不再有「宝石等级」掉落条件：等级属于物品本身", () => {
+  assert.throws(
+    () => profile(rule("legacy", ["uncut-skill-gem-1"], { gemLevel: { enabled: true, bounds: [{ op: "=", value: 1 }] } })),
+    /无法识别的掉落条件/,
+  );
 });

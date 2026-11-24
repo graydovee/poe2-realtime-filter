@@ -27,7 +27,9 @@ test("每套视觉风格都有一份完整特效预设，一个预设包含光�
 test("默认 4 条规则各自引用一个完整预设，且外观与之一致", () => {
   assert.equal(rules.length, 4);
   const presets = new Map(effects.styles.default.map((preset) => [preset.id, preset]));
-  assert.deepEqual(rules.map((rule) => rule.target.range.min.referenceItemId), ["exalted-orb", "chaos-orb", "orb-of-annulment", "divine-orb"]);
+  // 价格档从低到高：崇高石、混沌石、剥离石、神圣石；区间端点是普通的计价单位。
+  assert.deepEqual(rules.map((rule) => rule.target.range.min.currency), ["exalted", "chaos", "annulment", "divine"]);
+  assert.deepEqual(rules.map((rule) => rule.target.range.max?.currency ?? null), ["chaos", "annulment", "divine", null]);
   for (const rule of rules) {
     const preset = presets.get(rule.effectPresetId);
     assert.ok(preset, rule.id + " 的预设不存在：" + rule.effectPresetId);
@@ -38,7 +40,7 @@ test("默认 4 条规则各自引用一个完整预设，且外观与之一致",
       ...(preset.sound ? { sound: preset.sound } : {}),
     };
     assert.deepEqual(rule.effects, picked, rule.id + " 的特效应与预设一致");
-    assert.equal(rule.autoRange, true);
+    assert.equal(rule.autoRange, undefined, "价格档是普通规则，没有跟随市价的特殊开关");
     assert.deepEqual(rule.target.itemIds, []);
   }
 });

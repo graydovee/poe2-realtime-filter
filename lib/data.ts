@@ -57,12 +57,16 @@ const localizedUniqueNames: Record<string, { cn: string; tw: string }> = dropDat
 const stackableNames = new Set(dropData.stackable);
 const wikiImage = (path?: string | null) => path ? `https://www.poe2wiki.net/images/${path}` : undefined;
 
-export const ITEM_CATALOG: ItemDefinition[] = (catalogData.items as ItemDefinition[]).map((item) => ({
-  ...item,
-  stackable: stackableNames.has(item.name),
-  dropLevel: itemMetadata[item.name]?.dropLevel ?? undefined,
-  iconUrl: wikiImage(itemMetadata[item.name]?.icon),
-}));
+// 未切割宝石每个等级是一件独立物品，掉落数据和图标仍按不带等级后缀的基底名查。
+export const ITEM_CATALOG: ItemDefinition[] = (catalogData.items as ItemDefinition[]).map((item) => {
+  const metadataKey = item.name.replace(/ \(Level \d+\)$/, "");
+  return {
+    ...item,
+    stackable: stackableNames.has(metadataKey),
+    dropLevel: itemMetadata[metadataKey]?.dropLevel ?? undefined,
+    iconUrl: wikiImage(itemMetadata[metadataKey]?.icon),
+  };
+});
 
 function equipmentPath(item: ItemDefinition, group: "normal-bases" | "unique-equipment") {
   const [, kind, type] = item.categoryPath;
@@ -113,7 +117,7 @@ const craftingItemIds = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "
 
 /** 新方案的四个价格档，每档默认匹配整个「通货与材料」分类。 */
 export const DEFAULT_RULES: FilterRule[] = (rulesData as { rules: FilterRule[] }).rules.map((rule) => ({
-  id: rule.id, name: rule.name, enabled: true, hidden: false, autoRange: true, followBaseline: true,
+  id: rule.id, name: rule.name, enabled: true, hidden: false, followBaseline: true,
   target: { ...rule.target, itemIds: [...craftingItemIds], itemEnabled: true },
   effects: {},
 }));

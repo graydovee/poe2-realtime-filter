@@ -1,7 +1,7 @@
 import { inspectBaseStyles } from "./baseline-effects";
 import { FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId } from "./data";
 import { DROP_KEYS, dropInterval, dropLines, rarityInterval, type Interval } from "./drop-conditions";
-import { resolveAutoRanges, toExalted } from "./pricing";
+import { toExalted } from "./pricing";
 import type {
   FilterProfile,
   FilterRule,
@@ -50,6 +50,8 @@ export function matcherLines(item: ItemDefinition, withRarity = true): string[] 
   const lines: string[] = [];
   if (item.matcher.class) lines.push("\tClass == " + quote(item.matcher.class));
   if (item.matcher.baseType) lines.push("\tBaseType == " + quote(item.matcher.baseType));
+  // 未切割宝石每个等级共用一个基底，靠 GemLevel 区分。
+  if (item.matcher.gemLevel !== undefined) lines.push("\tGemLevel = " + item.matcher.gemLevel);
   if (withRarity && item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
   if (withRarity && item.matcher.nonUnique) lines.push("\tRarity < Unique");
   return lines;
@@ -108,6 +110,7 @@ function covers(earlier: Candidate, current: Candidate): boolean {
   const outer = earlier.item.matcher;
   const inner = current.item.matcher;
   if (outer.baseType && outer.baseType !== inner.baseType) return false;
+  if (outer.gemLevel !== inner.gemLevel) return false;
   if (outer.class && outer.class !== inner.class) return false;
   if (!encloses(candidateRarity(earlier), candidateRarity(current))) return false;
   return DROP_KEYS.every((field) => {
@@ -122,6 +125,7 @@ function overlapsSkipped(item: ItemDefinition, skipped: ItemDefinition[]): boole
   return skipped.some((other) => {
     if (other.id === item.id) return true;
     if (!other.matcher.baseType || other.matcher.baseType !== item.matcher.baseType) return false;
+    if (other.matcher.gemLevel !== item.matcher.gemLevel) return false;
     if (item.matcher.class && other.matcher.class && item.matcher.class !== other.matcher.class) return false;
     const [lo, hi] = rarityInterval(item);
     const [otherLo, otherHi] = rarityInterval(other);
@@ -204,8 +208,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     : { ...FALLBACK_SNAPSHOT, league };
   const skipped = new Set(standalone ? [] : profile.skippedItemIds ?? []);
   const rawRules = profile.rules ?? [];
-  const rules = resolveAutoRanges(rawRules.filter((rule) => rule.enabled), snapshot);
-  const autoDisabled = rules.filter((rule) => !rule.enabled).map((rule) => rule.name);
+  const rules = rawRules.filter((rule) => rule.enabled);
 
   const overrides: string[] = [];
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
@@ -230,7 +233,6 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   const coveredRules: SafetyReport["coveredRules"] = [];
 
   for (const rule of rules) {
-    if (!rule.enabled) continue;
     const { itemIds, useItems } = conditionUse(rule);
     const items = useItems ? [...new Set(itemIds)].map((id) => FILTER_ITEMS_BY_ID.get(id)) : ITEM_CATALOG;
     const actions = rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false);
@@ -262,8 +264,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
 
   const defaultDisplay = standalone ? "使用游戏默认显示" : "沿用基础过滤器规则";
   if (!rawRules.some((rule) => rule.enabled)) warnings.push("当前未启用规则，所有物品" + defaultDisplay + "。");
-  if (autoDisabled.length) warnings.push(autoDisabled.join("、") + " 跟随市价的价格档因缺少锚点行情被禁用。");
-  const unused = rules.filter((rule) => rule.enabled && !applied.has(rule.id) && !coveredRules.some((entry) => entry.ruleId === rule.id)).map((rule) => rule.name);
+  const unused = rules.filter((rule) => !applied.has(rule.id) && !coveredRules.some((entry) => entry.ruleId === rule.id)).map((rule) => rule.name);
   if (unused.length) warnings.push(unused.join("、") + " 没有命中任何物品（价格区间或物品选择可能为空）。");
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
     warnings.push("当前赛季缺少有效报价或汇率，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
@@ -278,7 +279,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     standalone ? "# Mode: custom rules" : "# Mode: overlay",
     ...(/^[ -~]+$/.test(league) ? ["# League: " + league] : []),
     ...(!standalone && !options.baselineName ? ["# Strictness: " + profile.strictness] : []),
-    "# Rules: " + rules.filter((rule) => rule.enabled).length + " enabled / " + skipped.size + " skipped items",
+    "# Rules: " + rules.length + " enabled / " + skipped.size + " skipped items",
     "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
     standalone ? "# Unmatched items: game defaults" : "# Safety: Unspecified actions are handled by the base filter.",
     "",

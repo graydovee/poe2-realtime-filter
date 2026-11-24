@@ -2017,15 +2017,23 @@ mod tests {
         let before = fs::read_to_string(&file).unwrap();
         assert_eq!(before.matches("Show # poe2-filter rule:").count(), 4);
         assert!(!before.contains("Gnawed Jawbone"));
+        // 单件物品缺报价只是不被命中：混沌石按汇率仍能换算，剥离石价格档的下限照样可用。
+        let mut no_chaos = market.clone();
+        no_chaos["prices"].as_object_mut().unwrap().remove("chaos-orb");
+        store.install(scheme, Some(no_chaos), None).unwrap();
+        let after = fs::read_to_string(&file).unwrap();
+        assert_eq!(after.matches("Show # poe2-filter rule:").count(), 3);
+        assert!(!after.contains("Chaos Orb"));
+        // 剥离石没有汇率，区间里用到它却没有报价时无法换算，拒绝安装。
         market["prices"]
             .as_object_mut()
             .unwrap()
-            .remove("chaos-orb");
+            .remove("orb-of-annulment");
         assert!(store
             .install(scheme, Some(market), None)
             .unwrap_err()
             .contains("锚点"));
-        assert_eq!(fs::read_to_string(file).unwrap(), before);
+        assert_eq!(fs::read_to_string(file).unwrap(), after);
     }
 
     #[test]

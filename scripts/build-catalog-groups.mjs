@@ -21,8 +21,9 @@ const classPaths = {
   22: ["equipment", "armour", "gloves"], 23: ["equipment", "armour", "boots"],
   24: ["equipment", "armour", "body-armour"], 25: ["equipment", "armour", "helmets"],
   42: ["equipment", "jewels"], 86: ["equipment", "relics"],
-  18: ["gems", "skill-gems"], 19: ["gems", "support-gems"], 78: ["gems", "gem-materials"],
-  93: ["gems", "uncut", "skill-gems"], 103: ["gems", "uncut", "support-gems"], 104: ["gems", "uncut", "spirit-gems"],
+  // 客户端的 Skill Gems / Support Gems 两个类别里装的是符文宝石和血脉宝石；未切割宝石按等级拆成独立条目，见 categoryPath()。
+  // 命源碎片（Animus Splinters）在客户端数据里单独占一个类别（78），但它是符文技能宝石，归到符文宝石里。
+  18: ["gems", "rune-gems"], 19: ["gems", "blood-gems"], 78: ["gems", "rune-gems"],
   31: ["other", "quest-items"], 33: ["supplies", "charms"],
   38: ["endgame", "fragments"], 39: ["endgame", "fragments"], 88: ["endgame", "fragments"],
   47: ["endgame", "trials", "ultimatums"], 102: ["endgame", "trials", "ultimatums"],
@@ -46,6 +47,8 @@ const matcherPaths = {
   Incubators: classPaths[76], "Stackable Currency": ["crafting", "currency"],
 };
 function categoryPath(item) {
+  const uncut = /^Uncut (Skill|Spirit|Support) Gem \(Level \d+\)$/.exec(item.name);
+  if (uncut) return ["gems", "uncut-" + uncut[1].toLowerCase() + "-gems"];
   const record = records.get(item.name);
   if (record?.ItemClass === 30) {
     if (/\bEssence\b/.test(item.name)) return ["crafting", "essences"];

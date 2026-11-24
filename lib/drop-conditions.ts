@@ -3,7 +3,6 @@ import type { DropBound, DropConditions, DropField, DropNumber, FilterRule, Item
 
 export const DROP_FIELDS = {
   stackSize: { label: "堆叠数量", command: "StackSize", minimum: 1 },
-  gemLevel: { label: "宝石等级", command: "GemLevel", minimum: 1 },
   itemLevel: { label: "物品等级", command: "ItemLevel", minimum: 1 },
   sockets: { label: "孔数", command: "Sockets", minimum: 0 },
   unidentifiedTier: { label: "未鉴定阶级", command: "UnidentifiedItemTier", minimum: 1 },
@@ -36,10 +35,9 @@ export function rarityInterval(item: ItemDefinition, rarity?: ItemRarity): Inter
 }
 
 export function supportsDropField(item: ItemDefinition, field: DropField): boolean {
-  const [group, kind] = item.categoryPath;
+  const [group] = item.categoryPath;
   switch (field) {
     case "stackSize": return Boolean(item.stackable);
-    case "gemLevel": return group === "gems" && item.categoryPath.at(-1) !== "support-gems" && kind !== "gem-materials";
     case "sockets": return group === "equipment" && item.categoryPath.some((key) => ["body-armour", "helmets", "gloves", "boots", "weapons", "one-hand", "two-hand", "shields", "bucklers", "foci"].includes(key));
     case "unidentifiedTier": return group === "equipment" && !item.categoryPath.some((key) => ["jewels", "relics"].includes(key)) && item.matcher.rarity !== "Unique";
     case "itemLevel": return true;

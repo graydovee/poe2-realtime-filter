@@ -21,8 +21,9 @@ const GROUP_NAMES: Record<string, [string, string, string]> = {
   emotions: ["液化情绪", "液化情緒", "Liquid Emotions"], omens: ["预兆", "預兆", "Omens"], socketables: ["插槽物品", "插槽物品", "Socketables"],
   runes: ["符文", "符文", "Runes"], "soul-cores": ["灵魂核心", "靈魂核心", "Soul Cores"], "socketables-other": ["其他插槽物品", "其他插槽物品", "Other Socketables"],
   supplies: ["药剂与咒符", "藥劑與咒符", "Flasks & Charms"], flasks: ["药剂", "藥劑", "Flasks"], life: ["生命药剂", "生命藥劑", "Life Flasks"], mana: ["魔力药剂", "魔力藥劑", "Mana Flasks"], charms: ["咒符", "咒符", "Charms"],
-  gems: ["宝石", "寶石", "Gems"], "skill-gems": ["技能宝石", "技能寶石", "Skill Gems"], "support-gems": ["辅助宝石", "輔助寶石", "Support Gems"],
-  "spirit-gems": ["精魂宝石", "精魂寶石", "Spirit Gems"], uncut: ["未切割宝石", "未切割寶石", "Uncut Gems"], "gem-materials": ["宝石材料", "寶石材料", "Gem Materials"],
+  gems: ["宝石", "寶石", "Gems"], "rune-gems": ["符文宝石", "符文寶石", "Rune Gems"], "blood-gems": ["血脉宝石", "血脈寶石", "Blood Gems"],
+  "uncut-skill-gems": ["未切割的技能宝石", "未切割的技能寶石", "Uncut Skill Gems"], "uncut-spirit-gems": ["未切割的精魂宝石", "未切割的精魂寶石", "Uncut Spirit Gems"],
+  "uncut-support-gems": ["未切割的辅助宝石", "未切割的輔助寶石", "Uncut Support Gems"],
   endgame: ["地图与终局", "地圖與終局", "Maps & Endgame"], fragments: ["碎片", "碎片", "Fragments"], trials: ["试炼物品", "試煉物品", "Trials"],
   ultimatums: ["通牒", "通牒", "Ultimatums"], baryas: ["试炼硬币", "試煉硬幣", "Baryas"], "vault-keys": ["宝库钥匙", "寶庫鑰匙", "Vault Keys"],
   "pinnacle-keys": ["巅峰钥匙", "巔峰鑰匙", "Pinnacle Keys"], logbooks: ["远征日志", "遠征日誌", "Expedition Logbooks"],
@@ -33,7 +34,9 @@ const GROUP_NAMES: Record<string, [string, string, string]> = {
 
 const LOCALE_INDEX: Record<Locale, number> = { cn: 0, tw: 1, us: 2 };
 
-const GROUP_ORDER = TAXONOMY.order;
+/** 通货与材料之外还要固定顺序的分组：宝石下面的子类，未切割的按等级排在前面。 */
+const EXTRA_ORDER = ["uncut-skill-gems", "uncut-spirit-gems", "uncut-support-gems", "blood-gems", "rune-gems"];
+const GROUP_ORDER = [...TAXONOMY.order, ...EXTRA_ORDER];
 
 /**
  * 分类菜单的展示顺序：通货与材料跟随 poe.ninja 侧栏（基础通货、碎片、深渊骨骸、

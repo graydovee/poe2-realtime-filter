@@ -68,10 +68,10 @@ jobs:
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
           @'
-          - 通货按单次掉落的堆叠数量筛选，支持多选共用阈值、同一通货多档规则及单件价格求交。
-          - 制作页提供规则排序、条件与特效复制，以及完整文本和安全检查预览。
-          - 选物目录提供图标、中英文搜索、分类批量选择、装备基底与传奇分组、未切割宝石等级快捷选项。
-          - 规则支持宝石等级、稀有度、物品等级、孔数和未鉴定阶级。分享码保存掉落条件与开关状态。
+          - 全新暗色工作台界面：赛季与行情、基础过滤器、自定义规则三个模块直接堆叠，右侧检查器实时预览光柱、图标与音效。
+          - 未切割宝石按等级拆成独立物品：技能、精魂 1–20 级，辅助 1–5 级，各等级有自己的行情价格；「宝石等级」掉落条件已移除。
+          - 四档默认价格规则改为普通规则：区间、单位和物品范围都可以编辑，默认沿用基础过滤器里对应通货的样式。
+          - 宝石分组更正为血脉宝石、符文宝石和三类未切割宝石；命源碎片归入符文宝石。分享码保存掉落条件与开关状态。
           - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
           '@ | Set-Content -Encoding utf8NoBOM release-notes.md
           gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md

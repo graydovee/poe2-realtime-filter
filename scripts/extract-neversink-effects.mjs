@@ -9,15 +9,16 @@ import path from "node:path";
  * 产物：
  *   data/neversink-effects.json —— 每套视觉风格各一份完整外观预设列表
  *                                  （光柱 + 地图图标 + 字体 + 音效，一个预设就是一套完整特效）
- *   data/default-rules.json     —— 崇高石 / 混沌石 / 剥离石 / 神圣石四条默认价格规则
+ *   data/default-rules.json     —— 崇高石 / 混沌石 / 剥离石 / 神圣石四条默认价格规则。
+ *                                    区间就是普通价格点：每档「≥ 1 枚本档通货，且 < 1 枚下一档通货」。
  */
 
 const ROOT = path.resolve("vendor/neversink");
 const DEFAULT_ANCHORS = [
-  { itemId: "exalted-orb", name: "Exalted Orb", ruleId: "default-exalted", label: "崇高石价格档" },
-  { itemId: "chaos-orb", name: "Chaos Orb", ruleId: "default-chaos", label: "混沌石价格档" },
-  { itemId: "orb-of-annulment", name: "Orb of Annulment", ruleId: "default-annulment", label: "剥离石价格档" },
-  { itemId: "divine-orb", name: "Divine Orb", ruleId: "default-divine", label: "神圣石价格档" },
+  { itemId: "exalted-orb", name: "Exalted Orb", unit: "exalted", ruleId: "default-exalted", label: "崇高石价格档" },
+  { itemId: "chaos-orb", name: "Chaos Orb", unit: "chaos", ruleId: "default-chaos", label: "混沌石价格档" },
+  { itemId: "orb-of-annulment", name: "Orb of Annulment", unit: "annulment", ruleId: "default-annulment", label: "剥离石价格档" },
+  { itemId: "divine-orb", name: "Divine Orb", unit: "divine", ruleId: "default-divine", label: "神圣石价格档" },
 ];
 
 const styleDirs = readdirSync(ROOT, { withFileTypes: true })
@@ -122,7 +123,7 @@ const payload = {
 };
 writeFileSync(path.resolve("data/neversink-effects.json"), JSON.stringify(payload, null, 2) + "\n");
 
-const pricePoint = (itemId) => ({ amount: 1, currency: "exalted", referenceItemId: itemId });
+const pricePoint = (unit) => ({ amount: 1, currency: unit });
 const rules = DEFAULT_ANCHORS.map((anchor, index) => {
   const { appearance, presetId } = anchorAppearances.get(anchor.itemId);
   const next = DEFAULT_ANCHORS[index + 1];
@@ -131,13 +132,12 @@ const rules = DEFAULT_ANCHORS.map((anchor, index) => {
     name: anchor.label,
     enabled: true,
     hidden: false,
-    autoRange: true,
     effectPresetId: presetId,
-    target: { itemIds: [], itemEnabled: true, priceEnabled: true, range: { min: pricePoint(anchor.itemId), ...(next ? { max: pricePoint(next.itemId) } : {}) } },
+    target: { itemIds: [], itemEnabled: true, priceEnabled: true, range: { min: pricePoint(anchor.unit), ...(next ? { max: pricePoint(next.unit) } : {}) } },
     effects: appearance,
   };
 });
-writeFileSync(path.resolve("data/default-rules.json"), JSON.stringify({ version: 2, generatedBy: "scripts/extract-neversink-effects.mjs", rules }, null, 2) + "\n");
+writeFileSync(path.resolve("data/default-rules.json"), JSON.stringify({ version: 3, generatedBy: "scripts/extract-neversink-effects.mjs", rules }, null, 2) + "\n");
 
 console.log("预设数量：" + styleNames.map((style) => style + " " + presetSets[style].length).join(" / "));
 console.log("默认规则预设：" + rules.map((rule) => rule.name + "=" + rule.effectPresetId).join("  "));

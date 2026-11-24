@@ -2,7 +2,10 @@ export type GameServer = "international" | "tencent";
 export type Locale = "cn" | "tw" | "us";
 export type Strictness = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type FilterStyle = "default" | "aura" | "cobalt" | "darkmode" | "mythic" | "vaal" | "zen" | "customsounds";
+/** 行情报价使用的通货单位。 */
 export type Currency = "exalted" | "divine" | "chaos";
+/** 规则价格区间可用的单位：三种报价通货，外加没有汇率、只能按行情报价换算的剥离石。 */
+export type PriceCurrency = Currency | "annulment";
 
 export type ItemCategory =
   | "currency"
@@ -21,6 +24,8 @@ export type ItemMatcher = {
   class?: string;
   rarity?: ItemRarity;
   nonUnique?: boolean;
+  /** 未切割宝石在游戏里只有一个基底，等级靠 GemLevel 条件区分；每个等级是一件独立物品。 */
+  gemLevel?: number;
 };
 
 export type ItemDefinition = {
@@ -74,8 +79,7 @@ export type MarketSnapshot = {
 
 export type PricePoint = {
   amount: number;
-  currency: Currency;
-  referenceItemId?: string;
+  currency: PriceCurrency;
 };
 
 export type PriceRange = {
@@ -95,7 +99,7 @@ export type ItemRarity = "Normal" | "Magic" | "Rare" | "Unique";
 export type DropOperator = ">=" | ">" | "=" | "<" | "<=";
 export type DropBound = { op: DropOperator; value: number };
 export type DropNumber = { enabled: boolean; bounds: DropBound[] };
-export type DropField = "stackSize" | "gemLevel" | "itemLevel" | "sockets" | "unidentifiedTier";
+export type DropField = "stackSize" | "itemLevel" | "sockets" | "unidentifiedTier";
 export type DropConditions = Partial<Record<DropField, DropNumber>> & { rarity?: { enabled: boolean; value: ItemRarity } };
 
 /** 同时启用的物品、单件价格和掉落条件取交集。 */
@@ -129,7 +133,7 @@ export type FilterRule = {
   name: string;
   enabled: boolean;
   hidden: boolean;
-  autoRange?: boolean;
+  /** 默认价格档尚未自定义特效：生成时沿用基础过滤器里对应通货的样式。界面上不体现。 */
   followBaseline?: boolean;
   /** 选中的完整特效预设 id（仅用于回显，生成器只读 effects）。 */
   effectPresetId?: string;

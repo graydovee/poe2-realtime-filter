@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { cleanup, data, engine, pricing, makeRule, snapshot, blockFor, ruleBlocks, withPrice, DEFAULT_PROFILE, DIVINE } from "./helpers.mjs";
+import { cleanup, data, engine, pricing, makeRule, snapshot, blockFor, ruleBlocks, withPrice, validateProfile, DEFAULT_PROFILE } from "./helpers.mjs";
 
 import { parseExchange } from "../worker/market-adapter.mjs";
 
@@ -155,10 +155,10 @@ test("隐藏高价值物品会让安全检查失败", () => {
   assert.deepEqual(generated.safetyReport.hiddenHighValueItems, ["Divine Orb"]);
 });
 
-test("缺少锚点行情时跟随市价的价格档被禁用", () => {
+test("缺少汇率时价格规则不生效，并提示行情不可用", () => {
   const generated = generateFilter(profile({}), { ...snapshot, rates: undefined, prices: {} });
   assert.equal(generated.appliedRules.length, 0);
-  assert.ok(generated.safetyReport.warnings.some((warning) => warning.includes("锚点")));
+  assert.ok(generated.safetyReport.warnings.some((warning) => warning.includes("缺少有效报价或汇率")));
 });
 
 test("快照赛季不一致时价格规则不生效", () => {
@@ -170,8 +170,110 @@ test("快照赛季不一致时价格规则不生效", () => {
   assert.equal(right.appliedRules.length, 4);
 });
 
-test("锚点区间按当日价格重排", () => {
-  const tiers = pricing.currencyPriceTiers(snapshot);
-  assert.deepEqual(tiers.map((tier) => tier.itemId), ["exalted-orb", "chaos-orb", "orb-of-annulment", "divine-orb"]);
-  assert.deepEqual(tiers.map((tier) => tier.exaltedValue), [1, DIVINE / 100, DIVINE / 10, DIVINE]);
+test("默认价格档是普通的相邻区间，每件有报价的通货与材料只落进一档", () => {
+  assert.deepEqual(DEFAULT_PROFILE.rules.map((rule) => [rule.target.range.min, rule.target.range.max ?? null]), [
+    [{ amount: 1, currency: "exalted" }, { amount: 1, currency: "chaos" }],
+    [{ amount: 1, currency: "chaos" }, { amount: 1, currency: "annulment" }],
+    [{ amount: 1, currency: "annulment" }, { amount: 1, currency: "divine" }],
+    [{ amount: 1, currency: "divine" }, null],
+  ]);
+  const blocks = ruleBlocks(generateFilter(profile({ skippedItemIds: [] }), snapshot).filterFile);
+  const tierOf = new Map();
+  for (const block of blocks) {
+    const [, ruleId, itemName] = /^Show # poe2-filter rule: (\S+) \/ (.+)$/.exec(block.split("\n")[0]);
+    assert.ok(!tierOf.has(itemName), itemName + " 落进了两档");
+    tierOf.set(itemName, ruleId);
+  }
+  assert.equal(tierOf.get("Exalted Orb"), "default-exalted");
+  assert.equal(tierOf.get("Chaos Orb"), "default-chaos");
+  assert.equal(tierOf.get("Orb of Annulment"), "default-annulment");
+  assert.equal(tierOf.get("Divine Orb"), "default-divine");
+  // 区间是普通数值：把「混沌石价格档」的上限放宽到 1D，1 枚剥离石（100E）就归到它，不再归剥离石档。
+  const widened = DEFAULT_PROFILE.rules.map((rule) => (rule.id === "default-chaos" ? { ...rule, target: { ...rule.target, range: { min: rule.target.range.min, max: { amount: 1, currency: "divine" } } } } : rule));
+  const edited = ruleBlocks(generateFilter(profile({ skippedItemIds: [], rules: widened }), snapshot).filterFile);
+  assert.ok(edited.some((block) => block.startsWith("Show # poe2-filter rule: default-chaos / Orb of Annulment")));
+  assert.ok(!edited.some((block) => block.includes("rule: default-annulment / Orb of Annulment")));
+});
+
+test("剥离石作为计价单位时按它的行情报价折算", () => {
+  const point = { amount: 2, currency: "annulment" };
+  assert.equal(pricing.toExalted(point, snapshot.rates, snapshot.prices), 200);
+  assert.equal(pricing.toDivines(point, snapshot.rates, snapshot.prices), 0.2);
+  assert.equal(pricing.toExalted(point, snapshot.rates, {}), undefined, "没有剥离石报价时无法换算");
+  assert.equal(pricing.formatPrice(point, snapshot), "2 剥离石 ≈ 200 E");
+  assert.equal(pricing.formatPrice({ amount: 1, currency: "annulment" }), "1 剥离石（等待行情）");
+  assert.equal(pricing.formatPrice({ amount: 1.5, currency: "chaos" }), "1.5 C");
+  const target = { range: { min: { amount: 1, currency: "annulment" }, max: { amount: 1, currency: "divine" } } };
+  const blocks = ruleBlocks(generateFilter(profile({ rules: [makeRule({ target })] }), snapshot).filterFile);
+  assert.ok(blocks.some((block) => block.includes("/ Orb of Annulment")));
+  assert.ok(!blocks.some((block) => block.includes("/ Chaos Orb")), "1 枚混沌石（10E）低于 1 枚剥离石（100E）");
+  assert.ok(!blocks.some((block) => block.includes("/ Divine Orb")), "上限不含 1D");
+});
+
+test("旧方案里的锚点价格点读成普通计价单位", () => {
+  const legacy = {
+    ...DEFAULT_PROFILE,
+    rules: [{
+      id: "default-chaos",
+      name: "混沌石价格档",
+      enabled: true,
+      hidden: false,
+      autoRange: true,
+      followBaseline: true,
+      target: {
+        itemIds: [],
+        range: {
+          min: { amount: 1, currency: "exalted", referenceItemId: "chaos-orb" },
+          max: { amount: 1, currency: "exalted", referenceItemId: "orb-of-annulment" },
+        },
+      },
+      effects: {},
+    }],
+  };
+  const [rule] = validateProfile(legacy).rules;
+  assert.deepEqual(rule.target.range, { min: { amount: 1, currency: "chaos" }, max: { amount: 1, currency: "annulment" } });
+  assert.equal(rule.autoRange, undefined);
+  assert.equal(rule.followBaseline, true, "默认价格档默认沿用基础过滤器里对应通货的样式");
+  // 单位必须是四种之一；没见过的单位直接报错。
+  const bad = { ...DEFAULT_PROFILE, rules: [{ ...makeRule(), target: { range: { min: { amount: 1, currency: "annulment-orb" } } } }] };
+  assert.throws(() => validateProfile(bad), /价格下限无效/);
+});
+
+test("未切割宝石按等级各自匹配、覆盖和跳过", () => {
+  const levels = (ids) => ({ itemIds: ids, itemEnabled: true });
+  const high = makeRule({ id: "high", name: "二十级", target: levels(["uncut-skill-gem-20"]), effects: { beam: "Red" } });
+  const low = makeRule({ id: "low", name: "十九级", target: levels(["uncut-skill-gem-19"]), effects: { beam: "Blue" } });
+  const separate = ruleBlocks(generateFilter(profile({ rules: [high, low] }), snapshot).filterFile);
+  assert.equal(separate.length, 2);
+  assert.match(separate[0], /^Show # poe2-filter rule: high \/ Uncut Skill Gem \(Level 20\)\n\tBaseType == "Uncut Skill Gem"\n\tGemLevel = 20\n\tPlayEffect Red$/);
+  assert.match(separate[1], /BaseType == "Uncut Skill Gem"\n\tGemLevel = 19\n\tPlayEffect Blue$/);
+  // 同一个等级被前面的规则覆盖；别的等级不受影响。
+  const again = makeRule({ id: "again", name: "二十级", target: levels(["uncut-skill-gem-20"]), effects: { beam: "Green" } });
+  const other = makeRule({ id: "other", name: "十九级", target: levels(["uncut-skill-gem-19"]), effects: { beam: "Green" } });
+  const covered = generateFilter(profile({ rules: [high, again, other] }), snapshot);
+  assert.deepEqual(covered.safetyReport.coveredRules, [{ ruleId: "again", ruleName: "二十级" }]);
+  assert.deepEqual(covered.appliedRules.map((entry) => entry.ruleId), ["high", "other"]);
+  assert.equal(ruleBlocks(covered.filterFile).length, 2);
+  // 跳过名单只排除选中的那个等级。
+  const all = ["uncut-skill-gem-20", "uncut-skill-gem-19", "uncut-skill-gem-1"];
+  const skipped = ruleBlocks(generateFilter(profile({ skippedItemIds: ["uncut-skill-gem-20"], rules: [makeRule({ target: levels(all) })] }), snapshot).filterFile);
+  assert.deepEqual(skipped.map((block) => block.match(/GemLevel = (\d+)/)[1]), ["19", "1"]);
+  // 各等级有各自的报价：只有满级的那件够贵。
+  const market = withPrice(withPrice(snapshot, "uncut-skill-gem-20", 4), "uncut-skill-gem-19", 0.001);
+  const priced = ruleBlocks(generateFilter(profile({ rules: [makeRule({ target: { ...levels(all), range: { min: { amount: 1, currency: "divine" } } } })] }), market).filterFile);
+  assert.deepEqual(priced.map((block) => block.match(/GemLevel = (\d+)/)[1]), ["20"]);
+  // 只填价格时同样逐级生成。
+  const byPrice = ruleBlocks(generateFilter(profile({ rules: [makeRule({ target: { range: { min: { amount: 1, currency: "divine" } } } })] }), market).filterFile);
+  assert.equal(byPrice.filter((block) => /Uncut Skill Gem \(Level 20\)/.test(block) && block.includes("GemLevel = 20")).length, 1);
+  assert.ok(!byPrice.some((block) => /Uncut Skill Gem \(Level 1\)/.test(block)));
+});
+
+test("poe.ninja 的逐级未切割宝石报价按名字对上对应等级", () => {
+  const names = ["Uncut Skill Gem (Level 19)", "Uncut Spirit Gem (Level 18)", "Uncut Support Gem (Level 3)"];
+  const items = names.map((name) => ({ id: "ninja-" + name, name }));
+  const lines = names.map((name, index) => ({ id: "ninja-" + name, maxVolumeCurrency: "exalted", maxVolumeRate: 1 / (index + 2), primaryValue: 1 }));
+  const { prices } = parseExchange({ core: { primary: "divine", rates: { exalted: 1000, chaos: 100 } }, items, lines }, data.ITEM_CATALOG, snapshot.capturedAt);
+  assert.deepEqual(Object.keys(prices).filter((id) => id.startsWith("uncut-")).sort(), ["uncut-skill-gem-19", "uncut-spirit-gem-18", "uncut-support-gem-3"]);
+  assert.equal(prices["uncut-skill-gem-19"].amount, 2);
+  assert.equal(prices["uncut-support-gem-3"].amount, 4);
 });

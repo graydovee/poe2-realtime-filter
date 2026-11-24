@@ -10,6 +10,8 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 
 import "./globals.css";
+import { Toaster } from "./components/ui/toast";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "poe2-filter · PoE2 过滤器编辑器",
@@ -20,10 +22,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <body>
-        <a href="#main" className="sr-only-focusable fixed left-4 top-3 z-50 rounded-sm border border-gold/50 bg-surface-2 px-3 py-2 text-xs text-ink">
-          跳到主要内容
-        </a>
-        {children}
+        <TooltipProvider>
+          <a
+            href="#main"
+            className="sr-only-focusable fixed top-3 left-4 z-tooltip rounded-md border border-gold/50 bg-surface-2 px-3 py-2 text-xs text-ink"
+          >
+            跳到主要内容
+          </a>
+          {children}
+          <Toaster />
+        </TooltipProvider>
       </body>
     </html>
   );

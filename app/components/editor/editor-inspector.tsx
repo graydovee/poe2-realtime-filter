@@ -1,0 +1,128 @@
+"use client";
+
+import { scrollToModule } from "../../hooks/navigation";
+import { requestLeaveEditor } from "../../hooks/use-shortcuts";
+import { useAppStore } from "../../state/store";
+import { SoundPreviewButton } from "../sound-preview";
+import { Alert } from "../ui/alert";
+import { Button } from "../ui/button";
+import { EmptyState } from "../ui/empty-state";
+import { Separator } from "../ui/separator";
+import { EffectSummary, LootScene } from "./appearance-preview";
+
+type SummaryRow = { label: string; value: string; warning?: boolean; jump: () => void };
+
+/** 配置摘要：每一行都能跳到对应的模块。 */
+function Summary() {
+  const profile = useAppStore((state) => state.profile);
+  const setBaseFilterOpen = useAppStore((state) => state.setBaseFilterOpen);
+  const rules = profile.rules ?? [];
+  const jumpToBase = () => {
+    setBaseFilterOpen(true);
+    scrollToModule("base");
+  };
+  const rows: SummaryRow[] = [
+    {
+      label: "赛季",
+      value: profile.league || "待选择",
+      warning: !profile.league,
+      jump: () => scrollToModule("season"),
+    },
+    {
+      label: "基础过滤器",
+      value: profile.baseFilter?.name ?? (profile.baseFilterHint ? "待选择" : "仅自定义规则"),
+      warning: Boolean(profile.baseFilterHint) && !profile.baseFilter,
+      jump: jumpToBase,
+    },
+    {
+      label: "自定义规则",
+      value: `${rules.length} 条 · 启用 ${rules.filter((rule) => rule.enabled).length}`,
+      jump: () => scrollToModule("rules"),
+    },
+    {
+      label: "隐藏规则",
+      value: `${rules.filter((rule) => rule.enabled && rule.hidden).length} 条`,
+      jump: () => scrollToModule("rules"),
+    },
+  ];
+  if (profile.baseFilter) {
+    rows.push({ label: "跳过物品", value: `${profile.skippedItemIds.length} 项`, jump: jumpToBase });
+  }
+
+  return (
+    <section aria-label="配置摘要">
+      <h3 className="mb-1.5 px-1 text-xs font-semibold text-ink-muted">配置摘要</h3>
+      <ul className="grid gap-0.5">
+        {rows.map((row) => (
+          <li key={row.label}>
+            <button
+              type="button"
+              onClick={row.jump}
+              className="grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 rounded-sm px-1 py-1 text-left transition-colors duration-150 hover:bg-surface-2 hover:text-gold-bright"
+            >
+              <span className="text-sm text-ink-muted">{row.label}</span>
+              <span className={`truncate text-right text-sm ${row.warning ? "text-ember" : "text-ink"}`} title={row.value}>
+                {row.value}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** 编辑器的检查器：当前规则在游戏里的实时效果、配置摘要，以及保存 / 预览 / 取消。 */
+export function EditorInspector() {
+  const rules = useAppStore((state) => state.profile.rules);
+  const activeRuleId = useAppStore((state) => state.activeRuleId);
+  const base = useAppStore((state) => state.profile.baseFilter);
+  const baseInspection = useAppStore((state) => state.baseInspection);
+  const customSounds = useAppStore((state) => state.customSounds);
+  const saveError = useAppStore((state) => state.saveError);
+  const schemeBusy = useAppStore((state) => state.schemeBusy);
+  const previewBusy = useAppStore((state) => state.previewBusy);
+  const requestSave = useAppStore((state) => state.requestSave);
+  const generate = useAppStore((state) => state.generate);
+
+  const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
+  const shownEffects = active ? (active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects) : {};
+  const customFile = active?.effects.sound?.type === "custom" ? customSounds[active.id] : undefined;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <section aria-label="实时预览" className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold text-ink-muted">实时预览</h3>
+            {active && <SoundPreviewButton sound={shownEffects.sound} file={customFile} base={base} />}
+          </div>
+          {active ? (
+            <>
+              <LootScene effects={shownEffects} label={active.name || "示例物品"} />
+              <EffectSummary effects={shownEffects} base={base} />
+            </>
+          ) : (
+            <EmptyState compact title="还没有规则" description="新增一条规则后，这里会显示它在游戏里的掉落效果。" />
+          )}
+        </section>
+        <Separator orientation="horizontal" className="my-0" />
+        <Summary />
+        {saveError && <Alert tone="ember">{saveError}</Alert>}
+      </div>
+      <footer className="grid shrink-0 gap-2 border-t border-line p-3">
+        <Button variant="primary" size="lg" disabled={schemeBusy} onClick={requestSave}>
+          {schemeBusy ? "保存中…" : "保存方案"}
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button disabled={schemeBusy || previewBusy} onClick={() => void generate()}>
+            {previewBusy ? "生成中…" : "预览"}
+          </Button>
+          <Button disabled={schemeBusy} onClick={requestLeaveEditor}>
+            取消
+          </Button>
+        </div>
+      </footer>
+    </div>
+  );
+}

@@ -16,6 +16,7 @@ const missing = required.filter((name) => !fs.existsSync(path.join(vendor, name)
 if (missing.length) throw new Error("missing NeverSink baseline files: " + missing.join(", "));
 
 const problems = [];
+const uncutGroup = (item) => (item.categoryPath?.[0] === "gems" ? item.categoryPath[1] : undefined);
 for (const name of required) {
   const text = fs.readFileSync(path.join(vendor, name), "utf8");
   if (!/^Show\b/m.test(text)) problems.push(name + ": no Show rule");
@@ -32,6 +33,15 @@ for (const item of catalog.items || []) {
   if (!item.name || !item.matcher || (!item.matcher.baseType && !item.matcher.class)) problems.push("catalog: invalid matcher " + item.id);
   if (!Array.isArray(item.categoryPath) || item.categoryPath.length < 2) problems.push("catalog: missing category path " + item.id);
   if (!item.localeNames?.cn || !item.localeNames?.tw || !item.localeNames?.us) problems.push("catalog: missing locale name " + item.id);
+  // 未切割宝石每个等级是一件独立物品：id 里的等级、GemLevel 和分组必须一致。
+  const uncut = /^uncut-(skill|spirit|support)-gem-(\d+)$/.exec(item.id || "");
+  if (uncut && (item.matcher.gemLevel !== Number(uncut[2]) || item.categoryPath?.join("/") !== "gems/uncut-" + uncut[1] + "-gems")) {
+    problems.push("catalog: inconsistent uncut gem level " + item.id);
+  }
+}
+for (const [kind, levels] of [["skill", 20], ["spirit", 20], ["support", 5]]) {
+  const found = (catalog.items || []).filter((item) => uncutGroup(item) === "uncut-" + kind + "-gems").length;
+  if (found !== levels) problems.push("catalog: expected " + levels + " uncut " + kind + " gem levels, found " + found);
 }
 
 const mechanics = JSON.parse(fs.readFileSync(path.join(root, "data", "item-mechanics.json"), "utf8"));
@@ -78,23 +88,30 @@ if (!Array.isArray(effects.customSounds)) problems.push("effect presets: missing
 
 const defaultRules = JSON.parse(fs.readFileSync(path.join(root, "data", "default-rules.json"), "utf8")).rules || [];
 if (defaultRules.length !== 4) problems.push("default rules: expected 4 price tiers, found " + defaultRules.length);
-const anchors = ["exalted-orb", "chaos-orb", "orb-of-annulment", "divine-orb"];
+// 价格档就是普通价格区间，从低到高每档「≥ 1 枚本档通货，且 < 1 枚下一档通货」，最高档不封顶。
+const tiers = [["default-exalted", "exalted"], ["default-chaos", "chaos"], ["default-annulment", "annulment"], ["default-divine", "divine"]];
 const defaultPresets = new Map((effects.styles?.default || []).map((preset) => [preset.id, preset]));
 const ruleIds = new Set();
-for (const rule of defaultRules) {
+defaultRules.forEach((rule, index) => {
   if (!rule.id || ruleIds.has(rule.id)) problems.push("default rules: duplicate id " + rule.id);
   ruleIds.add(rule.id);
   if (!rule.name || typeof rule.enabled !== "boolean" || typeof rule.hidden !== "boolean") problems.push("default rules: incomplete " + rule.id);
   if (!Array.isArray(rule.target?.itemIds) || rule.target.itemIds.length !== 0) problems.push("default rules: price tier must not select items " + rule.id);
-  const anchor = rule.target?.range?.min?.referenceItemId;
-  if (!anchors.includes(anchor)) problems.push("default rules: bad anchor " + anchor + " for " + rule.id);
+  if (rule.autoRange !== undefined) problems.push("default rules: price tiers are ordinary ranges, no autoRange " + rule.id);
+  const [expectedId, unit] = tiers[index] ?? [];
+  const next = tiers[index + 1];
+  if (rule.id !== expectedId) problems.push("default rules: expected " + expectedId + " at position " + index + ", found " + rule.id);
+  const wrong = (point, currency) => !point || point.amount !== 1 || point.currency !== currency;
+  const max = rule.target?.range?.max;
+  if (wrong(rule.target?.range?.min, unit)) problems.push("default rules: lower bound of " + rule.id + " must be 1 " + unit + ", found " + JSON.stringify(rule.target?.range?.min));
+  if (next ? wrong(max, next[1]) : max !== undefined) problems.push("default rules: upper bound of " + rule.id + (next ? " must be 1 " + next[1] : " must be unset") + ", found " + JSON.stringify(max));
   const preset = defaultPresets.get(rule.effectPresetId);
   if (!preset) problems.push("default rules: effectPresetId not in default style " + rule.id + " " + rule.effectPresetId);
   else {
     const expected = { ...(preset.beam ? { beam: preset.beam } : {}), ...(preset.icon ? { icon: preset.icon } : {}), ...(preset.font ? { font: preset.font } : {}), ...(preset.sound ? { sound: preset.sound } : {}) };
     if (JSON.stringify(expected) !== JSON.stringify(rule.effects)) problems.push("default rules: effects differ from preset " + rule.id);
   }
-}
+});
 
 if (unmapped.length) {
   for (const name of unmapped.slice(0, 10)) console.warn("WARN: 未登记来源玩法，先运行 node scripts/build-item-mechanics.mjs：" + name);

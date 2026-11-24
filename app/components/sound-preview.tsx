@@ -5,7 +5,8 @@ import { Square, Volume2 } from "lucide-react";
 
 import { readSound } from "../../lib/desktop";
 import type { BaseFilter, PresetSound } from "../../lib/types";
-import { Button } from "./ui/primitives";
+import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 
 /** 游戏内置音效的本地副本命名：public/sounds/alert-sound-1.mp3（也支持 ogg/wav）。 */
 const ALERT_EXTENSIONS = ["mp3", "ogg", "wav"];
@@ -22,7 +23,18 @@ async function hasBuiltinFile(id: number) {
   return undefined;
 }
 
-export function SoundPreviewButton({ sound, file, base, className }: { sound?: PresetSound; file?: File; base?: BaseFilter; className?: string }) {
+/** 试听一条规则的音效；再次点击停止。 */
+export function SoundPreviewButton({
+  sound,
+  file,
+  base,
+  className,
+}: {
+  sound?: PresetSound;
+  file?: File;
+  base?: BaseFilter;
+  className?: string;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -75,9 +87,13 @@ export function SoundPreviewButton({ sound, file, base, className }: { sound?: P
       source = url;
     } else if ((sound.type === "neversink" || sound.type === "baseline") && base) {
       try {
-        source = URL.createObjectURL(await readSound(sound.type === "baseline" ? `@poe2rf-baseline/${sound.fileName.split(";")[0]}` : sound.fileName, undefined, base));
+        source = URL.createObjectURL(
+          await readSound(sound.type === "baseline" ? `@poe2rf-baseline/${sound.fileName.split(";")[0]}` : sound.fileName, undefined, base),
+        );
         urlRef.current = source;
-      } catch { return; }
+      } catch {
+        return;
+      }
     }
     if (!source) return;
     const audio = new Audio(source);
@@ -99,23 +115,24 @@ export function SoundPreviewButton({ sound, file, base, className }: { sound?: P
     ? "沿用基础过滤器的音效"
     : sound.type === "builtin"
       ? missingBuiltin
-        ? "可在游戏内试听内置音效 " + sound.id
-        : "内置音效 " + sound.id
+        ? `可在游戏内试听内置音效 ${sound.id}`
+        : `内置音效 ${sound.id}`
       : sound.fileName;
 
   return (
     <div className={className}>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => void play()}
-        disabled={disabled || (sound?.type === "builtin" && !checked)}
-        aria-label={playing ? "停止试听" : "播放音效"}
-        title={hint}
-      >
-        {playing ? <Square aria-hidden="true" className="size-3.5" /> : <Volume2 aria-hidden="true" className="size-4" />}
-        {playing ? "停止试听" : "播放音效"}
-      </Button>
+      <Tooltip label={hint}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void play()}
+          disabled={disabled || (sound?.type === "builtin" && !checked)}
+          aria-label={playing ? "停止试听" : "试听音效"}
+        >
+          {playing ? <Square aria-hidden="true" className="size-3" /> : <Volume2 aria-hidden="true" />}
+          {playing ? "停止" : "试听"}
+        </Button>
+      </Tooltip>
     </div>
   );
 }
