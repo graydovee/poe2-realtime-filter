@@ -5,7 +5,7 @@ import { FilePen, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2, Copy, Downl
 import { cn } from "../../../lib/cn";
 import type { LocalScheme } from "../../../lib/desktop";
 import type { GameServer } from "../../../lib/types";
-import { useAppStore } from "../../state/store";
+import { revealInspector, useAppStore } from "../../state/store";
 import type { DownloadOffer } from "../../state/types";
 import { Badge, StatusDot } from "../ui/badge";
 import { Button, IconButton } from "../ui/button";
@@ -69,7 +69,11 @@ export function SchemeRow({
             type="button"
             aria-pressed={selected}
             aria-label={`查看方案 ${scheme.name} 的详情`}
-            onClick={() => setSelectedSchemeId(scheme.id)}
+            // 检查器收起或窗口较窄时，选中后要把它显示出来，否则点了没有任何反应。
+            onClick={() => {
+              setSelectedSchemeId(scheme.id);
+              revealInspector();
+            }}
             className="flex w-full min-w-0 cursor-pointer flex-col items-start gap-1 rounded-sm py-1 text-left"
           >
             <span className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autostart;
 mod base_filter;
 mod engine;
 mod market;
@@ -320,7 +321,14 @@ fn library(state: State<'_, Desktop>) -> Result<Value> {
         "schemes": library.schemes.iter().filter(|scheme| scheme.server() == library.server).collect::<Vec<_>>(),
         "filterDirectory": display_directory(effective),
         "customDirectory": library.settings.filter_directory.is_some(),
+        // Null when the startup entry cannot be read; the switch then stays unavailable.
+        "autostart": autostart::enabled().ok(),
     }))
+}
+
+#[tauri::command]
+fn set_autostart(enabled: bool) -> Result<()> {
+    autostart::set(enabled)
 }
 
 #[tauri::command]
@@ -917,7 +925,9 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         .iter()
         .find(|window| window.label == "main")
         .ok_or("主窗口配置不存在")?;
+    // Launched by the startup entry: stay in the tray until the window is opened.
     let webview = tauri::WebviewWindowBuilder::from_config(app, window)?
+        .visible(!autostart::requested())
         .data_directory(root.join("webview"))
         .build();
     if let Err(reason) = webview {
@@ -1002,6 +1012,7 @@ fn main() {
             local_market,
             refresh_market,
             save_settings,
+            set_autostart,
             pick_filter_directory,
             save_filter_directory,
             scan_base_filters,

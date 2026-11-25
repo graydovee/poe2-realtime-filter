@@ -11,7 +11,15 @@ export type LocalScheme = {
 };
 
 export type Settings = { intervalMinutes: number; paused: boolean };
-export type Library = { server: GameServer; settings: Settings; schemes: LocalScheme[]; filterDirectory: string; customDirectory: boolean };
+export type Library = {
+  server: GameServer;
+  settings: Settings;
+  schemes: LocalScheme[];
+  filterDirectory: string;
+  customDirectory: boolean;
+  /** 开机启动项是否指向本客户端；读不到启动项时为 null，开关不可用。 */
+  autostart: boolean | null;
+};
 export const SERVER_LABELS: Record<GameServer, string> = { international: "国际服 POE2", tencent: "腾讯服 POE2" };
 export function displayDirectory(path: string): string {
   if (path.startsWith("\\\\?\\UNC\\")) return "\\\\" + path.slice(8);

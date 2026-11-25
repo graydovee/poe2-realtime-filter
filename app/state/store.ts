@@ -88,6 +88,11 @@ export function toggleInspectorForViewport() {
   else state.setInspectorPeek(!state.inspectorPeek);
 }
 
+/** 选中方案后让检查器可见：停靠时展开，窄窗口时唤出侧滑层。 */
+export function revealInspector() {
+  if (!inspectorShownForViewport()) toggleInspectorForViewport();
+}
+
 /** 与当前服务器、赛季匹配且未过期的行情；否则是带当前赛季名的回退数据。 */
 export function useEditorMarket(): { matching: boolean; selected: MarketSnapshot } {
   const league = useAppStore((state) => state.profile.league);

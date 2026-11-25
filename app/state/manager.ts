@@ -38,6 +38,7 @@ export type ManagerActions = {
   selectServer: (server: GameServer) => Promise<void>;
   saveDirectory: (path: string | null) => Promise<void>;
   updateSettings: (intervalMinutes: number, paused: boolean) => Promise<void>;
+  setAutostart: (enabled: boolean) => Promise<void>;
   setSelectedSchemeId: (id: string | null) => void;
   openManagerDialog: (kind: ManagerDialogKind, scheme: LocalScheme) => void;
   setManagerDialog: (dialog: ManagerDialog | null) => void;
@@ -126,6 +127,13 @@ export const createManagerSlice: StateCreator<AppState, [], [], ManagerSlice> = 
       await local("save_settings", { server: library.server, intervalMinutes, paused });
       set({ intervalDraft: undefined });
       toast.success("刷新设置已保存");
+    });
+  },
+
+  setAutostart: async (enabled) => {
+    await get().runManager(async () => {
+      await local("set_autostart", { enabled });
+      toast.success(enabled ? "已开启开机启动" : "已关闭开机启动");
     });
   },
 

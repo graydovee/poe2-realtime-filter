@@ -188,6 +188,7 @@ let library: Library = {
   settings: { intervalMinutes: 120, paused: false },
   filterDirectory: "C:\\Users\\grayd\\Documents\\My Games\\Path of Exile 2",
   customDirectory: false,
+  autostart: false,
   schemes: [
     {
       id: "scheme-1",
@@ -280,6 +281,7 @@ const handlers: Record<string, Handler> = {
   select_server: ({ server }) => void (library.server = server as GameServer),
   save_settings: ({ intervalMinutes, paused }) =>
     void (library.settings = { intervalMinutes: Number(intervalMinutes), paused: Boolean(paused) }),
+  set_autostart: ({ enabled }) => void (library.autostart = Boolean(enabled)),
   local_catalog: () => clone(LEAGUE),
   local_market: ({ league, server }) => market(String(league), server as GameServer | undefined),
   refresh_market: async () => delay(900),

@@ -1,6 +1,7 @@
 "use client";
 
-import { Copy, Download, Eye, EyeOff, FilePen, PackageOpen, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import { useId } from "react";
+import { ArrowLeft, Copy, Download, Eye, EyeOff, FilePen, PackageOpen, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
 
 import { local, SERVER_LABELS, type Library, type LocalScheme } from "../../../lib/desktop";
 import type { GameServer } from "../../../lib/types";
@@ -218,6 +219,8 @@ function RefreshSettings({ library, busy }: { library: Library; busy: boolean })
   const intervalDraft = useAppStore((state) => state.intervalDraft);
   const patch = useAppStore((state) => state.patchManager);
   const updateSettings = useAppStore((state) => state.updateSettings);
+  const setAutostart = useAppStore((state) => state.setAutostart);
+  const autostartHint = useId();
   return (
     <Panel className="border-line/80 bg-surface-2/60" bodyClassName="p-4">
       <h3 className="text-sm font-semibold text-ink">刷新设置</h3>
@@ -253,6 +256,17 @@ function RefreshSettings({ library, busy }: { library: Library; busy: boolean })
         disabled={busy}
         onCheckedChange={(paused) => void updateSettings(library.settings.intervalMinutes, paused)}
       />
+      <Switch
+        label="开机启动"
+        className="mt-3"
+        describedBy={autostartHint}
+        checked={library.autostart === true}
+        disabled={busy || library.autostart === null}
+        onCheckedChange={(enabled) => void setAutostart(enabled)}
+      />
+      <p id={autostartHint} className="mt-1 text-xs leading-relaxed text-ink-muted">
+        {library.autostart === null ? "无法读取当前用户的启动项。" : "登录 Windows 后在托盘中启动，不打开窗口。"}
+      </p>
     </Panel>
   );
 }
@@ -311,6 +325,7 @@ export function ManagerInspector() {
   const library = useAppStore((state) => state.library);
   const busy = useAppStore((state) => state.managerBusy);
   const selectedSchemeId = useAppStore((state) => state.selectedSchemeId);
+  const setSelectedSchemeId = useAppStore((state) => state.setSelectedSchemeId);
   const baseOffers = useAppStore((state) => state.baseOffers);
 
   if (!library) return <EmptyState compact title="正在读取方案库…" className="py-10" />;
@@ -320,7 +335,14 @@ export function ManagerInspector() {
   return (
     <div className="space-y-4 p-4">
       {scheme ? (
-        <SchemeDetail scheme={scheme} server={library.server} busy={busy} offers={hint ? baseOffers[hint] : undefined} />
+        // 选中方案后概览被详情替换，这里留一个明确的返回入口。
+        <div>
+          <Button variant="ghost" size="sm" className="-ml-2 mb-1 text-ink-muted" onClick={() => setSelectedSchemeId(null)}>
+            <ArrowLeft aria-hidden="true" />
+            方案库概览
+          </Button>
+          <SchemeDetail scheme={scheme} server={library.server} busy={busy} offers={hint ? baseOffers[hint] : undefined} />
+        </div>
       ) : (
         <Overview library={library} busy={busy} server={library.server} />
       )}

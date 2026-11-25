@@ -68,9 +68,9 @@ jobs:
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
           @'
-          - 分享码改用顺序二进制正文和物品分类树，缩短包含大量物品的方案分享码。已发布的 POE2F1 分享码仍可导入。
-          - 整类选择用分类路径保存，零散选择用稳定槽位保存。同一方案中的重复选择集合会复用。
-          - 规则可以跟随基础过滤器中指定物品的特效。更换基础过滤器时会重新解析该物品的颜色、图标和音效等样式。
+          - 恢复「开机启动」：在方案库的「刷新设置」里开启，登录 Windows 后客户端直接在托盘中运行，不打开窗口。
+          - 方案库的检查器在方案详情里可以返回「方案库概览」。
+          - 窗口较窄或检查器收起时，点击方案会自动展开检查器。
           - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
           '@ | Set-Content -Encoding utf8NoBOM release-notes.md
           gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md
