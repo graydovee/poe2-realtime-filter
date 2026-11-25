@@ -593,7 +593,7 @@ async fn scheme_share(app: tauri::AppHandle, id: String) -> Result<String> {
 async fn inspect_share(app: tauri::AppHandle, code: String, server: Server) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
-        let share = share_code::decode(&code)?;
+        let share = share_code::decode(&code)?.share;
         let target = share.profile.get("server").map(|value| serde_json::from_value::<Server>(value.clone()))
             .transpose().map_err(|_| "分享码的游戏服务器无效")?.unwrap_or(server);
         Ok(json!({"server":target, "name":share.name, "league": share.profile["league"], "hasServer": share.profile.get("server").is_some(), "catalog":state.market(target).catalog(false)?}))
@@ -610,8 +610,8 @@ async fn scheme_import(
 ) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
-        let mut share = share_code::decode(&code)?;
-        let fields = share.profile.as_object_mut().ok_or("无效的方案内容")?;
+        let mut decoded = share_code::decode(&code)?;
+        let fields = decoded.share.profile.as_object_mut().ok_or("无效的方案内容")?;
         if let Some(target) = fields.get("server") {
             if target != &json!(server) {
                 return Err("分享码与目标服务器不一致".into());
@@ -630,7 +630,7 @@ async fn scheme_import(
         fields.insert("server".into(), json!(server));
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
         let mut library = state.store.load()?;
-        let id = state.store.import_decoded(&mut library, share, name)?;
+        let id = state.store.import_decoded(&mut library, decoded, name)?;
         if library.server != server {
             library.server = server;
             state.store.persist(&library)?;

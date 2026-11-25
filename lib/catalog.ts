@@ -1,5 +1,8 @@
+import type { CatalogNode } from "./catalog-view";
 import { CLASS_MATCH_BY_ID, TAXONOMY } from "./data";
 import type { ItemDefinition, Locale } from "./types";
+
+export { buildCatalogTree, catalogItems, type CatalogNode } from "./catalog-view";
 
 const GROUP_NAMES: Record<string, [string, string, string]> = {
   "normal-bases": ["普通装备基底", "普通裝備基底", "Normal Bases"],
@@ -53,21 +56,6 @@ export function groupName(key: string, locale: Locale): string {
   if (taxonomy) return taxonomy[locale] ?? taxonomy.us ?? key;
   return GROUP_NAMES[key]?.[LOCALE_INDEX[locale]] ?? key;
 }
-export type CatalogNode = { key: string; path: string[]; items: ItemDefinition[]; children: CatalogNode[] };
-
-export function buildCatalogTree(items: ItemDefinition[]): CatalogNode {
-  const root: CatalogNode = { key: "root", path: [], items: [], children: [] };
-  for (const item of items) {
-    let node = root;
-    for (const key of item.categoryPath) {
-      let child = node.children.find((child) => child.key === key);
-      if (!child) { child = { key, path: [...node.path, key], items: [], children: [] }; node.children.push(child); }
-      node = child;
-    }
-    node.items.push(item);
-  }
-  return root;
-}
 
 /**
  * 物品在选择器里的名字。换界石、远征日志、任务物品这类条目代表它所在的整个分类，目录里只有英文类名，
@@ -82,9 +70,6 @@ export function catalogNode(root: CatalogNode, path: string[]): CatalogNode | un
   let node = root;
   for (const key of path) { const next = node.children.find((child) => child.key === key); if (!next) return undefined; node = next; }
   return node;
-}
-export function catalogItems(node: CatalogNode): ItemDefinition[] {
-  return [...node.items, ...node.children.flatMap(catalogItems)];
 }
 export function searchCatalog(items: ItemDefinition[], query: string): ItemDefinition[] {
   const normalized = query.trim().toLocaleLowerCase();

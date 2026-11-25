@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package poe2filter.share;
+
+// POE2F2 分享码的协议头。Rust 端在 v2/frame.rs 按 protobuf 线格式读写。
+// 固定字节向量用于验证协议契约。
+//
+// 帧：POE2F2.<base64url(头长度 | ShareHeader | CRC32 | 载荷)>，Base64URL 无填充。
+//   头长度  uvarint，ShareHeader 的字节数，上限 128。
+//   CRC32   IEEE CRC32，小端 4 字节，对未压缩正文计算。
+//   载荷    按 compression 指定的方式编码，解压后正文上限为 1 MiB。
+//
+// 三个字段都必须显式写入且非零。未携带 compression 的早期草稿不属于此协议。
+// 新的可选字段使用新的字段号，读端按线类型跳过。格式、正文版本或压缩算法未知时
+// 提示升级。新增正文版本时，解码器保留对已发布版本的支持。
+message ShareHeader {
+  Format format = 1;
+  // 正文格式的版本。新增正式布局时分配新版本号。
+  uint32 revision = 2;
+  Compression compression = 3;
+}
+
+enum Format {
+  reserved 1; // 未发布的 JSON 正文原型。
+  FORMAT_UNSPECIFIED = 0;
+  FORMAT_POSITIONAL_CATALOG_LISTS = 2;
+}
+
+enum Compression {
+  COMPRESSION_UNSPECIFIED = 0;
+  COMPRESSION_RAW = 1;
+  COMPRESSION_BROTLI = 2;
+  // RFC 1951 DEFLATE，无 zlib 或 gzip 封装。
+  COMPRESSION_DEFLATE = 3;
+}

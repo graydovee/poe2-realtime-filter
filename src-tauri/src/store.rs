@@ -2,7 +2,7 @@ use crate::{
     base_filter::{self, BaseFilter, Baseline},
     engine::{self, Result},
     market,
-    share_code::{self, Share},
+    share_code::{self, DecodedShare, Share},
 };
 use base64::Engine;
 use regex::Regex;
@@ -658,6 +658,10 @@ impl Store {
     }
 
     pub fn share(scheme: &Scheme) -> Result<String> {
+        share_code::encode(&Self::share_payload(scheme)?)
+    }
+
+    fn share_payload(scheme: &Scheme) -> Result<Share> {
         let mut profile = scheme.profile.clone();
         if let Some(fields) = profile.as_object_mut() {
             if let Some(base) = fields.remove("baseFilter") {
@@ -667,7 +671,10 @@ impl Store {
             }
         }
         profile["server"] = json!(scheme.server());
-        share_code::encode(&Share {
+        // A scheme saved by an older version may still carry retired fields. Reading it in
+        // today's form, as the receiving side would, keeps them out of the code.
+        let profile: Value = engine::call("validate", profile)?;
+        Ok(Share {
             name: scheme.name.clone(),
             profile,
         })
@@ -686,9 +693,10 @@ impl Store {
     pub fn import_decoded(
         &self,
         library: &mut Library,
-        mut share: Share,
+        decoded: DecodedShare,
         name_override: Option<String>,
     ) -> Result<String> {
+        let mut share = decoded.into_import()?;
         // A share code may describe a baseline but never authorize reading a local path.
         if let Some(fields) = share.profile.as_object_mut() {
             fields.remove("baseFilter");
@@ -1456,7 +1464,7 @@ mod tests {
         assert!(store.import(&mut library, &broken, None).is_err());
         assert_eq!(library.schemes.len(), count);
         assert_eq!(fs::read(&library_path).unwrap(), saved);
-        assert!(store.import(&mut library, "POE2F2.AAAAA", None).is_err());
+        assert!(store.import(&mut library, "POE2F3.AAAAA", None).is_err());
         assert!(store.import(&mut library, "POE2F1.$$$", None).is_err());
         let renamed = store.default_game.join("新名字.filter");
         fs::write(&renamed, "User filter").unwrap();
@@ -1476,6 +1484,161 @@ mod tests {
             .unwrap();
         store.remove(&mut library, &copy, true).unwrap();
         assert!(!store.default_game.join("离线副本.filter").exists());
+    }
+
+    fn sort_selection_sets(profile: &mut Value) {
+        let sort = |value: &mut Value| {
+            let items = value.as_array_mut().unwrap();
+            items.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
+            items.dedup();
+        };
+        sort(&mut profile["skippedItemIds"]);
+        for rule in profile["rules"].as_array_mut().unwrap() {
+            sort(&mut rule["target"]["itemIds"]);
+        }
+    }
+
+    fn assert_regenerated_profile(expected: &Value, actual: &Value) {
+        let mut expected = expected.clone();
+        let mut actual = actual.clone();
+        let prior = expected["rules"].as_array_mut().unwrap();
+        let imported = actual["rules"].as_array_mut().unwrap();
+        assert_eq!(prior.len(), imported.len());
+        let mut used = BTreeSet::new();
+        for (before, after) in prior.iter_mut().zip(imported) {
+            let fields = after.as_object_mut().unwrap();
+            let id = fields.remove("id").unwrap();
+            let id = id.as_str().unwrap();
+            assert!(id.len() == 8 && id.bytes().all(|byte| byte.is_ascii_alphanumeric()));
+            assert!(used.insert(id.to_owned()));
+            let prior = before.as_object_mut().unwrap();
+            assert_ne!(prior.remove("id").unwrap(), id);
+            // The legacy fixed marker protects old local IDs during migration. Fresh IDs do
+            // not participate in that migration.
+            prior.remove("followBaseline");
+        }
+        sort_selection_sets(&mut expected);
+        sort_selection_sets(&mut actual);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn sharing_regenerates_rule_ids_and_normalizes_retired_fields() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let mut draft = profile(&store);
+        draft.as_object_mut().unwrap().remove("baseFilter");
+        draft["rules"] = json!([{
+            "id": "default-exalted", "name": "崇高石价格档", "enabled": true, "hidden": false,
+            "followBaseline": true,
+            "target": {"itemIds": ["divine-orb", "chaos-orb", "divine-orb"],
+                "range": {"min": {"amount": 1, "currency": "exalted"}}},
+            "effects": {}
+        }, {
+            "id": "rule-0f3a1c2d-3e4f-4a5b-8c6d-0e1f2a3b4c5d", "name": "旧规则", "enabled": true, "hidden": false,
+            "target": {"itemIds": ["chaos-orb"]}, "effects": {}
+        }]);
+        let id = store
+            .add(&mut library, "旧方案", draft, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get_mut(&mut library, &id).unwrap();
+        let mut expected = scheme.profile.clone();
+        expected["server"] = json!("international");
+        // What a library written before those fields were retired still holds.
+        scheme.profile["rules"][0]["autoRange"] = json!(true);
+        scheme.profile["rules"][0]["target"]["range"]["min"]["referenceItemId"] =
+            json!("exalted-orb");
+        let code = Store::share(scheme).unwrap();
+        assert!(code.starts_with("POE2F2."));
+        let shared = share_code::decode(&code).unwrap().share;
+        assert!(shared.profile["rules"].as_array().unwrap().iter().all(|rule| rule.get("id").is_none()));
+        assert_eq!(shared.profile["rules"][0]["baselineEffectItemId"], "exalted-orb");
+        assert!(shared.profile["rules"][0].get("effects").is_none());
+        // Export has no effect on the stored scheme or its local IDs.
+        assert_eq!(
+            scheme.profile["rules"][0]["target"]["itemIds"],
+            json!(["divine-orb", "chaos-orb", "divine-orb"])
+        );
+        assert_eq!(
+            scheme.profile["rules"][1]["id"],
+            "rule-0f3a1c2d-3e4f-4a5b-8c6d-0e1f2a3b4c5d"
+        );
+        assert_eq!(scheme.profile["rules"][0]["autoRange"], true);
+        let receiving = tempfile::tempdir().unwrap();
+        let receiving_store = fixture(receiving.path());
+        let mut elsewhere = receiving_store.load().unwrap();
+        let copy = receiving_store.import(&mut elsewhere, &code, None).unwrap();
+        let second = receiving_store.import(&mut elsewhere, &code, Some("再次导入".into())).unwrap();
+        let first_profile = &Store::get(&elsewhere, &copy).unwrap().profile;
+        let second_profile = &Store::get(&elsewhere, &second).unwrap().profile;
+        assert_regenerated_profile(&expected, first_profile);
+        assert_regenerated_profile(&expected, second_profile);
+        for (first, second) in first_profile["rules"].as_array().unwrap().iter()
+            .zip(second_profile["rules"].as_array().unwrap()) {
+            assert_ne!(first["id"], second["id"]);
+        }
+    }
+
+    #[test]
+    #[ignore = "set POE2_SHARE_TEST_LIBRARY to the installed library.json"]
+    fn installed_share_roundtrip_and_size() {
+        let path = PathBuf::from(
+            std::env::var_os("POE2_SHARE_TEST_LIBRARY")
+                .expect("set POE2_SHARE_TEST_LIBRARY to the installed library.json"),
+        );
+        let source = fs::read(&path).unwrap();
+        let library: Library = serde_json::from_slice(&source).unwrap();
+        let scheme = library
+            .schemes
+            .iter()
+            .find(|scheme| scheme.name == "终极打宝-自动更新物价")
+            .expect("installed acceptance scheme not found");
+        let payload = Store::share_payload(scheme).unwrap();
+        let rules = payload.profile["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 6);
+        let anchors = ["exalted-orb", "chaos-orb", "orb-of-annulment", "divine-orb"];
+        for (rule, anchor) in rules[..4].iter().zip(anchors) {
+            assert_eq!(rule["baselineEffectItemId"], anchor);
+            assert_eq!(rule["effects"], json!({}));
+        }
+        for (index, rule) in rules.iter().enumerate().skip(4) {
+            assert!(rule.get("baselineEffectItemId").is_none());
+            assert_eq!(rule["effects"], scheme.profile["rules"][index]["effects"]);
+        }
+        let (metadata, lists) = share_code::measure_body_sections(&payload).unwrap();
+        println!("uncompressed binary metadata: {metadata} B, item lists: {lists} B");
+        assert!(lists < 88, "sample item lists should benefit from whole category paths");
+        for (candidate, chars, duration) in
+            share_code::measure_compression_candidates(&payload).unwrap()
+        {
+            println!(
+                "{candidate:>20}  {chars:>5} chars  {:>8.3} ms",
+                duration.as_secs_f64() * 1000.0
+            );
+        }
+        let started = std::time::Instant::now();
+        let code = Store::share(scheme).unwrap();
+        println!(
+            "Store::share: {} chars, {:.3} ms",
+            code.len(),
+            started.elapsed().as_secs_f64() * 1000.0
+        );
+        assert!(
+            code.len() < 1000,
+            "installed acceptance scheme: {} chars",
+            code.len()
+        );
+
+        // Import into an isolated store so the real library and its filter directory are read-only.
+        let temp = tempfile::tempdir().unwrap();
+        let receiver = fixture(temp.path());
+        let mut received = receiver.load().unwrap();
+        let id = receiver.import(&mut received, &code, None).unwrap();
+        let imported = Store::get(&received, &id).unwrap();
+        assert_eq!(imported.name, payload.name);
+        assert_regenerated_profile(&payload.profile, &imported.profile);
+        assert_eq!(fs::read(&path).unwrap(), source);
     }
 
     #[test]
@@ -1516,11 +1679,12 @@ mod tests {
             if let Some(hint) = hint {
                 profile["baseFilterHint"] = json!(hint);
             }
-            share_code::encode(&Share {
+            let bytes = serde_json::to_vec(&Share {
                 name: name.into(),
                 profile,
-            })
-            .unwrap()
+            }).unwrap();
+            // Legacy codes may carry a local path. Import must ignore it.
+            format!("POE2F1.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes))
         };
         for (name, hint, kind, source) in [
             ("本地", "reference.filter", "local", Value::Null),
@@ -1541,7 +1705,7 @@ mod tests {
             assert!(scheme.profile["baseFilterHint"].is_null());
             let (_, sounds) = store.prepare_filter(scheme, None).unwrap();
             assert_eq!(sounds.len(), usize::from(name == "WeGame"));
-            let shared = share_code::decode(&Store::share(scheme).unwrap()).unwrap();
+            let shared = share_code::decode(&Store::share(scheme).unwrap()).unwrap().share;
             assert!(shared.profile["baseFilter"].is_null());
             assert_eq!(
                 shared.profile["baseFilterHint"],
@@ -1695,10 +1859,14 @@ mod tests {
             .unwrap();
         assert_eq!(zipped, text);
         let code = Store::share(scheme).unwrap();
-        assert_eq!(
-            share_code::decode(&code).unwrap().profile["rules"],
-            scheme.profile["rules"]
-        );
+        let mut expected = scheme.profile.clone();
+        let mut shared = share_code::decode(&code).unwrap().share.profile;
+        for rule in expected["rules"].as_array_mut().unwrap() {
+            rule.as_object_mut().unwrap().remove("id");
+        }
+        sort_selection_sets(&mut expected);
+        sort_selection_sets(&mut shared);
+        assert_eq!(shared["rules"], expected["rules"]);
         store.install(scheme, Some(market.clone()), None).unwrap();
         let installed = store.default_game.join("堆叠方案.filter");
         assert_eq!(fs::read_to_string(&installed).unwrap(), text);
@@ -2139,6 +2307,55 @@ mod tests {
     }
 
     #[test]
+    fn imported_effect_reference_follows_the_current_baseline_and_audio() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        fs::create_dir_all(&store.default_game).unwrap();
+        let baselines = [
+            ("First.filter", 31, "tone.ogg", b"first audio".as_slice()),
+            ("Second.filter", 44, "new.ogg", b"second audio".as_slice()),
+        ];
+        for (name, size, sound, bytes) in baselines {
+            fs::write(store.default_game.join(sound), bytes).unwrap();
+            fs::write(
+                store.default_game.join(name),
+                format!("Show\n BaseType == \"Divine Orb\"\n SetFontSize 36\nShow\n BaseType == \"Exalted Orb\"\n SetFontSize {size}\n CustomAlertSound \"{sound}\" 80\nShow\n"),
+            ).unwrap();
+        }
+        let mut library = store.load().unwrap();
+        let mut draft = profile(&store);
+        draft["baseFilter"] = json!(BaseFilter::from_file(&store.default_game.join("First.filter")).unwrap());
+        draft["rules"] = json!([{
+            "id":"arbitrary-rule", "name":"Borrow Exalted style", "enabled":true, "hidden":false,
+            "baselineEffectItemId":"exalted-orb", "effects":{}, "target":{"itemIds":["chaos-orb"]}
+        }]);
+        let original = store.add(&mut library, "Effect source", draft, BTreeMap::new()).unwrap();
+        let code = Store::share(Store::get(&library, &original).unwrap()).unwrap();
+        let wire = share_code::decode(&code).unwrap().share;
+        let rule = &wire.profile["rules"][0];
+        assert_eq!(rule["baselineEffectItemId"], "exalted-orb");
+        assert!(rule.get("effects").is_none());
+        assert!(rule.get("id").is_none());
+        let imported = store.import(&mut library, &code, Some("Imported source".into())).unwrap();
+        assert_eq!(Store::get(&library, &imported).unwrap().profile["baseFilter"]["name"], "First.filter");
+
+        for (name, size, _, bytes) in baselines {
+            let base = BaseFilter::from_file(&store.default_game.join(name)).unwrap();
+            let inspection = store.base_styles(base.clone()).unwrap();
+            assert_eq!(inspection["styles"]["exalted-orb"]["effects"]["font"]["fontSize"], size);
+            Store::get_mut(&mut library, &imported).unwrap().profile["baseFilter"] = json!(base);
+            store.persist(&library).unwrap();
+            library = store.load().unwrap();
+            let scheme = Store::get(&library, &imported).unwrap();
+            let (filter, _) = store.prepare_filter(scheme, None).unwrap();
+            let overlay = filter.split("\n\n").find(|block| block.contains("# poe2-filter rule:")).unwrap();
+            assert!(overlay.contains("BaseType == \"Chaos Orb\""), "{overlay}");
+            assert!(overlay.contains(&format!("SetFontSize {size}")), "{overlay}");
+            assert!(overlay.contains(&format!("poe2rf-{}.ogg", digest(bytes))), "{overlay}");
+        }
+    }
+
+    #[test]
     fn applied_base_preset_shares_portable_audio_and_preserves_installed_files() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
@@ -2154,7 +2371,7 @@ mod tests {
         fs::write(nested.join("required.ogg"), b"required audio").unwrap();
         let base: BaseFilter = serde_json::from_value(input["baseFilter"].clone()).unwrap();
         let inspection = store.base_styles(base.clone()).unwrap();
-        let effects = inspection["styles"]["default-exalted"]["effects"].clone();
+        let effects = inspection["styles"]["exalted-orb"]["effects"].clone();
         assert_eq!(effects["sound"]["fileName"], "sub/tone.ogg;sub/second.ogg");
         assert_eq!(effects["sound"]["fallback"]["positional"], true);
         assert!(inspection["presets"]
@@ -2177,7 +2394,7 @@ mod tests {
             .add(&mut library, "Preset QA", input.clone(), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
-        let share = share_code::decode(&Store::share(scheme).unwrap()).unwrap();
+        let share = share_code::decode(&Store::share(scheme).unwrap()).unwrap().share;
         assert!(share.profile["baseFilter"].is_null());
         assert_eq!(share.profile["rules"][0]["effects"], effects);
         assert_eq!(share.profile["baseFilterHint"], input["baseFilter"]["name"]);
@@ -2232,7 +2449,7 @@ mod tests {
         assert!(!output["filterFile"].as_str().unwrap().contains("Import "));
         let base = serde_json::from_value(input["baseFilter"].clone()).unwrap();
         assert_eq!(
-            store.base_styles(base).unwrap()["styles"]["default-exalted"]["effects"]["font"]
+            store.base_styles(base).unwrap()["styles"]["exalted-orb"]["effects"]["font"]
                 ["fontSize"],
             44
         );

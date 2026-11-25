@@ -1,18 +1,17 @@
-import { ITEM_CATALOG } from "./data";
-import type { EffectPreset, ItemMatcher, RuleEffects } from "./types";
+import { CLASS_OF_ITEM, DEFAULT_EFFECT_ITEMS, FILTER_ITEMS_BY_ID } from "./data";
+import type { EffectPreset, ItemDefinition, RuleEffects } from "./types";
 
-export const DEFAULT_EFFECT_ITEMS = {
-  "default-exalted": "exalted-orb",
-  "default-chaos": "chaos-orb",
-  "default-annulment": "orb-of-annulment",
-  "default-divine": "divine-orb",
-} as const;
+export { DEFAULT_EFFECT_ITEMS } from "./data";
 
 type ActionGroup = "beam" | "icon" | "fontSize" | "textColor" | "borderColor" | "backgroundColor" | "builtinSound" | "customSound" | "dropSound" | "dropSoundIfAlert";
 type Action = { key: ActionGroup; command: string; value: string };
-type Block = { show: boolean; continue: boolean; conditions: string[]; actions: Action[] };
+type Probe = { baseType: string; className?: string; gemLevel?: number; rarity?: number; nonUnique?: boolean; currency: boolean };
+type Condition = (item: Probe) => boolean | undefined;
+type Block = { index: number; show: boolean; continue: boolean; baseTypes?: Set<string>; conditions: Condition[]; actions: Action[] };
+type BlockIndex = { general: Block[]; exact: Map<string, Block[]> };
 export type InheritedStyle = { effects: RuleEffects; actions: string[]; warning?: string };
 
+/** 样式按参考物品的目录 ID 查找，和应用特效的规则 ID 无关。 */
 export type BaseInspection = { styles: Record<string, InheritedStyle>; presets: EffectPreset[] };
 type AudioReferences = Record<string, string>;
 
@@ -35,20 +34,41 @@ function readBlocks(text: string): Block[] {
     const [command, ...args] = tokenize(line);
     if (!command) continue;
     if (command === "Show" || command === "Hide" || command === "Minimal") {
-      current = { show: command === "Show", continue: false, conditions: [], actions: [] };
+      current = { index: blocks.length, show: command === "Show", continue: false, conditions: [], actions: [] };
       blocks.push(current);
     } else if (current) {
       if (command === "Continue") current.continue = true;
       else if (Object.prototype.hasOwnProperty.call(actionGroups, command)) {
         current.actions.push({ key: actionGroups[command], command, value: args.join(" ") });
-      } else current.conditions.push([command, ...args].join(" "));
+      } else if (command === "BaseType" && args[0] === "==" && args.length > 1 && !current.baseTypes) {
+        current.baseTypes = new Set(args.slice(1).map(filterName));
+      } else current.conditions.push(compileCondition(command, args));
     }
   }
   return blocks;
 }
 
+function indexBlocks(blocks: Block[]): BlockIndex {
+  const general: Block[] = [];
+  const exact = new Map<string, Block[]>();
+  for (const block of blocks) {
+    if (!block.baseTypes) general.push(block);
+    else for (const baseType of block.baseTypes) {
+      const selected = exact.get(baseType);
+      if (selected) selected.push(block);
+      else exact.set(baseType, [block]);
+    }
+  }
+  return { general, exact };
+}
+
 const operators = new Set(["=", "==", "!=", ">", ">=", "<", "<="]);
 const rarities = ["Normal", "Magic", "Rare", "Unique"];
+const currencyFlags = new Set(["Corrupted", "TwiceCorrupted", "Mirrored", "Identified", "FracturedItem", "SynthesisedItem", "AnyEnchantment", "ShapedMap", "ElderMap", "BlightedMap", "UberBlightedMap", "Replica"]);
+const currencyMods = new Set(["HasExplicitMod", "HasEnchantment", "EnchantmentPassiveNode", "HasImplicitMod", "HasInfluence"]);
+const filterName = (word: string) => word.replace(/^"|"$/g, "").toLowerCase();
+const unknown: Condition = () => undefined;
+
 function compare(operator: string, actual: number, target: number) {
   switch (operator) {
     case ">": return actual > target;
@@ -60,38 +80,67 @@ function compare(operator: string, actual: number, target: number) {
   }
 }
 
-function matchesCondition(condition: string, item: ItemMatcher): boolean | undefined {
-  const [field, ...args] = tokenize(condition);
+function compileCondition(field: string, args: string[]): Condition {
   const operator = operators.has(args[0]) ? args.shift()! : "=";
-  if (!args.length) return undefined;
+  if (!args.length) return unknown;
   if (field === "BaseType" || field === "Class") {
-    const actual = (field === "BaseType" ? item.baseType : item.class)?.toLowerCase();
-    if (!actual || !["=", "==", "!="].includes(operator)) return undefined;
-    const values = args.map((value) => value.replace(/^"|"$/g, "").toLowerCase());
-    if (operator === "!=") return !values.includes(actual);
-    return values.some((value) => operator === "==" ? actual === value : actual.includes(value));
+    if (!["=", "==", "!="].includes(operator)) return unknown;
+    const values = new Set(args.map(filterName));
+    const names = [...values];
+    return (item) => {
+      const actual = field === "BaseType" ? item.baseType : item.className;
+      if (!actual) return undefined;
+      if (operator === "==") return values.has(actual);
+      if (operator === "!=") return !values.has(actual);
+      return names.some((name) => actual.includes(name));
+    };
   }
   if (field === "Rarity") {
-    const target = rarities.indexOf(args[0]);
-    const actual = rarities.indexOf(item.rarity ?? "Normal");
-    if (args.length > 1 && ["=", "==", "!="].includes(operator)) {
-      const choices = args.map((value) => rarities.indexOf(value));
-      if (choices.includes(-1)) return undefined;
-      return operator === "!=" ? !choices.includes(actual) : choices.includes(actual);
-    }
-    return target === -1 ? undefined : compare(operator, actual, target);
+    const choices = args.map((value) => rarities.indexOf(value));
+    if (choices.includes(-1) || (choices.length > 1 && !["=", "==", "!="].includes(operator))) return unknown;
+    const matches = (actual: number) => choices.length === 1
+      ? compare(operator, actual, choices[0])
+      : choices.includes(actual) === (operator !== "!=");
+    const possible = rarities.map((_, index) => matches(index));
+    return (item) => {
+      if (item.rarity !== undefined) return possible[item.rarity];
+      const limit = item.nonUnique ? 3 : 4;
+      for (let index = 1; index < limit; index += 1) if (possible[index] !== possible[0]) return undefined;
+      return possible[0];
+    };
   }
-  if (field === "StackSize" || field === "Quality") {
+  if (field === "GemLevel" || field === "StackSize" || field === "Quality") {
     const target = Number(args[0]);
-    return Number.isFinite(target) ? compare(operator, field === "StackSize" ? 1 : 0, target) : undefined;
+    if (args.length !== 1 || !Number.isFinite(target)) return unknown;
+    return (item) => {
+      const actual = field === "GemLevel" ? item.gemLevel : item.currency ? (field === "StackSize" ? 1 : 0) : undefined;
+      return actual === undefined ? undefined : compare(operator, actual, target);
+    };
   }
-  if (["Corrupted", "TwiceCorrupted", "Mirrored", "Identified", "FracturedItem", "SynthesisedItem", "AnyEnchantment", "ShapedMap", "ElderMap", "BlightedMap", "UberBlightedMap", "Replica"].includes(field)) {
-    if (args[0] !== "True" && args[0] !== "False") return undefined;
-    const actual = field === "Identified";
-    return operator === "!=" ? actual !== (args[0] === "True") : actual === (args[0] === "True");
+  if (currencyFlags.has(field)) {
+    if (args.length !== 1 || !["True", "False"].includes(args[0]) || !["=", "==", "!="].includes(operator)) return unknown;
+    const matches = ((field === "Identified") === (args[0] === "True")) === (operator !== "!=");
+    return (item) => item.currency ? matches : undefined;
   }
-  if (["HasExplicitMod", "HasEnchantment", "EnchantmentPassiveNode", "HasImplicitMod", "HasInfluence"].includes(field)) return operator === "!=" ? undefined : false;
-  return undefined;
+  if (currencyMods.has(field) && operator !== "!=") return (item) => item.currency ? false : undefined;
+  return unknown;
+}
+
+export function canFollowBaselineItem(item: ItemDefinition | undefined): item is ItemDefinition {
+  return Boolean(item?.known && !item.ambiguous && item.matcher.baseType);
+}
+
+function catalogProbe(item: ItemDefinition): Probe {
+  const { baseType, gemLevel, rarity, nonUnique } = item.matcher;
+  const [group, section] = item.categoryPath;
+  // 保留旧价格档的单份、无品质通货探针。其他物品只用目录有把握的条件，不假定其掉落属性。
+  const currency = group === "crafting" && item.stackable === true
+    && (section === "currency" || (section === "shards" && item.category === "currency"));
+  const className = item.matcher.class ?? CLASS_OF_ITEM.get(item.id)?.item.matcher.class ?? (currency ? "Stackable Currency" : undefined);
+  return {
+    baseType: baseType!.toLowerCase(), className: className?.toLowerCase(), gemLevel,
+    rarity: rarity ? rarities.indexOf(rarity) : (currency ? 0 : undefined), nonUnique, currency,
+  };
 }
 
 function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects {
@@ -124,7 +173,7 @@ function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects 
 }
 
 /** Treat an unresolved condition as branching. Inherit only when both outcomes agree. */
-function styleFor(blocks: Block[], item: ItemMatcher, audio: AudioReferences): InheritedStyle | undefined {
+function styleFor(blocks: BlockIndex, item: Probe, audio: AudioReferences): InheritedStyle | undefined {
   type State = { actions: Action[]; show: boolean };
   let active: State[] = [{ actions: [], show: false }];
   let result: State | undefined;
@@ -134,13 +183,24 @@ function styleFor(blocks: Block[], item: ItemMatcher, audio: AudioReferences): I
     result = state;
     return true;
   };
-  for (const block of blocks) {
-    if (!active.length) break;
-    const conditions = block.conditions.map((condition) => matchesCondition(condition, item));
-    if (conditions.includes(false)) continue;
+  // 按原顺序合并通用块和匹配该基底的块，避免每件物品重复检查所有精确匹配条件。
+  const { general } = blocks;
+  const exact = blocks.exact.get(item.baseType) ?? [];
+  let generalIndex = 0;
+  let exactIndex = 0;
+  while (active.length && (generalIndex < general.length || exactIndex < exact.length)) {
+    const broad = general[generalIndex];
+    const specific = exact[exactIndex];
+    const block = broad && (!specific || broad.index < specific.index) ? general[generalIndex++] : exact[exactIndex++];
+    let uncertain = false;
+    if (block.conditions.some((condition) => {
+      const match = condition(item);
+      if (match === undefined) uncertain = true;
+      return match === false;
+    })) continue;
     const next = new Map<string, State>();
     for (const state of active) {
-      if (conditions.includes(undefined)) next.set(signature(state), state);
+      if (uncertain) next.set(signature(state), state);
       const actions = new Map(state.actions.map((action) => [action.key, action]));
       for (const action of block.actions) actions.set(action.key, action);
       const matched = { show: block.show, actions: [...actions.values()] };
@@ -158,31 +218,38 @@ function styleFor(blocks: Block[], item: ItemMatcher, audio: AudioReferences): I
   };
 }
 
-function anchorStyles(blocks: Block[], audio: AudioReferences): Record<string, InheritedStyle> {
-  return Object.fromEntries(Object.entries(DEFAULT_EFFECT_ITEMS).map(([ruleId, itemId]) => {
-    const item = ITEM_CATALOG.find((entry) => entry.id === itemId)!;
-    return [ruleId, styleFor(blocks, { class: "Stackable Currency", ...item.matcher }, audio) ?? {
+function itemStyles(blocks: Block[], audio: AudioReferences, itemIds: Iterable<string>): BaseInspection["styles"] {
+  const index = indexBlocks(blocks);
+  const entries: [string, InheritedStyle][] = [];
+  for (const itemId of itemIds) {
+    const item = FILTER_ITEMS_BY_ID.get(itemId);
+    if (!canFollowBaselineItem(item)) continue;
+    entries.push([itemId, styleFor(index, catalogProbe(item), audio) ?? {
       effects: {}, actions: [], warning: `无法确定基础过滤器中「${item.name}」的显示特效，使用游戏默认显示样式。`,
-    }];
-  }));
+    }]);
+  }
+  return Object.fromEntries(entries);
 }
 
-export function inspectBaseStyles(baseline: string): Record<string, InheritedStyle> {
-  return anchorStyles(readBlocks(baseline), {});
+export function inspectBaseStyles(baseline: string, itemIds: Iterable<string> = Object.values(DEFAULT_EFFECT_ITEMS)): BaseInspection["styles"] {
+  return itemStyles(readBlocks(baseline), {}, itemIds);
 }
 
 export function inspectBaseFilter(baseline: string, audio: AudioReferences): BaseInspection {
   const blocks = readBlocks(baseline);
-  const styles = anchorStyles(blocks, audio);
-  const presets: EffectPreset[] = [];
-  const seen = new Set<string>();
-  function add(effects: RuleEffects) {
+  const styles = itemStyles(blocks, audio, FILTER_ITEMS_BY_ID.keys());
+  const presets = new Map<string, EffectPreset>();
+  function add(effects: RuleEffects, sourceItemId?: string) {
+    if (!Object.keys(effects).length) return;
     const key = JSON.stringify(effects);
-    if (!Object.keys(effects).length || seen.has(key)) return;
-    seen.add(key);
-    presets.push({ id: `base-${presets.length + 1}`, ...effects });
+    let preset = presets.get(key);
+    if (!preset) {
+      preset = { id: `base-${presets.size + 1}`, ...effects };
+      presets.set(key, preset);
+    }
+    if (sourceItemId !== undefined) (preset.sourceItemIds ??= []).push(sourceItemId);
   }
   for (const block of blocks) if (block.show) add(displayEffects(block.actions, audio));
-  for (const style of Object.values(styles)) add(style.effects);
-  return { styles, presets };
+  for (const [itemId, style] of Object.entries(styles)) if (!style.warning) add(style.effects, itemId);
+  return { styles, presets: [...presets.values()] };
 }

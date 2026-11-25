@@ -1,5 +1,7 @@
 "use client";
 
+import { itemLabel } from "../../../lib/catalog";
+import { FILTER_ITEMS_BY_ID } from "../../../lib/data";
 import {
   beamColorNames,
   beamColorValues,
@@ -12,6 +14,11 @@ import {
 import type { BaseFilter, RuleEffects } from "../../../lib/types";
 import { cn } from "../../../lib/cn";
 import { SoundPreviewButton } from "../sound-preview";
+
+export function effectSourceLabel(itemId: string) {
+  const item = FILTER_ITEMS_BY_ID.get(itemId);
+  return item ? itemLabel(item, "cn") : itemId;
+}
 
 /** 没有设置光柱时，预览里用一条暗淡的暖色光表示「沿用基础样式」。 */
 const FALLBACK_BEAM = "#8a7a5c";

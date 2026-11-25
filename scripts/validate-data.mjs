@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateCatalogShareData } from "./lib/catalog-data.mjs";
 
 const root = process.cwd();
 const vendor = path.join(root, "vendor", "neversink");
@@ -42,6 +43,11 @@ for (const item of catalog.items || []) {
 for (const [kind, levels] of [["skill", 20], ["spirit", 20], ["support", 5]]) {
   const found = (catalog.items || []).filter((item) => uncutGroup(item) === "uncut-" + kind + "-gems").length;
   if (found !== levels) problems.push("catalog: expected " + levels + " uncut " + kind + " gem levels, found " + found);
+}
+try {
+  await validateCatalogShareData(catalog);
+} catch (error) {
+  problems.push("share catalog: " + error.message + "。更新槽位及分类路径序号请运行 node scripts/apply-catalog-mechanics.mjs --share-only");
 }
 
 const mechanics = JSON.parse(fs.readFileSync(path.join(root, "data", "item-mechanics.json"), "utf8"));

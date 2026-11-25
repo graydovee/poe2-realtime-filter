@@ -34726,5 +34726,3676 @@
         "class-selection"
       ]
     }
-  ]
+  ],
+  "shareGroups": {
+    "0": {
+      "path": [
+        "crafting",
+        "bones"
+      ],
+      "slots": {
+        "altered-collarbone": 0,
+        "ancient-collarbone": 1,
+        "ancient-jawbone": 2,
+        "ancient-rib": 3,
+        "gnawed-collarbone": 4,
+        "gnawed-jawbone": 5,
+        "gnawed-rib": 6,
+        "preserved-collarbone": 7,
+        "preserved-cranium": 8,
+        "preserved-jawbone": 9,
+        "preserved-rib": 10
+      }
+    },
+    "1": {
+      "path": [
+        "crafting",
+        "catalysts"
+      ],
+      "slots": {
+        "adaptive-catalyst": 0,
+        "carapace-catalyst": 1,
+        "chayula-s-catalyst": 2,
+        "esh-s-catalyst": 3,
+        "flesh-catalyst": 4,
+        "necrotic-catalyst": 5,
+        "neural-catalyst": 6,
+        "reaver-catalyst": 7,
+        "refined-adaptive-catalyst": 8,
+        "refined-carapace-catalyst": 9,
+        "refined-chayula-s-catalyst": 10,
+        "refined-esh-s-catalyst": 11,
+        "refined-flesh-catalyst": 12,
+        "refined-necrotic-catalyst": 13,
+        "refined-neural-catalyst": 14,
+        "refined-reaver-catalyst": 15,
+        "refined-sibilant-catalyst": 16,
+        "refined-skittering-catalyst": 17,
+        "refined-tul-s-catalyst": 18,
+        "refined-uul-netol-s-catalyst": 19,
+        "refined-xoph-s-catalyst": 20,
+        "sibilant-catalyst": 21,
+        "skittering-catalyst": 22,
+        "tul-s-catalyst": 23,
+        "uul-netol-s-catalyst": 24,
+        "xoph-s-catalyst": 25
+      }
+    },
+    "2": {
+      "path": [
+        "crafting",
+        "currency"
+      ],
+      "slots": {
+        "albino-rhoa-feather": 0,
+        "arcanist-s-etcher": 1,
+        "armourer-s-scrap": 2,
+        "artificer-s-orb": 3,
+        "blacksmith-s-whetstone": 4,
+        "chaos-orb": 5,
+        "cryptic-key": 6,
+        "divine-orb": 7,
+        "exalted-orb": 8,
+        "fracturing-orb": 9,
+        "gemcutter-s-prism": 10,
+        "glassblower-s-bauble": 11,
+        "gold": 12,
+        "greater-chaos-orb": 13,
+        "greater-exalted-orb": 14,
+        "greater-jeweller-s-orb": 15,
+        "greater-orb-of-augmentation": 16,
+        "greater-orb-of-transmutation": 17,
+        "greater-regal-orb": 18,
+        "hinekora-s-lock": 19,
+        "lesser-jeweller-s-orb": 20,
+        "mirror-of-kalandra": 21,
+        "orb-of-alchemy": 22,
+        "orb-of-annulment": 23,
+        "orb-of-augmentation": 24,
+        "orb-of-chance": 25,
+        "orb-of-transmutation": 26,
+        "perfect-chaos-orb": 27,
+        "perfect-exalted-orb": 28,
+        "perfect-jeweller-s-orb": 29,
+        "perfect-orb-of-augmentation": 30,
+        "perfect-orb-of-transmutation": 31,
+        "perfect-regal-orb": 32,
+        "regal-orb": 33,
+        "scroll-of-wisdom": 34,
+        "vaal-orb": 35
+      }
+    },
+    "3": {
+      "path": [
+        "crafting",
+        "emotions"
+      ],
+      "slots": {
+        "ancient-concentrated-liquid-fear": 0,
+        "ancient-concentrated-liquid-isolation": 1,
+        "ancient-concentrated-liquid-suffering": 2,
+        "ancient-diluted-liquid-greed": 3,
+        "ancient-diluted-liquid-guilt": 4,
+        "ancient-diluted-liquid-ire": 5,
+        "ancient-liquid-despair": 6,
+        "ancient-liquid-disgust": 7,
+        "ancient-liquid-envy": 8,
+        "ancient-liquid-paranoia": 9,
+        "ancient-potent-liquid-contempt": 10,
+        "ancient-potent-liquid-ferocity": 11,
+        "ancient-potent-liquid-melancholy": 12,
+        "concentrated-liquid-fear": 13,
+        "concentrated-liquid-isolation": 14,
+        "concentrated-liquid-suffering": 15,
+        "diluted-liquid-greed": 16,
+        "diluted-liquid-guilt": 17,
+        "diluted-liquid-ire": 18,
+        "liquid-despair": 19,
+        "liquid-disgust": 20,
+        "liquid-envy": 21,
+        "liquid-paranoia": 22,
+        "potent-liquid-contempt": 23,
+        "potent-liquid-ferocity": 24,
+        "potent-liquid-melancholy": 25
+      }
+    },
+    "4": {
+      "path": [
+        "crafting",
+        "essences"
+      ],
+      "slots": {
+        "essence-of-abrasion": 0,
+        "essence-of-alacrity": 1,
+        "essence-of-battle": 2,
+        "essence-of-command": 3,
+        "essence-of-delirium": 4,
+        "essence-of-electricity": 5,
+        "essence-of-enhancement": 6,
+        "essence-of-flames": 7,
+        "essence-of-grounding": 8,
+        "essence-of-haste": 9,
+        "essence-of-horror": 10,
+        "essence-of-hysteria": 11,
+        "essence-of-ice": 12,
+        "essence-of-insanity": 13,
+        "essence-of-insulation": 14,
+        "essence-of-opulence": 15,
+        "essence-of-ruin": 16,
+        "essence-of-seeking": 17,
+        "essence-of-sorcery": 18,
+        "essence-of-thawing": 19,
+        "essence-of-the-abyss": 20,
+        "essence-of-the-body": 21,
+        "essence-of-the-breach": 22,
+        "essence-of-the-infinite": 23,
+        "essence-of-the-mind": 24,
+        "greater-essence-of-abrasion": 25,
+        "greater-essence-of-alacrity": 26,
+        "greater-essence-of-battle": 27,
+        "greater-essence-of-command": 28,
+        "greater-essence-of-electricity": 29,
+        "greater-essence-of-enhancement": 30,
+        "greater-essence-of-flames": 31,
+        "greater-essence-of-grounding": 32,
+        "greater-essence-of-haste": 33,
+        "greater-essence-of-ice": 34,
+        "greater-essence-of-insulation": 35,
+        "greater-essence-of-opulence": 36,
+        "greater-essence-of-ruin": 37,
+        "greater-essence-of-seeking": 38,
+        "greater-essence-of-sorcery": 39,
+        "greater-essence-of-thawing": 40,
+        "greater-essence-of-the-body": 41,
+        "greater-essence-of-the-infinite": 42,
+        "greater-essence-of-the-mind": 43,
+        "lesser-essence-of-abrasion": 44,
+        "lesser-essence-of-alacrity": 45,
+        "lesser-essence-of-battle": 46,
+        "lesser-essence-of-command": 47,
+        "lesser-essence-of-electricity": 48,
+        "lesser-essence-of-enhancement": 49,
+        "lesser-essence-of-flames": 50,
+        "lesser-essence-of-grounding": 51,
+        "lesser-essence-of-haste": 52,
+        "lesser-essence-of-ice": 53,
+        "lesser-essence-of-insulation": 54,
+        "lesser-essence-of-opulence": 55,
+        "lesser-essence-of-ruin": 56,
+        "lesser-essence-of-seeking": 57,
+        "lesser-essence-of-sorcery": 58,
+        "lesser-essence-of-thawing": 59,
+        "lesser-essence-of-the-body": 60,
+        "lesser-essence-of-the-infinite": 61,
+        "lesser-essence-of-the-mind": 62,
+        "perfect-essence-of-abrasion": 63,
+        "perfect-essence-of-alacrity": 64,
+        "perfect-essence-of-battle": 65,
+        "perfect-essence-of-command": 66,
+        "perfect-essence-of-electricity": 67,
+        "perfect-essence-of-enhancement": 68,
+        "perfect-essence-of-flames": 69,
+        "perfect-essence-of-grounding": 70,
+        "perfect-essence-of-haste": 71,
+        "perfect-essence-of-ice": 72,
+        "perfect-essence-of-insulation": 73,
+        "perfect-essence-of-opulence": 74,
+        "perfect-essence-of-ruin": 75,
+        "perfect-essence-of-seeking": 76,
+        "perfect-essence-of-sorcery": 77,
+        "perfect-essence-of-thawing": 78,
+        "perfect-essence-of-the-body": 79,
+        "perfect-essence-of-the-infinite": 80,
+        "perfect-essence-of-the-mind": 81
+      }
+    },
+    "5": {
+      "path": [
+        "crafting",
+        "expedition"
+      ],
+      "slots": {
+        "aldur-s-saga": 0,
+        "blazing-flux": 1,
+        "chilling-flux": 2,
+        "crackling-flux": 3,
+        "medved-s-saga": 4,
+        "olroth-s-saga": 5,
+        "perfect-flux": 6,
+        "thaumaturgic-flux-level-1": 7,
+        "thaumaturgic-flux-level-10": 8,
+        "thaumaturgic-flux-level-11": 9,
+        "thaumaturgic-flux-level-12": 10,
+        "thaumaturgic-flux-level-13": 11,
+        "thaumaturgic-flux-level-14": 12,
+        "thaumaturgic-flux-level-15": 13,
+        "thaumaturgic-flux-level-16": 14,
+        "thaumaturgic-flux-level-17": 15,
+        "thaumaturgic-flux-level-18": 16,
+        "thaumaturgic-flux-level-19": 17,
+        "thaumaturgic-flux-level-2": 18,
+        "thaumaturgic-flux-level-20": 19,
+        "thaumaturgic-flux-level-3": 20,
+        "thaumaturgic-flux-level-4": 21,
+        "thaumaturgic-flux-level-5": 22,
+        "thaumaturgic-flux-level-6": 23,
+        "thaumaturgic-flux-level-7": 24,
+        "thaumaturgic-flux-level-8": 25,
+        "thaumaturgic-flux-level-9": 26,
+        "uhtred-s-saga": 27,
+        "void-flux": 28,
+        "vorana-s-saga": 29
+      }
+    },
+    "6": {
+      "path": [
+        "crafting",
+        "omens"
+      ],
+      "slots": {
+        "omen-of-abyssal-echoes": 0,
+        "omen-of-amelioration": 1,
+        "omen-of-answered-prayers": 2,
+        "omen-of-bartering": 3,
+        "omen-of-catalysing-exaltation": 4,
+        "omen-of-chance": 5,
+        "omen-of-chaotic-effectiveness": 6,
+        "omen-of-chaotic-monsters": 7,
+        "omen-of-chaotic-quantity": 8,
+        "omen-of-chaotic-rarity": 9,
+        "omen-of-corruption": 10,
+        "omen-of-dextral-annulment": 11,
+        "omen-of-dextral-crystallisation": 12,
+        "omen-of-dextral-erasure": 13,
+        "omen-of-dextral-exaltation": 14,
+        "omen-of-dextral-necromancy": 15,
+        "omen-of-gambling": 16,
+        "omen-of-greater-exaltation": 17,
+        "omen-of-light": 18,
+        "omen-of-putrefaction": 19,
+        "omen-of-refreshment": 20,
+        "omen-of-reinforcements": 21,
+        "omen-of-resurgence": 22,
+        "omen-of-sanctification": 23,
+        "omen-of-secret-compartments": 24,
+        "omen-of-sinistral-annulment": 25,
+        "omen-of-sinistral-crystallisation": 26,
+        "omen-of-sinistral-erasure": 27,
+        "omen-of-sinistral-exaltation": 28,
+        "omen-of-sinistral-necromancy": 29,
+        "omen-of-the-ancients": 30,
+        "omen-of-the-blackblooded": 31,
+        "omen-of-the-blessed": 32,
+        "omen-of-the-hunt": 33,
+        "omen-of-the-liege": 34,
+        "omen-of-the-sovereign": 35,
+        "omen-of-whittling": 36
+      }
+    },
+    "7": {
+      "path": [
+        "crafting",
+        "shards"
+      ],
+      "slots": {
+        "alchemy-shard": 0,
+        "artificer-s-shard": 1,
+        "breach-splinter": 2,
+        "chance-shard": 3,
+        "petition-splinter": 4,
+        "regal-shard": 5,
+        "runic-splinter": 6,
+        "shattered-triskelion": 7,
+        "simulacrum-splinter": 8,
+        "transmutation-shard": 9
+      }
+    },
+    "8": {
+      "path": [
+        "crafting",
+        "socketables",
+        "runes"
+      ],
+      "slots": {
+        "adept-rune": 0,
+        "ancient-rune-of-animosity": 1,
+        "ancient-rune-of-control": 2,
+        "ancient-rune-of-decay": 3,
+        "ancient-rune-of-detonation": 4,
+        "ancient-rune-of-discovery": 5,
+        "ancient-rune-of-dueling": 6,
+        "ancient-rune-of-prowess": 7,
+        "ancient-rune-of-retaliation": 8,
+        "ancient-rune-of-shattering": 9,
+        "ancient-rune-of-splinters": 10,
+        "ancient-rune-of-the-horde": 11,
+        "ancient-rune-of-the-titan": 12,
+        "ancient-rune-of-witchcraft": 13,
+        "body-rune": 14,
+        "charging-rune": 15,
+        "countess-seske-s-rune-of-archery": 16,
+        "courtesan-mannan-s-rune-of-cruelty": 17,
+        "craiceann-s-rune-of-recovery": 18,
+        "craiceann-s-rune-of-warding": 19,
+        "desert-rune": 20,
+        "farrul-s-rune-of-grace": 21,
+        "farrul-s-rune-of-the-chase": 22,
+        "farrul-s-rune-of-the-hunt": 23,
+        "fenumus-rune-of-agony": 24,
+        "fenumus-rune-of-draining": 25,
+        "fenumus-rune-of-spinning": 26,
+        "glacial-rune": 27,
+        "greater-adept-rune": 28,
+        "greater-body-rune": 29,
+        "greater-charging-rune": 30,
+        "greater-desert-rune": 31,
+        "greater-glacial-rune": 32,
+        "greater-inspiration-rune": 33,
+        "greater-iron-rune": 34,
+        "greater-mind-rune": 35,
+        "greater-rebirth-rune": 36,
+        "greater-resolve-rune": 37,
+        "greater-robust-rune": 38,
+        "greater-rune-of-alacrity": 39,
+        "greater-rune-of-leadership": 40,
+        "greater-rune-of-nobility": 41,
+        "greater-rune-of-tithing": 42,
+        "greater-stone-rune": 43,
+        "greater-storm-rune": 44,
+        "greater-vision-rune": 45,
+        "greater-ward-rune": 46,
+        "hedgewitch-assandra-s-rune-of-wisdom": 47,
+        "inspiration-rune": 48,
+        "iron-rune": 49,
+        "lady-hestra-s-rune-of-winter": 50,
+        "lesser-adept-rune": 51,
+        "lesser-body-rune": 52,
+        "lesser-charging-rune": 53,
+        "lesser-desert-rune": 54,
+        "lesser-glacial-rune": 55,
+        "lesser-inspiration-rune": 56,
+        "lesser-iron-rune": 57,
+        "lesser-mind-rune": 58,
+        "lesser-rebirth-rune": 59,
+        "lesser-resolve-rune": 60,
+        "lesser-robust-rune": 61,
+        "lesser-stone-rune": 62,
+        "lesser-storm-rune": 63,
+        "lesser-vision-rune": 64,
+        "lesser-ward-rune": 65,
+        "masterwork-rune": 66,
+        "mind-rune": 67,
+        "perfect-adept-rune": 68,
+        "perfect-body-rune": 69,
+        "perfect-charging-rune": 70,
+        "perfect-desert-rune": 71,
+        "perfect-glacial-rune": 72,
+        "perfect-inspiration-rune": 73,
+        "perfect-iron-rune": 74,
+        "perfect-mind-rune": 75,
+        "perfect-rebirth-rune": 76,
+        "perfect-resolve-rune": 77,
+        "perfect-robust-rune": 78,
+        "perfect-stone-rune": 79,
+        "perfect-storm-rune": 80,
+        "perfect-vision-rune": 81,
+        "perfect-ward-rune": 82,
+        "rebirth-rune": 83,
+        "resolve-rune": 84,
+        "robust-rune": 85,
+        "rune-of-accumulation": 86,
+        "rune-of-acrobatics": 87,
+        "rune-of-confrontation": 88,
+        "rune-of-consistency": 89,
+        "rune-of-culmination": 90,
+        "rune-of-foundations": 91,
+        "rune-of-reach": 92,
+        "rune-of-renown": 93,
+        "rune-of-the-blossom": 94,
+        "rune-of-the-hunt": 95,
+        "rune-of-the-prism": 96,
+        "rune-of-vital-flame": 97,
+        "rune-of-vitality": 98,
+        "saqawal-s-rune-of-erosion": 99,
+        "saqawal-s-rune-of-memory": 100,
+        "saqawal-s-rune-of-the-sky": 101,
+        "stone-rune": 102,
+        "storm-rune": 103,
+        "thane-girt-s-rune-of-wildness": 104,
+        "thane-grannell-s-rune-of-mastery": 105,
+        "thane-leld-s-rune-of-spring": 106,
+        "thane-myrk-s-rune-of-summer": 107,
+        "the-greatwolf-s-rune-of-claws": 108,
+        "the-greatwolf-s-rune-of-willpower": 109,
+        "vision-rune": 110,
+        "ward-rune": 111,
+        "warding-rune-of-annihilation": 112,
+        "warding-rune-of-armature": 113,
+        "warding-rune-of-bodyguards": 114,
+        "warding-rune-of-courage": 115,
+        "warding-rune-of-desperation": 116,
+        "warding-rune-of-disintegration": 117,
+        "warding-rune-of-equinox": 118,
+        "warding-rune-of-glancing": 119,
+        "warding-rune-of-heart": 120,
+        "warding-rune-of-hollowing": 121,
+        "warding-rune-of-nourishment": 122,
+        "warding-rune-of-obsession": 123,
+        "warding-rune-of-protection": 124,
+        "warding-rune-of-reinforcement": 125,
+        "warding-rune-of-salvaging": 126,
+        "warding-rune-of-stability": 127,
+        "warding-rune-of-symbiosis": 128
+      }
+    },
+    "9": {
+      "path": [
+        "crafting",
+        "socketables",
+        "socketables-other"
+      ],
+      "slots": {
+        "aldur-s-legacy": 0,
+        "amanamu-s-gaze": 1,
+        "astrid-s-creativity": 2,
+        "bear-idol": 3,
+        "betrayal-of-aldur": 4,
+        "boar-idol": 5,
+        "breath-of-aldur": 6,
+        "cadigan-s-epiphany": 7,
+        "carved-cunning": 8,
+        "carved-majesty": 9,
+        "carved-mischief": 10,
+        "carved-tenacity": 11,
+        "cat-idol": 12,
+        "citaqualotl-s-thesis": 13,
+        "emergent-instinct": 14,
+        "emergent-possibility": 15,
+        "emergent-protection": 16,
+        "emergent-vigour": 17,
+        "fox-idol": 18,
+        "guatelitzi-s-thesis": 19,
+        "hawk-idol": 20,
+        "idol-of-alira": 21,
+        "idol-of-eeshta": 22,
+        "idol-of-egrin": 23,
+        "idol-of-eramir": 24,
+        "idol-of-greust": 25,
+        "idol-of-grold": 26,
+        "idol-of-kraityn": 27,
+        "idol-of-maxarius": 28,
+        "idol-of-oak": 29,
+        "idol-of-ralakesh": 30,
+        "idol-of-silk": 31,
+        "idol-of-sirrius": 32,
+        "idol-of-the-martyr": 33,
+        "idol-of-the-pharisee": 34,
+        "idol-of-the-sycophant": 35,
+        "idol-of-thruldana": 36,
+        "idol-of-yeena": 37,
+        "ire-of-aldur": 38,
+        "jiquani-s-thesis": 39,
+        "katla-s-gloom": 40,
+        "kolr-s-hunt": 41,
+        "kurgal-s-gaze": 42,
+        "medved-s-tending": 43,
+        "owl-idol": 44,
+        "ox-idol": 45,
+        "panther-idol": 46,
+        "passion-of-aldur": 47,
+        "primate-idol": 48,
+        "quipolatl-s-thesis": 49,
+        "rabbit-idol": 50,
+        "raven-touched-shard": 51,
+        "serle-s-triumph": 52,
+        "snake-idol": 53,
+        "stag-idol": 54,
+        "stoat-idol": 55,
+        "tecrod-s-gaze": 56,
+        "thrud-s-might": 57,
+        "uhtred-s-sidereus": 58,
+        "ulaman-s-gaze": 59,
+        "vorana-s-carnage": 60,
+        "wolf-idol": 61
+      }
+    },
+    "10": {
+      "path": [
+        "crafting",
+        "socketables",
+        "soul-cores"
+      ],
+      "slots": {
+        "atmohua-s-soul-core-of-retreat": 0,
+        "atziri-s-soul-core-of-alacrity": 1,
+        "atziri-s-soul-core-of-devotion": 2,
+        "atziri-s-soul-core-of-inoculation": 3,
+        "atziri-s-soul-core-of-vitality": 4,
+        "cholotl-s-soul-core-of-war": 5,
+        "citaqualotl-s-soul-core-of-foulness": 6,
+        "estazunti-s-soul-core-of-convalescence": 7,
+        "guatelitzi-s-soul-core-of-endurance": 8,
+        "hayoxi-s-soul-core-of-heatproofing": 9,
+        "jiquani-s-soul-core-of-abundance": 10,
+        "jiquani-s-soul-core-of-automation": 11,
+        "jiquani-s-soul-core-of-malediction": 12,
+        "jiquani-s-soul-core-of-munitions": 13,
+        "jiquani-s-soul-core-of-quaking": 14,
+        "jiquani-s-soul-core-of-radiance": 15,
+        "jiquani-s-soul-core-of-rallying": 16,
+        "jiquani-s-soul-core-of-rippling": 17,
+        "jiquani-s-soul-core-of-severing": 18,
+        "jiquani-s-soul-core-of-snares": 19,
+        "jiquani-s-soul-core-of-squalls": 20,
+        "jiquani-s-soul-core-of-targeting": 21,
+        "jiquani-s-soul-core-of-thundering": 22,
+        "opiloti-s-soul-core-of-assault": 23,
+        "quipolatl-s-soul-core-of-flow": 24,
+        "soul-core-of-atmohua": 25,
+        "soul-core-of-azcapa": 26,
+        "soul-core-of-cholotl": 27,
+        "soul-core-of-citaqualotl": 28,
+        "soul-core-of-jiquani": 29,
+        "soul-core-of-opiloti": 30,
+        "soul-core-of-puhuarte": 31,
+        "soul-core-of-quipolatl": 32,
+        "soul-core-of-tacati": 33,
+        "soul-core-of-ticaba": 34,
+        "soul-core-of-topotante": 35,
+        "soul-core-of-tzamoto": 36,
+        "soul-core-of-xopec": 37,
+        "soul-core-of-zalatl": 38,
+        "soul-core-of-zantipi": 39,
+        "tacati-s-soul-core-of-affliction": 40,
+        "topotante-s-soul-core-of-dampening": 41,
+        "tzamoto-s-soul-core-of-ferocity": 42,
+        "uromoti-s-soul-core-of-attenuation": 43,
+        "xipocado-s-soul-core-of-dominion": 44,
+        "xopec-s-soul-core-of-power": 45,
+        "zalatl-s-soul-core-of-insulation": 46
+      }
+    },
+    "11": {
+      "path": [
+        "crafting",
+        "temple"
+      ],
+      "slots": {
+        "ancient-infuser": 0,
+        "architect-s-orb": 1,
+        "core-destabiliser": 2,
+        "crystallised-corruption": 3,
+        "kamasa-s-orb-of-sacrifice": 4,
+        "kopec-s-orb-of-sacrifice": 5,
+        "orb-of-extraction": 6,
+        "vaal-arcanist-s-infuser": 7,
+        "vaal-armourer-s-infuser": 8,
+        "vaal-blacksmith-s-infuser": 9,
+        "vaal-catalysing-infuser": 10,
+        "vaal-cultivation-orb": 11,
+        "yaomac-s-orb-of-sacrifice": 12,
+        "yugul-s-orb-of-sacrifice": 13
+      }
+    },
+    "12": {
+      "path": [
+        "crafting",
+        "trial"
+      ],
+      "slots": {
+        "bronze-key": 0,
+        "gold-key": 1,
+        "silver-key": 2
+      }
+    },
+    "13": {
+      "path": [
+        "crafting",
+        "verisium"
+      ],
+      "slots": {
+        "adaptive-alloy": 0,
+        "celestial-alloy": 1,
+        "cyclonic-alloy": 2,
+        "exceptional-verisium": 3,
+        "expansive-alloy": 4,
+        "liquid-verisium": 5,
+        "medved-s-crest-of-the-circle": 6,
+        "mystic-alloy": 7,
+        "olroth-s-crest-of-the-sun": 8,
+        "prismatic-alloy": 9,
+        "protective-alloy": 10,
+        "revered-starlit-ore": 11,
+        "runic-alloy": 12,
+        "sovereign-alloy": 13,
+        "starlit-ore": 14,
+        "swift-alloy": 15,
+        "the-runebinder-s-alloy": 16,
+        "the-runefather-s-alloy": 17,
+        "transcendent-alloy": 18,
+        "uhtred-s-crest-of-the-chalice": 19,
+        "venerable-starlit-ore": 20,
+        "veridical-starlit-ore": 21,
+        "verisium": 22,
+        "vorana-s-crest-of-the-scythe": 23,
+        "warding-starlit-ore": 24
+      }
+    },
+    "14": {
+      "path": [
+        "endgame",
+        "fragments"
+      ],
+      "slots": {
+        "an-audience-with-the-king": 0,
+        "breachlord-sac": 1,
+        "breachstone": 2,
+        "cowardly-fate": 3,
+        "deadly-fate": 4,
+        "head-of-the-king": 5,
+        "idol-of-estazunti": 6,
+        "kulemak-s-invitation": 7,
+        "raven-s-reflection": 8,
+        "sacred-bloom": 9,
+        "simulacrum": 10,
+        "the-triskelion-reforged": 11,
+        "victorious-fate": 12
+      }
+    },
+    "15": {
+      "path": [
+        "endgame",
+        "incubators"
+      ],
+      "slots": {
+        "vaal-siphoner": 0
+      }
+    },
+    "16": {
+      "path": [
+        "endgame",
+        "logbooks"
+      ],
+      "slots": {
+        "class-expedition-logbook": 0
+      }
+    },
+    "17": {
+      "path": [
+        "endgame",
+        "pinnacle-keys"
+      ],
+      "slots": {
+        "call-of-the-shadows": 0,
+        "origin-spark": 1
+      }
+    },
+    "18": {
+      "path": [
+        "endgame",
+        "tablets"
+      ],
+      "slots": {
+        "abyss-tablet": 0,
+        "breach-tablet": 1,
+        "delirium-tablet": 2,
+        "expedition-tablet": 3,
+        "irradiated-tablet": 4,
+        "overseer-tablet": 5,
+        "ritual-tablet": 6,
+        "temple-tablet": 7
+      }
+    },
+    "19": {
+      "path": [
+        "endgame",
+        "trials",
+        "baryas"
+      ],
+      "slots": {
+        "djinn-barya": 0,
+        "test-of-cunning-barya": 1,
+        "test-of-strength-barya": 2,
+        "test-of-time-barya": 3,
+        "test-of-will-barya": 4
+      }
+    },
+    "20": {
+      "path": [
+        "endgame",
+        "trials",
+        "ultimatums"
+      ],
+      "slots": {
+        "inscribed-ultimatum": 0
+      }
+    },
+    "21": {
+      "path": [
+        "endgame",
+        "vault-keys"
+      ],
+      "slots": {
+        "olroth-s-reliquary-key": 0,
+        "ritualistic-reliquary-key": 1,
+        "tangmazu-s-reliquary-key": 2,
+        "the-arbiter-s-reliquary-key": 3,
+        "the-trialmaster-s-reliquary-key": 4,
+        "twilight-reliquary-key": 5,
+        "xesht-s-reliquary-key": 6,
+        "zarokh-s-reliquary-key": 7
+      }
+    },
+    "22": {
+      "path": [
+        "endgame",
+        "waystones"
+      ],
+      "slots": {
+        "class-waystones": 0
+      }
+    },
+    "23": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "armour",
+        "body-armour"
+      ],
+      "slots": {
+        "base:adherent-s-raiment": 0,
+        "base:altar-robe": 1,
+        "base:ancestral-mail": 2,
+        "base:anchorite-garb": 3,
+        "base:ancient-mail": 4,
+        "base:armoured-vest": 5,
+        "base:assassin-garb": 6,
+        "base:austere-garb": 7,
+        "base:bone-raiment": 8,
+        "base:ceremonial-robe": 9,
+        "base:chain-mail": 10,
+        "base:champion-cuirass": 11,
+        "base:cleric-vestments": 12,
+        "base:cloaked-mail": 13,
+        "base:conjurer-mantle": 14,
+        "base:conqueror-plate": 15,
+        "base:corsair-coat": 16,
+        "base:corvus-mantle": 17,
+        "base:dastard-armour": 18,
+        "base:death-mail": 19,
+        "base:death-mantle": 20,
+        "base:elegant-plate": 21,
+        "base:elementalist-robe": 22,
+        "base:enlightened-robe": 23,
+        "base:explorer-armour": 24,
+        "base:exquisite-vest": 25,
+        "base:falconer-s-jacket": 26,
+        "base:feathered-raiment": 27,
+        "base:feathered-robe": 28,
+        "base:flowing-raiment": 29,
+        "base:full-plate": 30,
+        "base:fur-plate": 31,
+        "base:garment": 32,
+        "base:gilded-vestments": 33,
+        "base:golden-mail": 34,
+        "base:grand-regalia": 35,
+        "base:grasping-mail": 36,
+        "base:hatungo-garb": 37,
+        "base:havoc-raiment": 38,
+        "base:hawker-s-jacket": 39,
+        "base:heartcarver-mantle": 40,
+        "base:heavy-plate": 41,
+        "base:hermit-garb": 42,
+        "base:heroic-armour": 43,
+        "base:hexer-s-robe": 44,
+        "base:iron-cuirass": 45,
+        "base:ironclad-vestments": 46,
+        "base:itinerant-jacket": 47,
+        "base:keth-raiment": 48,
+        "base:knight-armour": 49,
+        "base:lamellar-mail": 50,
+        "base:layered-vest": 51,
+        "base:leather-vest": 52,
+        "base:lizardscale-coat": 53,
+        "base:mail-vestments": 54,
+        "base:mantled-mail": 55,
+        "base:marabout-garb": 56,
+        "base:maraketh-cuirass": 57,
+        "base:occultist-mantle": 58,
+        "base:ornate-plate": 59,
+        "base:ornate-ringmail": 60,
+        "base:pathfinder-coat": 61,
+        "base:pilgrim-vestments": 62,
+        "base:plated-raiment": 63,
+        "base:plated-vestments": 64,
+        "base:primal-markings": 65,
+        "base:quilted-vest": 66,
+        "base:raider-plate": 67,
+        "base:rambler-jacket": 68,
+        "base:revered-vestments": 69,
+        "base:rhoahide-coat": 70,
+        "base:river-raiment": 71,
+        "base:rogue-armour": 72,
+        "base:runner-vest": 73,
+        "base:rusted-cuirass": 74,
+        "base:sacramental-robe": 75,
+        "base:sacrificial-mantle": 76,
+        "base:sacrificial-regalia": 77,
+        "base:scale-mail": 78,
+        "base:scalper-s-jacket": 79,
+        "base:scout-s-vest": 80,
+        "base:seastorm-mantle": 81,
+        "base:serpentscale-coat": 82,
+        "base:shaman-mantle": 83,
+        "base:shrouded-mail": 84,
+        "base:shrouded-vest": 85,
+        "base:silk-robe": 86,
+        "base:sleek-jacket": 87,
+        "base:slipstrike-vest": 88,
+        "base:smuggler-coat": 89,
+        "base:soldier-cuirass": 90,
+        "base:steel-plate": 91,
+        "base:stone-cuirass": 92,
+        "base:strider-vest": 93,
+        "base:studded-vest": 94,
+        "base:swiftstalker-coat": 95,
+        "base:tattered-robe": 96,
+        "base:thane-mail": 97,
+        "base:tideseer-mantle": 98,
+        "base:trailblazer-armour": 99,
+        "base:utzaal-cuirass": 100,
+        "base:vaal-cuirass": 101,
+        "base:vagabond-armour": 102,
+        "base:vile-robe": 103,
+        "base:votive-raiment": 104,
+        "base:warlord-cuirass": 105,
+        "base:waxed-jacket": 106,
+        "base:wayfarer-jacket": 107,
+        "base:wolfskin-mantle": 108,
+        "base:wyrmscale-coat": 109
+      }
+    },
+    "24": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "armour",
+        "boots"
+      ],
+      "slots": {
+        "base:ancient-leggings": 0,
+        "base:apostle-leggings": 1,
+        "base:bastion-sabatons": 2,
+        "base:blacksteel-sabatons": 3,
+        "base:bound-sandals": 4,
+        "base:braced-sabatons": 5,
+        "base:bronze-greaves": 6,
+        "base:bulwark-greaves": 7,
+        "base:carved-greaves": 8,
+        "base:cavalry-boots": 9,
+        "base:charmed-shoes": 10,
+        "base:cinched-boots": 11,
+        "base:covered-sabatons": 12,
+        "base:cryptic-leggings": 13,
+        "base:daggerfoot-shoes": 14,
+        "base:dragonscale-boots": 15,
+        "base:drakeskin-boots": 16,
+        "base:dunerunner-sandals": 17,
+        "base:elegant-greaves": 18,
+        "base:elegant-slippers": 19,
+        "base:embossed-boots": 20,
+        "base:faithful-leggings": 21,
+        "base:feathered-sandals": 22,
+        "base:flared-boots": 23,
+        "base:flax-sandals": 24,
+        "base:fortress-sabatons": 25,
+        "base:grand-cuisses": 26,
+        "base:hunting-shoes": 27,
+        "base:iron-greaves": 28,
+        "base:laced-boots": 29,
+        "base:lattice-sandals": 30,
+        "base:lizardscale-boots": 31,
+        "base:luxurious-slippers": 32,
+        "base:mail-sabatons": 33,
+        "base:noble-sabatons": 34,
+        "base:ornate-greaves": 35,
+        "base:quickslip-shoes": 36,
+        "base:reefsteel-greaves": 37,
+        "base:rough-greaves": 38,
+        "base:sandsworn-sandals": 39,
+        "base:secured-leggings": 40,
+        "base:sekhema-sandals": 41,
+        "base:serpentscale-boots": 42,
+        "base:shamanistic-leggings": 43,
+        "base:silk-slippers": 44,
+        "base:stacked-sabatons": 45,
+        "base:steelpoint-shoes": 46,
+        "base:steeltoe-boots": 47,
+        "base:stone-greaves": 48,
+        "base:straw-sandals": 49,
+        "base:studded-boots": 50,
+        "base:tasalian-greaves": 51,
+        "base:threaded-shoes": 52,
+        "base:treerunner-shoes": 53,
+        "base:trimmed-greaves": 54,
+        "base:vaal-greaves": 55,
+        "base:velour-shoes": 56,
+        "base:veteran-sabatons": 57,
+        "base:wanderer-shoes": 58,
+        "base:warlock-leggings": 59,
+        "base:weaver-leggings": 60,
+        "base:wrapped-sandals": 61
+      }
+    },
+    "25": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "armour",
+        "gloves"
+      ],
+      "slots": {
+        "base:adherent-cuffs": 0,
+        "base:adorned-wraps": 1,
+        "base:aged-cuffs": 2,
+        "base:ancient-cuffs": 3,
+        "base:ancient-gauntlets": 4,
+        "base:ancient-mitts": 5,
+        "base:barbed-bracers": 6,
+        "base:baroque-gloves": 7,
+        "base:blacksteel-gauntlets": 8,
+        "base:bolstered-mitts": 9,
+        "base:bound-cuffs": 10,
+        "base:buckled-wraps": 11,
+        "base:burnished-gauntlets": 12,
+        "base:commander-gauntlets": 13,
+        "base:cultist-gauntlets": 14,
+        "base:detailed-mitts": 15,
+        "base:doubled-gauntlets": 16,
+        "base:elegant-wraps": 17,
+        "base:embroidered-gloves": 18,
+        "base:engraved-bracers": 19,
+        "base:feathered-mitts": 20,
+        "base:fine-bracers": 21,
+        "base:firm-bracers": 22,
+        "base:furtive-wraps": 23,
+        "base:gauze-wraps": 24,
+        "base:gleaming-cuffs": 25,
+        "base:gold-gloves": 26,
+        "base:goldcast-cuffs": 27,
+        "base:grand-bracers": 28,
+        "base:grand-manchettes": 29,
+        "base:grim-gloves": 30,
+        "base:intricate-gloves": 31,
+        "base:jewelled-gloves": 32,
+        "base:kalguuran-cuffs": 33,
+        "base:knightly-mitts": 34,
+        "base:layered-gauntlets": 35,
+        "base:linen-wraps": 36,
+        "base:massive-mitts": 37,
+        "base:moulded-mitts": 38,
+        "base:opulent-gloves": 39,
+        "base:ornate-cuffs": 40,
+        "base:ornate-gauntlets": 41,
+        "base:ornate-mitts": 42,
+        "base:pauascale-gloves": 43,
+        "base:plate-gauntlets": 44,
+        "base:polished-bracers": 45,
+        "base:refined-bracers": 46,
+        "base:ringmail-gauntlets": 47,
+        "base:riveted-mitts": 48,
+        "base:rope-cuffs": 49,
+        "base:sectioned-bracers": 50,
+        "base:secured-wraps": 51,
+        "base:sirenscale-gloves": 52,
+        "base:sombre-gloves": 53,
+        "base:spiked-bracers": 54,
+        "base:spined-bracers": 55,
+        "base:spiral-wraps": 56,
+        "base:stalking-bracers": 57,
+        "base:steelmail-gauntlets": 58,
+        "base:stitched-gloves": 59,
+        "base:stocky-mitts": 60,
+        "base:suede-bracers": 61,
+        "base:tempered-mitts": 62,
+        "base:titan-mitts": 63,
+        "base:torn-gloves": 64,
+        "base:utility-wraps": 65,
+        "base:vaal-gloves": 66,
+        "base:vaal-mitts": 67,
+        "base:vaal-wraps": 68,
+        "base:war-wraps": 69,
+        "base:zealot-gauntlets": 70
+      }
+    },
+    "26": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "armour",
+        "helmets"
+      ],
+      "slots": {
+        "base:ancestral-tiara": 0,
+        "base:ancient-visor": 1,
+        "base:armoured-cap": 2,
+        "base:avian-mask": 3,
+        "base:beaded-circlet": 4,
+        "base:brigand-mask": 5,
+        "base:brimmed-helm": 6,
+        "base:cabalist-helm": 7,
+        "base:cassis-helm": 8,
+        "base:chain-tiara": 9,
+        "base:champion-helm": 10,
+        "base:closed-helm": 11,
+        "base:corsair-cap": 12,
+        "base:covert-hood": 13,
+        "base:cowled-helm": 14,
+        "base:cryptic-crown": 15,
+        "base:cryptic-helm": 16,
+        "base:cultist-crown": 17,
+        "base:death-mask": 18,
+        "base:decorated-helm": 19,
+        "base:deerstalker-hood": 20,
+        "base:desert-cap": 21,
+        "base:divine-crown": 22,
+        "base:druidic-crown": 23,
+        "base:elegant-greathelm": 24,
+        "base:elite-greathelm": 25,
+        "base:face-mask": 26,
+        "base:faridun-mask": 27,
+        "base:feathered-tiara": 28,
+        "base:felt-cap": 29,
+        "base:fierce-greathelm": 30,
+        "base:freebooter-cap": 31,
+        "base:gladiatorial-helm": 32,
+        "base:gold-circlet": 33,
+        "base:grand-visage": 34,
+        "base:grinning-mask": 35,
+        "base:guarded-helm": 36,
+        "base:hallowed-crown": 37,
+        "base:heavy-crown": 38,
+        "base:hewn-mask": 39,
+        "base:hooded-mask": 40,
+        "base:horned-crown": 41,
+        "base:hunter-hood": 42,
+        "base:imperial-greathelm": 43,
+        "base:inquisitor-crown": 44,
+        "base:iron-crown": 45,
+        "base:jade-tiara": 46,
+        "base:jungle-tiara": 47,
+        "base:kamasan-tiara": 48,
+        "base:lace-hood": 49,
+        "base:leatherbound-hood": 50,
+        "base:magus-tiara": 51,
+        "base:martyr-crown": 52,
+        "base:masked-greathelm": 53,
+        "base:noble-greathelm": 54,
+        "base:paragon-greathelm": 55,
+        "base:pariah-mask": 56,
+        "base:rusted-greathelm": 57,
+        "base:saintly-crown": 58,
+        "base:sandsworn-tiara": 59,
+        "base:shabby-hood": 60,
+        "base:shielded-helm": 61,
+        "base:skycrown-tiara": 62,
+        "base:soaring-mask": 63,
+        "base:soldier-greathelm": 64,
+        "base:solid-mask": 65,
+        "base:sorcerous-tiara": 66,
+        "base:spired-greathelm": 67,
+        "base:spiritbone-crown": 68,
+        "base:tenebrous-crown": 69,
+        "base:trapper-hood": 70,
+        "base:tribal-mask": 71,
+        "base:twig-circlet": 72,
+        "base:veiled-mask": 73,
+        "base:velvet-cap": 74,
+        "base:vermeil-circlet": 75,
+        "base:viper-cap": 76,
+        "base:visored-helm": 77,
+        "base:warded-helm": 78,
+        "base:warmonger-greathelm": 79,
+        "base:warrior-greathelm": 80,
+        "base:wicker-tiara": 81,
+        "base:woven-cap": 82,
+        "base:wrapped-cap": 83,
+        "base:wrapped-greathelm": 84
+      }
+    },
+    "27": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "jewellery",
+        "amulets"
+      ],
+      "slots": {
+        "base:absent-amulet": 0,
+        "base:amber-amulet": 1,
+        "base:azure-amulet": 2,
+        "base:bloodstone-amulet": 3,
+        "base:corona-amulet": 4,
+        "base:crimson-amulet": 5,
+        "base:distorted-amulet": 6,
+        "base:dusk-amulet": 7,
+        "base:gloam-amulet": 8,
+        "base:gold-amulet": 9,
+        "base:jade-amulet": 10,
+        "base:lament-amulet": 11,
+        "base:lapis-amulet": 12,
+        "base:lunar-amulet": 13,
+        "base:pearlescent-amulet": 14,
+        "base:penumbra-amulet": 15,
+        "base:portent-amulet": 16,
+        "base:solar-amulet": 17,
+        "base:stellar-amulet": 18,
+        "base:tenebrous-amulet": 19,
+        "base:twisted-amulet": 20,
+        "base:veridical-chain": 21
+      }
+    },
+    "28": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "jewellery",
+        "belts"
+      ],
+      "slots": {
+        "base:double-belt": 0,
+        "base:fine-belt": 1,
+        "base:forking-belt": 2,
+        "base:heavy-belt": 3,
+        "base:invoking-belt": 4,
+        "base:linen-belt": 5,
+        "base:long-belt": 6,
+        "base:mail-belt": 7,
+        "base:ornate-belt": 8,
+        "base:plate-belt": 9,
+        "base:rawhide-belt": 10,
+        "base:sinew-belt": 11,
+        "base:stalking-belt": 12,
+        "base:utility-belt": 13,
+        "base:wide-belt": 14
+      }
+    },
+    "29": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "jewellery",
+        "rings"
+      ],
+      "slots": {
+        "base:abyssal-signet": 0,
+        "base:amethyst-ring": 1,
+        "base:biostatic-ring": 2,
+        "base:breach-ring": 3,
+        "base:dusk-ring": 4,
+        "base:emerald-ring": 5,
+        "base:gloam-ring": 6,
+        "base:gold-ring": 7,
+        "base:grasping-ring": 8,
+        "base:iron-ring": 9,
+        "base:kinetic-ring": 10,
+        "base:lazuli-ring": 11,
+        "base:mnemonic-ring": 12,
+        "base:oneiric-ring": 13,
+        "base:pearl-ring": 14,
+        "base:penumbra-ring": 15,
+        "base:prismatic-ring": 16,
+        "base:refined-breach-ring": 17,
+        "base:ring": 18,
+        "base:ruby-ring": 19,
+        "base:sapphire-ring": 20,
+        "base:tenebrous-ring": 21,
+        "base:topaz-ring": 22,
+        "base:two-stone-ring": 23,
+        "base:unset-ring": 24,
+        "base:vitalic-ring": 25
+      }
+    },
+    "30": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "jewels"
+      ],
+      "slots": {
+        "base:diamond": 0,
+        "base:emerald": 1,
+        "base:ruby": 2,
+        "base:sapphire": 3,
+        "base:time-lost-diamond": 4,
+        "base:time-lost-emerald": 5,
+        "base:time-lost-ruby": 6,
+        "base:time-lost-sapphire": 7,
+        "base:timeless-jewel": 8
+      }
+    },
+    "31": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "offhands",
+        "bucklers"
+      ],
+      "slots": {
+        "base:ancient-buckler": 0,
+        "base:array-buckler": 1,
+        "base:bladeguard-buckler": 2,
+        "base:desert-buckler": 3,
+        "base:gutspike-buckler": 4,
+        "base:iron-buckler": 5,
+        "base:jingling-buckler": 6,
+        "base:leather-buckler": 7,
+        "base:ornate-buckler": 8,
+        "base:plated-buckler": 9,
+        "base:ridged-buckler": 10,
+        "base:spiked-buckler": 11,
+        "base:wooden-buckler": 12
+      }
+    },
+    "32": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "offhands",
+        "foci"
+      ],
+      "slots": {
+        "base:antler-focus": 0,
+        "base:arrayed-focus": 1,
+        "base:crystal-focus": 2,
+        "base:cultist-focus": 3,
+        "base:druidic-focus": 4,
+        "base:engraved-focus": 5,
+        "base:hallowed-focus": 6,
+        "base:leyline-focus": 7,
+        "base:sacred-focus": 8,
+        "base:tasalian-focus": 9,
+        "base:tonal-focus": 10,
+        "base:twig-focus": 11,
+        "base:voodoo-focus": 12,
+        "base:woven-focus": 13
+      }
+    },
+    "33": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "offhands",
+        "quivers"
+      ],
+      "slots": {
+        "base:blunt-quiver": 0,
+        "base:broadhead-quiver": 1,
+        "base:fire-quiver": 2,
+        "base:penetrating-quiver": 3,
+        "base:primed-quiver": 4,
+        "base:sacral-quiver": 5,
+        "base:serrated-quiver": 6,
+        "base:toxic-quiver": 7,
+        "base:two-point-quiver": 8,
+        "base:visceral-quiver": 9,
+        "base:volant-quiver": 10
+      }
+    },
+    "34": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "offhands",
+        "shields"
+      ],
+      "slots": {
+        "base:avian-targe": 0,
+        "base:baroque-targe": 1,
+        "base:barricade-tower-shield": 2,
+        "base:blacksteel-crest-shield": 3,
+        "base:blacksteel-tower-shield": 4,
+        "base:blazon-crest-shield": 5,
+        "base:braced-tower-shield": 6,
+        "base:bulwark-tower-shield": 7,
+        "base:crescent-targe": 8,
+        "base:crucible-tower-shield": 9,
+        "base:effigial-tower-shield": 10,
+        "base:emblem-crest-shield": 11,
+        "base:fortress-tower-shield": 12,
+        "base:glacial-fortress": 13,
+        "base:glowering-crest-shield": 14,
+        "base:golden-targe": 15,
+        "base:goldworked-tower-shield": 16,
+        "base:hardwood-targe": 17,
+        "base:heraldric-tower-shield": 18,
+        "base:intricate-crest-shield": 19,
+        "base:jingling-crest-shield": 20,
+        "base:mammoth-targe": 21,
+        "base:noble-tower-shield": 22,
+        "base:omen-crest-shield": 23,
+        "base:painted-tower-shield": 24,
+        "base:pelage-targe": 25,
+        "base:quartered-crest-shield": 26,
+        "base:rampart-tower-shield": 27,
+        "base:royal-tower-shield": 28,
+        "base:sekheman-crest-shield": 29,
+        "base:sigil-crest-shield": 30,
+        "base:soaring-targe": 31,
+        "base:splintered-tower-shield": 32,
+        "base:stone-targe": 33,
+        "base:stone-tower-shield": 34,
+        "base:tawhoan-tower-shield": 35,
+        "base:vaal-crest-shield": 36,
+        "base:vaal-tower-shield": 37,
+        "base:venerable-defender": 38
+      }
+    },
+    "35": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "one-hand",
+        "one-hand-maces"
+      ],
+      "slots": {
+        "base:akoyan-club": 0,
+        "base:bandit-mace": 1,
+        "base:crown-mace": 2,
+        "base:execratus-hammer": 3,
+        "base:flanged-mace": 4,
+        "base:fortified-hammer": 5,
+        "base:kalguuran-forgehammer": 6,
+        "base:marauding-mace": 7,
+        "base:marching-mace": 8,
+        "base:molten-hammer": 9,
+        "base:morning-star": 10,
+        "base:plated-mace": 11,
+        "base:slim-mace": 12,
+        "base:smithing-hammer": 13,
+        "base:spiked-club": 14,
+        "base:strife-pick": 15,
+        "base:structured-hammer": 16,
+        "base:torment-club": 17,
+        "base:warpick": 18,
+        "base:wooden-club": 19
+      }
+    },
+    "36": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "one-hand",
+        "sceptres"
+      ],
+      "slots": {
+        "base:omen-sceptre": 0,
+        "base:rattling-sceptre": 1,
+        "base:shrine-sceptre": 2,
+        "base:stoic-sceptre": 3,
+        "base:wrath-sceptre": 4
+      }
+    },
+    "37": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "one-hand",
+        "spears"
+      ],
+      "slots": {
+        "base:akoyan-spear": 0,
+        "base:barbed-spear": 1,
+        "base:branched-spear": 2,
+        "base:flying-spear": 3,
+        "base:forked-spear": 4,
+        "base:grand-spear": 5,
+        "base:guardian-spear": 6,
+        "base:hardwood-spear": 7,
+        "base:helix-spear": 8,
+        "base:hunting-spear": 9,
+        "base:ironhead-spear": 10,
+        "base:jagged-spear": 11,
+        "base:massive-spear": 12,
+        "base:orichalcum-spear": 13,
+        "base:pronged-spear": 14,
+        "base:seaglass-spear": 15,
+        "base:soaring-spear": 16,
+        "base:spiked-spear": 17,
+        "base:stalking-spear": 18,
+        "base:war-spear": 19,
+        "base:winged-spear": 20
+      }
+    },
+    "38": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "one-hand",
+        "wands"
+      ],
+      "slots": {
+        "base:acrid-wand": 0,
+        "base:attuned-wand": 1,
+        "base:bone-wand": 2,
+        "base:dueling-wand": 3,
+        "base:galvanic-wand": 4,
+        "base:runic-fork": 5,
+        "base:siphoning-wand": 6,
+        "base:twisted-wand": 7,
+        "base:volatile-wand": 8,
+        "base:withered-wand": 9
+      }
+    },
+    "39": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "relics"
+      ],
+      "slots": {
+        "base:amphora-relic": 0,
+        "base:coffer-relic": 1,
+        "base:incense-relic": 2,
+        "base:seal-relic": 3,
+        "base:tapestry-relic": 4,
+        "base:urn-relic": 5,
+        "base:vase-relic": 6
+      }
+    },
+    "40": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "bows"
+      ],
+      "slots": {
+        "base:adherent-bow": 0,
+        "base:artillery-bow": 1,
+        "base:cavalry-bow": 2,
+        "base:composite-bow": 3,
+        "base:crude-bow": 4,
+        "base:dualstring-bow": 5,
+        "base:fanatic-bow": 6,
+        "base:gemini-bow": 7,
+        "base:guardian-bow": 8,
+        "base:heartwood-shortbow": 9,
+        "base:heavy-bow": 10,
+        "base:ironwood-shortbow": 11,
+        "base:militant-bow": 12,
+        "base:obliterator-bow": 13,
+        "base:recurve-bow": 14,
+        "base:shortbow": 15,
+        "base:twin-bow": 16,
+        "base:warden-bow": 17,
+        "base:warmonger-bow": 18,
+        "base:zealot-bow": 19
+      }
+    },
+    "41": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "crossbows"
+      ],
+      "slots": {
+        "base:bleak-crossbow": 0,
+        "base:cannonade-crossbow": 1,
+        "base:desolate-crossbow": 2,
+        "base:dyad-crossbow": 3,
+        "base:elegant-crossbow": 4,
+        "base:engraved-crossbow": 5,
+        "base:flexed-crossbow": 6,
+        "base:gemini-crossbow": 7,
+        "base:makeshift-crossbow": 8,
+        "base:siege-crossbow": 9,
+        "base:stout-crossbow": 10,
+        "base:tense-crossbow": 11,
+        "base:trarthan-cannon": 12,
+        "base:twin-crossbow": 13
+      }
+    },
+    "42": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "quarterstaves"
+      ],
+      "slots": {
+        "base:aegis-quarterstaff": 0,
+        "base:bladed-quarterstaff": 1,
+        "base:bolting-quarterstaff": 2,
+        "base:crescent-quarterstaff": 3,
+        "base:dreaming-quarterstaff": 4,
+        "base:gothic-quarterstaff": 5,
+        "base:guardian-quarterstaff": 6,
+        "base:long-quarterstaff": 7,
+        "base:lunar-quarterstaff": 8,
+        "base:razor-quarterstaff": 9,
+        "base:sinister-quarterstaff": 10,
+        "base:skullcrusher-quarterstaff": 11,
+        "base:smooth-quarterstaff": 12,
+        "base:steelpoint-quarterstaff": 13,
+        "base:striking-quarterstaff": 14,
+        "base:warding-quarterstaff": 15,
+        "base:waxing-quarterstaff": 16,
+        "base:wrapped-quarterstaff": 17,
+        "base:wyrm-quarterstaff": 18
+      }
+    },
+    "43": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "staves"
+      ],
+      "slots": {
+        "base:ashen-staff": 0,
+        "base:chiming-staff": 1,
+        "base:gelid-staff": 2,
+        "base:paralysing-staff": 3,
+        "base:perching-staff": 4,
+        "base:permafrost-staff": 5,
+        "base:pyrophyte-staff": 6,
+        "base:ravenous-staff": 7,
+        "base:reaping-staff": 8,
+        "base:reflecting-staff": 9,
+        "base:roaring-staff": 10,
+        "base:sanctified-staff": 11,
+        "base:voltaic-staff": 12
+      }
+    },
+    "44": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "talismans"
+      ],
+      "slots": {
+        "base:alpha-talisman": 0,
+        "base:ashbark-talisman": 1,
+        "base:changeling-talisman": 2,
+        "base:condemned-talisman": 3,
+        "base:cruel-talisman": 4,
+        "base:familial-talisman": 5,
+        "base:fang-talisman": 6,
+        "base:fungal-talisman": 7,
+        "base:fury-talisman": 8,
+        "base:howling-talisman": 9,
+        "base:jade-talisman": 10,
+        "base:lumbering-talisman": 11,
+        "base:maji-talisman": 12,
+        "base:nettle-talisman": 13,
+        "base:roaring-talisman": 14,
+        "base:spiny-talisman": 15,
+        "base:thunder-talisman": 16,
+        "base:vicious-talisman": 17,
+        "base:wildwood-talisman": 18,
+        "base:wingbeat-talisman": 19
+      }
+    },
+    "45": {
+      "path": [
+        "equipment",
+        "normal-bases",
+        "two-hand",
+        "two-hand-maces"
+      ],
+      "slots": {
+        "base:aberrant-sledge": 0,
+        "base:anvil-maul": 1,
+        "base:crumbling-maul": 2,
+        "base:cultist-greathammer": 3,
+        "base:disintegrating-maul": 4,
+        "base:fanatic-greathammer": 5,
+        "base:felled-greatclub": 6,
+        "base:forge-maul": 7,
+        "base:giant-maul": 8,
+        "base:heavy-greathammer": 9,
+        "base:ironwood-greathammer": 10,
+        "base:leaden-greathammer": 11,
+        "base:massive-greathammer": 12,
+        "base:oak-greathammer": 13,
+        "base:pointed-maul": 14,
+        "base:ruination-maul": 15,
+        "base:sacred-maul": 16,
+        "base:studded-greatclub": 17,
+        "base:tawhoan-greatclub": 18,
+        "base:temple-maul": 19,
+        "base:totemic-greatclub": 20
+      }
+    },
+    "46": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "armour",
+        "body-armour"
+      ],
+      "slots": {
+        "unique:altar-robe": 0,
+        "unique:ancestral-mail": 1,
+        "unique:anchorite-garb": 2,
+        "unique:ancient-mail": 3,
+        "unique:armoured-vest": 4,
+        "unique:assassin-garb": 5,
+        "unique:bone-raiment": 6,
+        "unique:chain-mail": 7,
+        "unique:champion-cuirass": 8,
+        "unique:cleric-vestments": 9,
+        "unique:cloaked-mail": 10,
+        "unique:conqueror-plate": 11,
+        "unique:corvus-mantle": 12,
+        "unique:elementalist-robe": 13,
+        "unique:enlightened-robe": 14,
+        "unique:explorer-armour": 15,
+        "unique:exquisite-vest": 16,
+        "unique:feathered-robe": 17,
+        "unique:full-plate": 18,
+        "unique:fur-plate": 19,
+        "unique:garment": 20,
+        "unique:gilded-vestments": 21,
+        "unique:grand-regalia": 22,
+        "unique:havoc-raiment": 23,
+        "unique:hermit-garb": 24,
+        "unique:heroic-armour": 25,
+        "unique:hexer-s-robe": 26,
+        "unique:iron-cuirass": 27,
+        "unique:keth-raiment": 28,
+        "unique:knight-armour": 29,
+        "unique:lamellar-mail": 30,
+        "unique:leather-vest": 31,
+        "unique:mail-vestments": 32,
+        "unique:marabout-garb": 33,
+        "unique:maraketh-cuirass": 34,
+        "unique:ornate-ringmail": 35,
+        "unique:pathfinder-coat": 36,
+        "unique:pilgrim-vestments": 37,
+        "unique:plated-raiment": 38,
+        "unique:plated-vestments": 39,
+        "unique:primal-markings": 40,
+        "unique:quilted-vest": 41,
+        "unique:raider-plate": 42,
+        "unique:revered-vestments": 43,
+        "unique:rhoahide-coat": 44,
+        "unique:rogue-armour": 45,
+        "unique:rusted-cuirass": 46,
+        "unique:sacrificial-mantle": 47,
+        "unique:sacrificial-regalia": 48,
+        "unique:scale-mail": 49,
+        "unique:scalper-s-jacket": 50,
+        "unique:scout-s-vest": 51,
+        "unique:serpentscale-coat": 52,
+        "unique:shaman-mantle": 53,
+        "unique:shrouded-vest": 54,
+        "unique:silk-robe": 55,
+        "unique:smuggler-coat": 56,
+        "unique:steel-plate": 57,
+        "unique:strider-vest": 58,
+        "unique:studded-vest": 59,
+        "unique:tattered-robe": 60,
+        "unique:tideseer-mantle": 61,
+        "unique:vaal-cuirass": 62,
+        "unique:vagabond-armour": 63,
+        "unique:votive-raiment": 64,
+        "unique:waxed-jacket": 65,
+        "unique:wayfarer-jacket": 66
+      }
+    },
+    "47": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "armour",
+        "boots"
+      ],
+      "slots": {
+        "unique:ancient-leggings": 0,
+        "unique:braced-sabatons": 1,
+        "unique:bronze-greaves": 2,
+        "unique:cinched-boots": 3,
+        "unique:covered-sabatons": 4,
+        "unique:embossed-boots": 5,
+        "unique:feathered-sandals": 6,
+        "unique:grand-cuisses": 7,
+        "unique:hunting-shoes": 8,
+        "unique:iron-greaves": 9,
+        "unique:laced-boots": 10,
+        "unique:lattice-sandals": 11,
+        "unique:lizardscale-boots": 12,
+        "unique:mail-sabatons": 13,
+        "unique:rough-greaves": 14,
+        "unique:secured-leggings": 15,
+        "unique:silk-slippers": 16,
+        "unique:stacked-sabatons": 17,
+        "unique:steeltoe-boots": 18,
+        "unique:stone-greaves": 19,
+        "unique:straw-sandals": 20,
+        "unique:threaded-shoes": 21,
+        "unique:trimmed-greaves": 22,
+        "unique:velour-shoes": 23,
+        "unique:wrapped-sandals": 24
+      }
+    },
+    "48": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "armour",
+        "gloves"
+      ],
+      "slots": {
+        "unique:aged-cuffs": 0,
+        "unique:bolstered-mitts": 1,
+        "unique:burnished-gauntlets": 2,
+        "unique:doubled-gauntlets": 3,
+        "unique:embroidered-gloves": 4,
+        "unique:engraved-bracers": 5,
+        "unique:fine-bracers": 6,
+        "unique:firm-bracers": 7,
+        "unique:furtive-wraps": 8,
+        "unique:gauze-wraps": 9,
+        "unique:goldcast-cuffs": 10,
+        "unique:grand-manchettes": 11,
+        "unique:intricate-gloves": 12,
+        "unique:jewelled-gloves": 13,
+        "unique:kalguuran-cuffs": 14,
+        "unique:layered-gauntlets": 15,
+        "unique:linen-wraps": 16,
+        "unique:moulded-mitts": 17,
+        "unique:ornate-gauntlets": 18,
+        "unique:pauascale-gloves": 19,
+        "unique:plate-gauntlets": 20,
+        "unique:ringmail-gauntlets": 21,
+        "unique:riveted-mitts": 22,
+        "unique:rope-cuffs": 23,
+        "unique:sectioned-bracers": 24,
+        "unique:sombre-gloves": 25,
+        "unique:spined-bracers": 26,
+        "unique:spiral-wraps": 27,
+        "unique:stitched-gloves": 28,
+        "unique:stocky-mitts": 29,
+        "unique:suede-bracers": 30,
+        "unique:tempered-mitts": 31,
+        "unique:titan-mitts": 32,
+        "unique:torn-gloves": 33,
+        "unique:utility-wraps": 34
+      }
+    },
+    "49": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "armour",
+        "helmets"
+      ],
+      "slots": {
+        "unique:ancient-visor": 0,
+        "unique:armoured-cap": 1,
+        "unique:beaded-circlet": 2,
+        "unique:brimmed-helm": 3,
+        "unique:chain-tiara": 4,
+        "unique:closed-helm": 5,
+        "unique:corsair-cap": 6,
+        "unique:covert-hood": 7,
+        "unique:cowled-helm": 8,
+        "unique:cultist-crown": 9,
+        "unique:death-mask": 10,
+        "unique:decorated-helm": 11,
+        "unique:elite-greathelm": 12,
+        "unique:face-mask": 13,
+        "unique:feathered-tiara": 14,
+        "unique:felt-cap": 15,
+        "unique:fierce-greathelm": 16,
+        "unique:gold-circlet": 17,
+        "unique:grand-visage": 18,
+        "unique:guarded-helm": 19,
+        "unique:heavy-crown": 20,
+        "unique:hewn-mask": 21,
+        "unique:hooded-mask": 22,
+        "unique:horned-crown": 23,
+        "unique:hunter-hood": 24,
+        "unique:iron-crown": 25,
+        "unique:jade-tiara": 26,
+        "unique:lace-hood": 27,
+        "unique:leatherbound-hood": 28,
+        "unique:magus-tiara": 29,
+        "unique:martyr-crown": 30,
+        "unique:rusted-greathelm": 31,
+        "unique:shabby-hood": 32,
+        "unique:shielded-helm": 33,
+        "unique:soldier-greathelm": 34,
+        "unique:solid-mask": 35,
+        "unique:spired-greathelm": 36,
+        "unique:spiritbone-crown": 37,
+        "unique:tenebrous-crown": 38,
+        "unique:tribal-mask": 39,
+        "unique:twig-circlet": 40,
+        "unique:veiled-mask": 41,
+        "unique:velvet-cap": 42,
+        "unique:vermeil-circlet": 43,
+        "unique:viper-cap": 44,
+        "unique:visored-helm": 45,
+        "unique:warrior-greathelm": 46,
+        "unique:wicker-tiara": 47,
+        "unique:wrapped-greathelm": 48
+      }
+    },
+    "50": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "jewellery",
+        "amulets"
+      ],
+      "slots": {
+        "unique:amber-amulet": 0,
+        "unique:azure-amulet": 1,
+        "unique:bloodstone-amulet": 2,
+        "unique:crimson-amulet": 3,
+        "unique:gold-amulet": 4,
+        "unique:jade-amulet": 5,
+        "unique:lapis-amulet": 6,
+        "unique:lunar-amulet": 7,
+        "unique:solar-amulet": 8,
+        "unique:stellar-amulet": 9,
+        "unique:veridical-chain": 10
+      }
+    },
+    "51": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "jewellery",
+        "belts"
+      ],
+      "slots": {
+        "unique:double-belt": 0,
+        "unique:fine-belt": 1,
+        "unique:heavy-belt": 2,
+        "unique:linen-belt": 3,
+        "unique:long-belt": 4,
+        "unique:mail-belt": 5,
+        "unique:ornate-belt": 6,
+        "unique:plate-belt": 7,
+        "unique:rawhide-belt": 8,
+        "unique:utility-belt": 9,
+        "unique:wide-belt": 10
+      }
+    },
+    "52": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "jewellery",
+        "rings"
+      ],
+      "slots": {
+        "unique:abyssal-signet": 0,
+        "unique:amethyst-ring": 1,
+        "unique:emerald-ring": 2,
+        "unique:gold-ring": 3,
+        "unique:iron-ring": 4,
+        "unique:lazuli-ring": 5,
+        "unique:pearl-ring": 6,
+        "unique:prismatic-ring": 7,
+        "unique:ring": 8,
+        "unique:ruby-ring": 9,
+        "unique:sapphire-ring": 10,
+        "unique:topaz-ring": 11,
+        "unique:two-stone-ring": 12,
+        "unique:unset-ring": 13
+      }
+    },
+    "53": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "jewels"
+      ],
+      "slots": {
+        "unique:diamond": 0,
+        "unique:emerald": 1,
+        "unique:ruby": 2,
+        "unique:sapphire": 3,
+        "unique:time-lost-diamond": 4,
+        "unique:timeless-jewel": 5
+      }
+    },
+    "54": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "offhands",
+        "bucklers"
+      ],
+      "slots": {
+        "unique:array-buckler": 0,
+        "unique:iron-buckler": 1,
+        "unique:leather-buckler": 2,
+        "unique:ornate-buckler": 3,
+        "unique:plated-buckler": 4,
+        "unique:ridged-buckler": 5,
+        "unique:spiked-buckler": 6,
+        "unique:wooden-buckler": 7
+      }
+    },
+    "55": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "offhands",
+        "foci"
+      ],
+      "slots": {
+        "unique:antler-focus": 0,
+        "unique:crystal-focus": 1,
+        "unique:engraved-focus": 2,
+        "unique:sacred-focus": 3,
+        "unique:tonal-focus": 4,
+        "unique:twig-focus": 5,
+        "unique:voodoo-focus": 6,
+        "unique:woven-focus": 7
+      }
+    },
+    "56": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "offhands",
+        "quivers"
+      ],
+      "slots": {
+        "unique:blunt-quiver": 0,
+        "unique:broadhead-quiver": 1,
+        "unique:fire-quiver": 2,
+        "unique:penetrating-quiver": 3,
+        "unique:primed-quiver": 4,
+        "unique:sacral-quiver": 5,
+        "unique:toxic-quiver": 6,
+        "unique:visceral-quiver": 7
+      }
+    },
+    "57": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "offhands",
+        "shields"
+      ],
+      "slots": {
+        "unique:barricade-tower-shield": 0,
+        "unique:blacksteel-tower-shield": 1,
+        "unique:blazon-crest-shield": 2,
+        "unique:braced-tower-shield": 3,
+        "unique:crescent-targe": 4,
+        "unique:crucible-tower-shield": 5,
+        "unique:effigial-tower-shield": 6,
+        "unique:emblem-crest-shield": 7,
+        "unique:glacial-fortress": 8,
+        "unique:hardwood-targe": 9,
+        "unique:heraldric-tower-shield": 10,
+        "unique:intricate-crest-shield": 11,
+        "unique:jingling-crest-shield": 12,
+        "unique:omen-crest-shield": 13,
+        "unique:painted-tower-shield": 14,
+        "unique:pelage-targe": 15,
+        "unique:rampart-tower-shield": 16,
+        "unique:sigil-crest-shield": 17,
+        "unique:splintered-tower-shield": 18,
+        "unique:vaal-tower-shield": 19,
+        "unique:venerable-defender": 20
+      }
+    },
+    "58": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "one-hand",
+        "one-hand-maces"
+      ],
+      "slots": {
+        "unique:execratus-hammer": 0,
+        "unique:flanged-mace": 1,
+        "unique:kalguuran-forgehammer": 2,
+        "unique:marching-mace": 3,
+        "unique:morning-star": 4,
+        "unique:slim-mace": 5,
+        "unique:smithing-hammer": 6,
+        "unique:spiked-club": 7,
+        "unique:torment-club": 8,
+        "unique:warpick": 9,
+        "unique:wooden-club": 10
+      }
+    },
+    "59": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "one-hand",
+        "sceptres"
+      ],
+      "slots": {
+        "unique:omen-sceptre": 0,
+        "unique:rattling-sceptre": 1,
+        "unique:shrine-sceptre": 2,
+        "unique:stoic-sceptre": 3
+      }
+    },
+    "60": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "one-hand",
+        "spears"
+      ],
+      "slots": {
+        "unique:barbed-spear": 0,
+        "unique:forked-spear": 1,
+        "unique:grand-spear": 2,
+        "unique:hardwood-spear": 3,
+        "unique:helix-spear": 4,
+        "unique:hunting-spear": 5,
+        "unique:ironhead-spear": 6,
+        "unique:pronged-spear": 7,
+        "unique:war-spear": 8,
+        "unique:winged-spear": 9
+      }
+    },
+    "61": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "one-hand",
+        "wands"
+      ],
+      "slots": {
+        "unique:acrid-wand": 0,
+        "unique:attuned-wand": 1,
+        "unique:bone-wand": 2,
+        "unique:runic-fork": 3,
+        "unique:siphoning-wand": 4,
+        "unique:twisted-wand": 5,
+        "unique:volatile-wand": 6,
+        "unique:withered-wand": 7
+      }
+    },
+    "62": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "relics"
+      ],
+      "slots": {
+        "unique:amphora-relic": 0,
+        "unique:coffer-relic": 1,
+        "unique:incense-relic": 2,
+        "unique:seal-relic": 3,
+        "unique:tapestry-relic": 4,
+        "unique:vase-relic": 5
+      }
+    },
+    "63": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "bows"
+      ],
+      "slots": {
+        "unique:artillery-bow": 0,
+        "unique:composite-bow": 1,
+        "unique:crude-bow": 2,
+        "unique:dualstring-bow": 3,
+        "unique:fanatic-bow": 4,
+        "unique:heartwood-shortbow": 5,
+        "unique:heavy-bow": 6,
+        "unique:recurve-bow": 7,
+        "unique:shortbow": 8,
+        "unique:warden-bow": 9,
+        "unique:zealot-bow": 10
+      }
+    },
+    "64": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "crossbows"
+      ],
+      "slots": {
+        "unique:desolate-crossbow": 0,
+        "unique:dyad-crossbow": 1,
+        "unique:makeshift-crossbow": 2,
+        "unique:tense-crossbow": 3,
+        "unique:trarthan-cannon": 4
+      }
+    },
+    "65": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "quarterstaves"
+      ],
+      "slots": {
+        "unique:crescent-quarterstaff": 0,
+        "unique:gothic-quarterstaff": 1,
+        "unique:long-quarterstaff": 2,
+        "unique:steelpoint-quarterstaff": 3,
+        "unique:warding-quarterstaff": 4,
+        "unique:wrapped-quarterstaff": 5,
+        "unique:wyrm-quarterstaff": 6
+      }
+    },
+    "66": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "staves"
+      ],
+      "slots": {
+        "unique:ashen-staff": 0,
+        "unique:chiming-staff": 1,
+        "unique:gelid-staff": 2,
+        "unique:perching-staff": 3,
+        "unique:permafrost-staff": 4,
+        "unique:pyrophyte-staff": 5,
+        "unique:ravenous-staff": 6,
+        "unique:reflecting-staff": 7,
+        "unique:voltaic-staff": 8
+      }
+    },
+    "67": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "talismans"
+      ],
+      "slots": {
+        "unique:ashbark-talisman": 0,
+        "unique:changeling-talisman": 1,
+        "unique:familial-talisman": 2,
+        "unique:lumbering-talisman": 3,
+        "unique:nettle-talisman": 4,
+        "unique:vicious-talisman": 5
+      }
+    },
+    "68": {
+      "path": [
+        "equipment",
+        "unique-equipment",
+        "two-hand",
+        "two-hand-maces"
+      ],
+      "slots": {
+        "unique:aberrant-sledge": 0,
+        "unique:crumbling-maul": 1,
+        "unique:cultist-greathammer": 2,
+        "unique:felled-greatclub": 3,
+        "unique:forge-maul": 4,
+        "unique:giant-maul": 5,
+        "unique:leaden-greathammer": 6,
+        "unique:oak-greathammer": 7,
+        "unique:pointed-maul": 8,
+        "unique:studded-greatclub": 9,
+        "unique:temple-maul": 10,
+        "unique:totemic-greatclub": 11
+      }
+    },
+    "69": {
+      "path": [
+        "gems",
+        "blood-gems"
+      ],
+      "slots": {
+        "ahn-s-citadel": 0,
+        "ailith-s-chimes": 1,
+        "amanamu-s-tithe": 2,
+        "arakaali-s-lust": 3,
+        "arbiter-s-ignition": 4,
+        "arbiter-s-reach": 5,
+        "arjun-s-medal": 6,
+        "atalui-s-bloodletting": 7,
+        "atziri-s-allure": 8,
+        "atziri-s-call": 9,
+        "atziri-s-communion": 10,
+        "atziri-s-impatience": 11,
+        "bhatair-s-vengeance": 12,
+        "breachlord-s-amalgam": 13,
+        "breachlord-s-rift": 14,
+        "brutus-brain": 15,
+        "catha-s-brilliance": 16,
+        "cirel-s-cultivation": 17,
+        "concussive-runes": 18,
+        "daresso-s-passion": 19,
+        "dialla-s-desire": 20,
+        "doedre-s-undoing": 21,
+        "dominus-grasp": 22,
+        "dreamer-s-knell": 23,
+        "einhar-s-beastrite": 24,
+        "eonyr-s-thunder": 25,
+        "esh-s-prowess": 26,
+        "esh-s-radiance": 27,
+        "garukhan-s-resolve": 28,
+        "guatelitzi-s-ablation": 29,
+        "hayoxi-s-fulmination": 30,
+        "healing-runes": 31,
+        "helbrym-s-hide": 32,
+        "her-declaration": 33,
+        "ixchel-s-torment": 34,
+        "kalisa-s-crescendo": 35,
+        "kaom-s-madness": 36,
+        "khatal-s-rejuvenation": 37,
+        "kulemak-s-dominion": 38,
+        "kurgal-s-leash": 39,
+        "m-rrigan-s-insight": 40,
+        "medved-s-felling": 41,
+        "morgana-s-tempest": 42,
+        "ois-n-s-oath": 43,
+        "olroth-s-conviction": 44,
+        "olroth-s-hubris": 45,
+        "paquate-s-pact": 46,
+        "prototype-seventeen": 47,
+        "rakiata-s-flow": 48,
+        "ratha-s-assault": 49,
+        "rigwald-s-ferocity": 50,
+        "romira-s-requital": 51,
+        "runeforged-blades": 52,
+        "runic-extraction": 53,
+        "runic-infusion": 54,
+        "scouring-flame": 55,
+        "seraph-s-heart": 56,
+        "sione-s-temper": 57,
+        "styrn-s-ferocity": 58,
+        "styrn-s-mountain": 59,
+        "tacati-s-ire": 60,
+        "tangmazu-s-thurible": 61,
+        "tasalio-s-rhythm": 62,
+        "tawhoa-s-tending": 63,
+        "tecrod-s-revenge": 64,
+        "trickster-s-shard": 65,
+        "tul-s-avalanche": 66,
+        "tul-s-stillness": 67,
+        "uhtred-s-augury": 68,
+        "uhtred-s-constellation": 69,
+        "uhtred-s-exodus": 70,
+        "uhtred-s-omen": 71,
+        "uhtred-s-rite": 72,
+        "uruk-s-smelting": 73,
+        "uul-netol-s-embrace": 74,
+        "varashta-s-blessing": 75,
+        "vilenta-s-propulsion": 76,
+        "vorana-s-siege": 77,
+        "vruun-s-aftermath": 78,
+        "vruun-s-inevitability": 79,
+        "xibaqua-s-rending": 80,
+        "xoph-s-pyre": 81,
+        "zarokh-s-refrain": 82,
+        "zarokh-s-revolt": 83,
+        "zerphi-s-infamy": 84
+      }
+    },
+    "70": {
+      "path": [
+        "gems",
+        "rune-gems"
+      ],
+      "slots": {
+        "animus-exchange": 0,
+        "animus-splinters": 1,
+        "bitter-dead": 2,
+        "conductive-runes": 3,
+        "detonate-living": 4,
+        "eternal-march": 5,
+        "explosive-transmutation": 6,
+        "frostflame-nova": 7,
+        "grim-pillars": 8,
+        "hollow-shell": 9,
+        "leylines": 10,
+        "powered-by-verisium": 11,
+        "rain-of-blades": 12,
+        "refutation": 13,
+        "remnants-of-kalguur": 14,
+        "repulsion": 15,
+        "runic-reprieve": 16,
+        "skyfall": 17,
+        "triskelion-cascade": 18,
+        "verisium-manifestations": 19,
+        "voltaic-barrier": 20,
+        "wardbound-minions": 21
+      }
+    },
+    "71": {
+      "path": [
+        "gems",
+        "uncut-skill-gems"
+      ],
+      "slots": {
+        "uncut-skill-gem-1": 0,
+        "uncut-skill-gem-10": 1,
+        "uncut-skill-gem-11": 2,
+        "uncut-skill-gem-12": 3,
+        "uncut-skill-gem-13": 4,
+        "uncut-skill-gem-14": 5,
+        "uncut-skill-gem-15": 6,
+        "uncut-skill-gem-16": 7,
+        "uncut-skill-gem-17": 8,
+        "uncut-skill-gem-18": 9,
+        "uncut-skill-gem-19": 10,
+        "uncut-skill-gem-2": 11,
+        "uncut-skill-gem-20": 12,
+        "uncut-skill-gem-3": 13,
+        "uncut-skill-gem-4": 14,
+        "uncut-skill-gem-5": 15,
+        "uncut-skill-gem-6": 16,
+        "uncut-skill-gem-7": 17,
+        "uncut-skill-gem-8": 18,
+        "uncut-skill-gem-9": 19
+      }
+    },
+    "72": {
+      "path": [
+        "gems",
+        "uncut-spirit-gems"
+      ],
+      "slots": {
+        "uncut-spirit-gem-1": 0,
+        "uncut-spirit-gem-10": 1,
+        "uncut-spirit-gem-11": 2,
+        "uncut-spirit-gem-12": 3,
+        "uncut-spirit-gem-13": 4,
+        "uncut-spirit-gem-14": 5,
+        "uncut-spirit-gem-15": 6,
+        "uncut-spirit-gem-16": 7,
+        "uncut-spirit-gem-17": 8,
+        "uncut-spirit-gem-18": 9,
+        "uncut-spirit-gem-19": 10,
+        "uncut-spirit-gem-2": 11,
+        "uncut-spirit-gem-20": 12,
+        "uncut-spirit-gem-3": 13,
+        "uncut-spirit-gem-4": 14,
+        "uncut-spirit-gem-5": 15,
+        "uncut-spirit-gem-6": 16,
+        "uncut-spirit-gem-7": 17,
+        "uncut-spirit-gem-8": 18,
+        "uncut-spirit-gem-9": 19
+      }
+    },
+    "73": {
+      "path": [
+        "gems",
+        "uncut-support-gems"
+      ],
+      "slots": {
+        "uncut-support-gem-1": 0,
+        "uncut-support-gem-2": 1,
+        "uncut-support-gem-3": 2,
+        "uncut-support-gem-4": 3,
+        "uncut-support-gem-5": 4
+      }
+    },
+    "74": {
+      "path": [
+        "other",
+        "other-items"
+      ],
+      "slots": {
+        "catalyst": 0,
+        "colossal": 1,
+        "crest-shield": 2,
+        "essence": 3,
+        "fist-of-kalguur": 4,
+        "fragments-of-the-past": 5,
+        "gargantuan": 6,
+        "giant": 7,
+        "grand": 8,
+        "greater": 9,
+        "idol": 10,
+        "legacy-of": 11,
+        "lesser": 12,
+        "liquid": 13,
+        "medium": 14,
+        "omen": 15,
+        "rune": 16,
+        "soul-core": 17,
+        "targe": 18,
+        "tower-shield": 19,
+        "transcendent": 20,
+        "ultimate": 21
+      }
+    },
+    "75": {
+      "path": [
+        "other",
+        "quest-items"
+      ],
+      "slots": {
+        "class-quest-items": 0
+      }
+    },
+    "76": {
+      "path": [
+        "other",
+        "special-items"
+      ],
+      "slots": {
+        "banded-wombgift": 0,
+        "lavish-wombgift": 1,
+        "ornate-wombgift": 2,
+        "revelatory-wombgift": 3,
+        "signet-wombgift": 4
+      }
+    },
+    "77": {
+      "path": [
+        "supplies",
+        "charms"
+      ],
+      "slots": {
+        "amethyst-charm": 0,
+        "antidote-charm": 1,
+        "dousing-charm": 2,
+        "golden-charm": 3,
+        "grounding-charm": 4,
+        "ruby-charm": 5,
+        "sapphire-charm": 6,
+        "silver-charm": 7,
+        "staunching-charm": 8,
+        "stone-charm": 9,
+        "thawing-charm": 10,
+        "topaz-charm": 11
+      }
+    },
+    "78": {
+      "path": [
+        "supplies",
+        "flasks",
+        "life"
+      ],
+      "slots": {
+        "gargantuan-life-flask": 0,
+        "ultimate-life-flask": 1
+      }
+    },
+    "79": {
+      "path": [
+        "supplies",
+        "flasks",
+        "mana"
+      ],
+      "slots": {
+        "gargantuan-mana-flask": 0,
+        "transcendent-mana-flask": 1,
+        "ultimate-mana-flask": 2
+      }
+    },
+    "80": {
+      "path": null,
+      "slots": {
+        "aberrant-sledge": 0,
+        "absent-amulet": 1,
+        "abyssal-signet": 2,
+        "acrid-wand": 3,
+        "adherent-bow": 4,
+        "adherent-cuffs": 5,
+        "adherent-s-raiment": 6,
+        "adorned-wraps": 7,
+        "aegis-quarterstaff": 8,
+        "aged-cuffs": 9,
+        "akoyan-club": 10,
+        "akoyan-spear": 11,
+        "alpha-talisman": 12,
+        "altar-robe": 13,
+        "amber-amulet": 14,
+        "amethyst-ring": 15,
+        "amphora-relic": 16,
+        "ancestral-mail": 17,
+        "ancestral-tiara": 18,
+        "anchorite-garb": 19,
+        "ancient-buckler": 20,
+        "ancient-cuffs": 21,
+        "ancient-gauntlets": 22,
+        "ancient-leggings": 23,
+        "ancient-mail": 24,
+        "ancient-mitts": 25,
+        "ancient-visor": 26,
+        "antler-focus": 27,
+        "anvil-maul": 28,
+        "apostle-leggings": 29,
+        "armoured-cap": 30,
+        "armoured-vest": 31,
+        "array-buckler": 32,
+        "arrayed-focus": 33,
+        "artillery-bow": 34,
+        "ashbark-talisman": 35,
+        "ashen-staff": 36,
+        "assassin-garb": 37,
+        "attuned-wand": 38,
+        "austere-garb": 39,
+        "avian-mask": 40,
+        "avian-targe": 41,
+        "azure-amulet": 42,
+        "bandit-mace": 43,
+        "barbed-bracers": 44,
+        "barbed-spear": 45,
+        "baroque-gloves": 46,
+        "baroque-targe": 47,
+        "barricade-tower-shield": 48,
+        "base:class-amulets": 49,
+        "base:class-belts": 50,
+        "base:class-body-armours": 51,
+        "base:class-boots": 52,
+        "base:class-bows": 53,
+        "base:class-bucklers": 54,
+        "base:class-crossbows": 55,
+        "base:class-foci": 56,
+        "base:class-gloves": 57,
+        "base:class-helmets": 58,
+        "base:class-jewels": 59,
+        "base:class-one-hand-maces": 60,
+        "base:class-quarterstaves": 61,
+        "base:class-quivers": 62,
+        "base:class-rings": 63,
+        "base:class-sceptres": 64,
+        "base:class-shields": 65,
+        "base:class-spears": 66,
+        "base:class-staves": 67,
+        "base:class-talismans": 68,
+        "base:class-two-hand-maces": 69,
+        "base:class-wands": 70,
+        "bastion-sabatons": 71,
+        "beaded-circlet": 72,
+        "biostatic-ring": 73,
+        "blacksteel-crest-shield": 74,
+        "blacksteel-gauntlets": 75,
+        "blacksteel-sabatons": 76,
+        "blacksteel-tower-shield": 77,
+        "bladed-quarterstaff": 78,
+        "bladeguard-buckler": 79,
+        "blazon-crest-shield": 80,
+        "bleak-crossbow": 81,
+        "bloodstone-amulet": 82,
+        "blunt-quiver": 83,
+        "bolstered-mitts": 84,
+        "bolting-quarterstaff": 85,
+        "bone-raiment": 86,
+        "bone-wand": 87,
+        "bound-cuffs": 88,
+        "bound-sandals": 89,
+        "braced-sabatons": 90,
+        "braced-tower-shield": 91,
+        "branched-spear": 92,
+        "breach-ring": 93,
+        "brigand-mask": 94,
+        "brimmed-helm": 95,
+        "broadhead-quiver": 96,
+        "bronze-greaves": 97,
+        "buckled-wraps": 98,
+        "bulwark-greaves": 99,
+        "bulwark-tower-shield": 100,
+        "burnished-gauntlets": 101,
+        "cabalist-helm": 102,
+        "cannonade-crossbow": 103,
+        "carved-greaves": 104,
+        "cassis-helm": 105,
+        "cavalry-boots": 106,
+        "cavalry-bow": 107,
+        "ceremonial-robe": 108,
+        "chain-mail": 109,
+        "chain-tiara": 110,
+        "champion-cuirass": 111,
+        "champion-helm": 112,
+        "changeling-talisman": 113,
+        "charmed-shoes": 114,
+        "chiming-staff": 115,
+        "cinched-boots": 116,
+        "class-amulets": 117,
+        "class-augment": 118,
+        "class-belts": 119,
+        "class-body-armours": 120,
+        "class-boots": 121,
+        "class-bows": 122,
+        "class-bucklers": 123,
+        "class-charms": 124,
+        "class-crossbows": 125,
+        "class-fishing-rods": 126,
+        "class-foci": 127,
+        "class-gloves": 128,
+        "class-helmets": 129,
+        "class-incubators": 130,
+        "class-instance-local-items": 131,
+        "class-jewels": 132,
+        "class-life-flasks": 133,
+        "class-mana-flasks": 134,
+        "class-map-fragments": 135,
+        "class-omen": 136,
+        "class-one-hand-maces": 137,
+        "class-pinnacle-keys": 138,
+        "class-quarterstaves": 139,
+        "class-quivers": 140,
+        "class-rings": 141,
+        "class-sceptres": 142,
+        "class-shields": 143,
+        "class-skill-gems": 144,
+        "class-spears": 145,
+        "class-stackable-currency": 146,
+        "class-staves": 147,
+        "class-support-gems": 148,
+        "class-tablet": 149,
+        "class-talismans": 150,
+        "class-two-hand-maces": 151,
+        "class-vault-keys": 152,
+        "class-wands": 153,
+        "cleric-vestments": 154,
+        "cloaked-mail": 155,
+        "closed-helm": 156,
+        "coffer-relic": 157,
+        "commander-gauntlets": 158,
+        "composite-bow": 159,
+        "condemned-talisman": 160,
+        "conjurer-mantle": 161,
+        "conqueror-plate": 162,
+        "corona-amulet": 163,
+        "corsair-cap": 164,
+        "corsair-coat": 165,
+        "corvus-mantle": 166,
+        "covered-sabatons": 167,
+        "covert-hood": 168,
+        "cowled-helm": 169,
+        "crescent-quarterstaff": 170,
+        "crescent-targe": 171,
+        "crimson-amulet": 172,
+        "crown-mace": 173,
+        "crucible-tower-shield": 174,
+        "crude-bow": 175,
+        "cruel-talisman": 176,
+        "crumbling-maul": 177,
+        "cryptic-crown": 178,
+        "cryptic-helm": 179,
+        "cryptic-leggings": 180,
+        "crystal-focus": 181,
+        "cultist-crown": 182,
+        "cultist-focus": 183,
+        "cultist-gauntlets": 184,
+        "cultist-greathammer": 185,
+        "daggerfoot-shoes": 186,
+        "dastard-armour": 187,
+        "death-mail": 188,
+        "death-mantle": 189,
+        "death-mask": 190,
+        "decorated-helm": 191,
+        "deerstalker-hood": 192,
+        "desert-buckler": 193,
+        "desert-cap": 194,
+        "desolate-crossbow": 195,
+        "detailed-mitts": 196,
+        "diamond": 197,
+        "disintegrating-maul": 198,
+        "distorted-amulet": 199,
+        "divine-crown": 200,
+        "double-belt": 201,
+        "doubled-gauntlets": 202,
+        "dragonscale-boots": 203,
+        "drakeskin-boots": 204,
+        "dreaming-quarterstaff": 205,
+        "druidic-crown": 206,
+        "druidic-focus": 207,
+        "dualstring-bow": 208,
+        "dueling-wand": 209,
+        "dunerunner-sandals": 210,
+        "dusk-amulet": 211,
+        "dusk-ring": 212,
+        "dyad-crossbow": 213,
+        "effigial-tower-shield": 214,
+        "elegant-crossbow": 215,
+        "elegant-greathelm": 216,
+        "elegant-greaves": 217,
+        "elegant-plate": 218,
+        "elegant-slippers": 219,
+        "elegant-wraps": 220,
+        "elementalist-robe": 221,
+        "elite-greathelm": 222,
+        "emblem-crest-shield": 223,
+        "embossed-boots": 224,
+        "embroidered-gloves": 225,
+        "emerald": 226,
+        "emerald-ring": 227,
+        "engraved-bracers": 228,
+        "engraved-crossbow": 229,
+        "engraved-focus": 230,
+        "enlightened-robe": 231,
+        "execratus-hammer": 232,
+        "explorer-armour": 233,
+        "exquisite-vest": 234,
+        "face-mask": 235,
+        "faithful-leggings": 236,
+        "falconer-s-jacket": 237,
+        "familial-talisman": 238,
+        "fanatic-bow": 239,
+        "fanatic-greathammer": 240,
+        "fang-talisman": 241,
+        "faridun-mask": 242,
+        "feathered-mitts": 243,
+        "feathered-raiment": 244,
+        "feathered-robe": 245,
+        "feathered-sandals": 246,
+        "feathered-tiara": 247,
+        "felled-greatclub": 248,
+        "felt-cap": 249,
+        "fierce-greathelm": 250,
+        "fine-belt": 251,
+        "fine-bracers": 252,
+        "fire-quiver": 253,
+        "firm-bracers": 254,
+        "flanged-mace": 255,
+        "flared-boots": 256,
+        "flax-sandals": 257,
+        "flexed-crossbow": 258,
+        "flowing-raiment": 259,
+        "flying-spear": 260,
+        "forge-maul": 261,
+        "forked-spear": 262,
+        "forking-belt": 263,
+        "fortified-hammer": 264,
+        "fortress-sabatons": 265,
+        "fortress-tower-shield": 266,
+        "freebooter-cap": 267,
+        "full-plate": 268,
+        "fungal-talisman": 269,
+        "fur-plate": 270,
+        "furtive-wraps": 271,
+        "fury-talisman": 272,
+        "galvanic-wand": 273,
+        "garment": 274,
+        "gauze-wraps": 275,
+        "gelid-staff": 276,
+        "gemini-bow": 277,
+        "gemini-crossbow": 278,
+        "giant-maul": 279,
+        "gilded-vestments": 280,
+        "glacial-fortress": 281,
+        "gladiatorial-helm": 282,
+        "gleaming-cuffs": 283,
+        "gloam-amulet": 284,
+        "gloam-ring": 285,
+        "glowering-crest-shield": 286,
+        "gold-amulet": 287,
+        "gold-circlet": 288,
+        "gold-gloves": 289,
+        "gold-ring": 290,
+        "goldcast-cuffs": 291,
+        "golden-mail": 292,
+        "golden-targe": 293,
+        "goldworked-tower-shield": 294,
+        "gothic-quarterstaff": 295,
+        "grand-bracers": 296,
+        "grand-cuisses": 297,
+        "grand-manchettes": 298,
+        "grand-regalia": 299,
+        "grand-spear": 300,
+        "grand-visage": 301,
+        "grasping-mail": 302,
+        "grasping-ring": 303,
+        "grim-gloves": 304,
+        "grinning-mask": 305,
+        "guarded-helm": 306,
+        "guardian-bow": 307,
+        "guardian-quarterstaff": 308,
+        "guardian-spear": 309,
+        "gutspike-buckler": 310,
+        "hallowed-crown": 311,
+        "hallowed-focus": 312,
+        "hardwood-spear": 313,
+        "hardwood-targe": 314,
+        "hatungo-garb": 315,
+        "havoc-raiment": 316,
+        "hawker-s-jacket": 317,
+        "heartcarver-mantle": 318,
+        "heartwood-shortbow": 319,
+        "heavy-belt": 320,
+        "heavy-bow": 321,
+        "heavy-crown": 322,
+        "heavy-greathammer": 323,
+        "heavy-plate": 324,
+        "helix-spear": 325,
+        "heraldric-tower-shield": 326,
+        "hermit-garb": 327,
+        "heroic-armour": 328,
+        "hewn-mask": 329,
+        "hexer-s-robe": 330,
+        "hooded-mask": 331,
+        "horned-crown": 332,
+        "howling-talisman": 333,
+        "hunter-hood": 334,
+        "hunting-shoes": 335,
+        "hunting-spear": 336,
+        "imperial-greathelm": 337,
+        "incense-relic": 338,
+        "inquisitor-crown": 339,
+        "intricate-crest-shield": 340,
+        "intricate-gloves": 341,
+        "invoking-belt": 342,
+        "iron-buckler": 343,
+        "iron-crown": 344,
+        "iron-cuirass": 345,
+        "iron-greaves": 346,
+        "iron-ring": 347,
+        "ironclad-vestments": 348,
+        "ironhead-spear": 349,
+        "ironwood-greathammer": 350,
+        "ironwood-shortbow": 351,
+        "itinerant-jacket": 352,
+        "jade-amulet": 353,
+        "jade-talisman": 354,
+        "jade-tiara": 355,
+        "jagged-spear": 356,
+        "jewelled-gloves": 357,
+        "jingling-buckler": 358,
+        "jingling-crest-shield": 359,
+        "jungle-tiara": 360,
+        "kalguuran-cuffs": 361,
+        "kalguuran-forgehammer": 362,
+        "kamasan-tiara": 363,
+        "keth-raiment": 364,
+        "kinetic-ring": 365,
+        "knight-armour": 366,
+        "knightly-mitts": 367,
+        "lace-hood": 368,
+        "laced-boots": 369,
+        "lamellar-mail": 370,
+        "lament-amulet": 371,
+        "lapis-amulet": 372,
+        "lattice-sandals": 373,
+        "layered-gauntlets": 374,
+        "layered-vest": 375,
+        "lazuli-ring": 376,
+        "leaden-greathammer": 377,
+        "leather-buckler": 378,
+        "leather-vest": 379,
+        "leatherbound-hood": 380,
+        "leyline-focus": 381,
+        "linen-belt": 382,
+        "linen-wraps": 383,
+        "lizardscale-boots": 384,
+        "lizardscale-coat": 385,
+        "long-belt": 386,
+        "long-quarterstaff": 387,
+        "lumbering-talisman": 388,
+        "lunar-amulet": 389,
+        "lunar-quarterstaff": 390,
+        "luxurious-slippers": 391,
+        "magus-tiara": 392,
+        "mail-belt": 393,
+        "mail-sabatons": 394,
+        "mail-vestments": 395,
+        "maji-talisman": 396,
+        "makeshift-crossbow": 397,
+        "mammoth-targe": 398,
+        "mantled-mail": 399,
+        "marabout-garb": 400,
+        "maraketh-cuirass": 401,
+        "marauding-mace": 402,
+        "marching-mace": 403,
+        "martyr-crown": 404,
+        "masked-greathelm": 405,
+        "massive-greathammer": 406,
+        "massive-mitts": 407,
+        "massive-spear": 408,
+        "militant-bow": 409,
+        "mnemonic-ring": 410,
+        "molten-hammer": 411,
+        "morning-star": 412,
+        "moulded-mitts": 413,
+        "nettle-talisman": 414,
+        "noble-greathelm": 415,
+        "noble-sabatons": 416,
+        "noble-tower-shield": 417,
+        "oak-greathammer": 418,
+        "obliterator-bow": 419,
+        "occultist-mantle": 420,
+        "omen-crest-shield": 421,
+        "omen-sceptre": 422,
+        "oneiric-ring": 423,
+        "opulent-gloves": 424,
+        "orichalcum-spear": 425,
+        "ornate-belt": 426,
+        "ornate-buckler": 427,
+        "ornate-cuffs": 428,
+        "ornate-gauntlets": 429,
+        "ornate-greaves": 430,
+        "ornate-mitts": 431,
+        "ornate-plate": 432,
+        "ornate-ringmail": 433,
+        "painted-tower-shield": 434,
+        "paragon-greathelm": 435,
+        "paralysing-staff": 436,
+        "pariah-mask": 437,
+        "pathfinder-coat": 438,
+        "pauascale-gloves": 439,
+        "pearl-ring": 440,
+        "pearlescent-amulet": 441,
+        "pelage-targe": 442,
+        "penetrating-quiver": 443,
+        "penumbra-amulet": 444,
+        "penumbra-ring": 445,
+        "perching-staff": 446,
+        "permafrost-staff": 447,
+        "pilgrim-vestments": 448,
+        "plate-belt": 449,
+        "plate-gauntlets": 450,
+        "plated-buckler": 451,
+        "plated-mace": 452,
+        "plated-raiment": 453,
+        "plated-vestments": 454,
+        "pointed-maul": 455,
+        "polished-bracers": 456,
+        "portent-amulet": 457,
+        "primal-markings": 458,
+        "primed-quiver": 459,
+        "prismatic-ring": 460,
+        "pronged-spear": 461,
+        "pyrophyte-staff": 462,
+        "quartered-crest-shield": 463,
+        "quickslip-shoes": 464,
+        "quilted-vest": 465,
+        "raider-plate": 466,
+        "rambler-jacket": 467,
+        "rampart-tower-shield": 468,
+        "rattling-sceptre": 469,
+        "ravenous-staff": 470,
+        "rawhide-belt": 471,
+        "razor-quarterstaff": 472,
+        "reaping-staff": 473,
+        "recurve-bow": 474,
+        "reefsteel-greaves": 475,
+        "refined-bracers": 476,
+        "refined-breach-ring": 477,
+        "reflecting-staff": 478,
+        "revered-vestments": 479,
+        "rhoahide-coat": 480,
+        "ridged-buckler": 481,
+        "ring": 482,
+        "ringmail-gauntlets": 483,
+        "river-raiment": 484,
+        "riveted-mitts": 485,
+        "roaring-staff": 486,
+        "roaring-talisman": 487,
+        "rogue-armour": 488,
+        "rope-cuffs": 489,
+        "rough-greaves": 490,
+        "royal-tower-shield": 491,
+        "ruby": 492,
+        "ruby-ring": 493,
+        "ruination-maul": 494,
+        "runic-fork": 495,
+        "runner-vest": 496,
+        "rusted-cuirass": 497,
+        "rusted-greathelm": 498,
+        "sacral-quiver": 499,
+        "sacramental-robe": 500,
+        "sacred-focus": 501,
+        "sacred-maul": 502,
+        "sacrificial-mantle": 503,
+        "sacrificial-regalia": 504,
+        "saintly-crown": 505,
+        "sanctified-staff": 506,
+        "sandsworn-sandals": 507,
+        "sandsworn-tiara": 508,
+        "sapphire": 509,
+        "sapphire-ring": 510,
+        "scale-mail": 511,
+        "scalper-s-jacket": 512,
+        "scout-s-vest": 513,
+        "seaglass-spear": 514,
+        "seal-relic": 515,
+        "seastorm-mantle": 516,
+        "sectioned-bracers": 517,
+        "secured-leggings": 518,
+        "secured-wraps": 519,
+        "sekhema-sandals": 520,
+        "sekheman-crest-shield": 521,
+        "serpentscale-boots": 522,
+        "serpentscale-coat": 523,
+        "serrated-quiver": 524,
+        "shabby-hood": 525,
+        "shaman-mantle": 526,
+        "shamanistic-leggings": 527,
+        "shielded-helm": 528,
+        "shortbow": 529,
+        "shrine-sceptre": 530,
+        "shrouded-mail": 531,
+        "shrouded-vest": 532,
+        "siege-crossbow": 533,
+        "sigil-crest-shield": 534,
+        "silk-robe": 535,
+        "silk-slippers": 536,
+        "sinew-belt": 537,
+        "sinister-quarterstaff": 538,
+        "siphoning-wand": 539,
+        "sirenscale-gloves": 540,
+        "skullcrusher-quarterstaff": 541,
+        "skycrown-tiara": 542,
+        "sleek-jacket": 543,
+        "slim-mace": 544,
+        "slipstrike-vest": 545,
+        "smithing-hammer": 546,
+        "smooth-quarterstaff": 547,
+        "smuggler-coat": 548,
+        "soaring-mask": 549,
+        "soaring-spear": 550,
+        "soaring-targe": 551,
+        "solar-amulet": 552,
+        "soldier-cuirass": 553,
+        "soldier-greathelm": 554,
+        "solid-mask": 555,
+        "sombre-gloves": 556,
+        "sorcerous-tiara": 557,
+        "spiked-bracers": 558,
+        "spiked-buckler": 559,
+        "spiked-club": 560,
+        "spiked-spear": 561,
+        "spined-bracers": 562,
+        "spiny-talisman": 563,
+        "spiral-wraps": 564,
+        "spired-greathelm": 565,
+        "spiritbone-crown": 566,
+        "splintered-tower-shield": 567,
+        "stacked-sabatons": 568,
+        "stalking-belt": 569,
+        "stalking-bracers": 570,
+        "stalking-spear": 571,
+        "steel-plate": 572,
+        "steelmail-gauntlets": 573,
+        "steelpoint-quarterstaff": 574,
+        "steelpoint-shoes": 575,
+        "steeltoe-boots": 576,
+        "stellar-amulet": 577,
+        "stitched-gloves": 578,
+        "stocky-mitts": 579,
+        "stoic-sceptre": 580,
+        "stone-cuirass": 581,
+        "stone-greaves": 582,
+        "stone-targe": 583,
+        "stone-tower-shield": 584,
+        "stout-crossbow": 585,
+        "straw-sandals": 586,
+        "strider-vest": 587,
+        "strife-pick": 588,
+        "striking-quarterstaff": 589,
+        "structured-hammer": 590,
+        "studded-boots": 591,
+        "studded-greatclub": 592,
+        "studded-vest": 593,
+        "suede-bracers": 594,
+        "swiftstalker-coat": 595,
+        "tapestry-relic": 596,
+        "tasalian-focus": 597,
+        "tasalian-greaves": 598,
+        "tattered-robe": 599,
+        "tawhoan-greatclub": 600,
+        "tawhoan-tower-shield": 601,
+        "tempered-mitts": 602,
+        "temple-maul": 603,
+        "tenebrous-amulet": 604,
+        "tenebrous-crown": 605,
+        "tenebrous-ring": 606,
+        "tense-crossbow": 607,
+        "thane-mail": 608,
+        "threaded-shoes": 609,
+        "thunder-talisman": 610,
+        "tideseer-mantle": 611,
+        "time-lost-diamond": 612,
+        "time-lost-emerald": 613,
+        "time-lost-ruby": 614,
+        "time-lost-sapphire": 615,
+        "timeless-jewel": 616,
+        "titan-mitts": 617,
+        "tonal-focus": 618,
+        "topaz-ring": 619,
+        "torment-club": 620,
+        "torn-gloves": 621,
+        "totemic-greatclub": 622,
+        "toxic-quiver": 623,
+        "trailblazer-armour": 624,
+        "trapper-hood": 625,
+        "trarthan-cannon": 626,
+        "treerunner-shoes": 627,
+        "tribal-mask": 628,
+        "trimmed-greaves": 629,
+        "twig-circlet": 630,
+        "twig-focus": 631,
+        "twin-bow": 632,
+        "twin-crossbow": 633,
+        "twisted-amulet": 634,
+        "twisted-wand": 635,
+        "two-point-quiver": 636,
+        "two-stone-ring": 637,
+        "unique:class-amulets": 638,
+        "unique:class-belts": 639,
+        "unique:class-body-armours": 640,
+        "unique:class-boots": 641,
+        "unique:class-bows": 642,
+        "unique:class-bucklers": 643,
+        "unique:class-crossbows": 644,
+        "unique:class-foci": 645,
+        "unique:class-gloves": 646,
+        "unique:class-helmets": 647,
+        "unique:class-jewels": 648,
+        "unique:class-one-hand-maces": 649,
+        "unique:class-quarterstaves": 650,
+        "unique:class-quivers": 651,
+        "unique:class-rings": 652,
+        "unique:class-sceptres": 653,
+        "unique:class-shields": 654,
+        "unique:class-spears": 655,
+        "unique:class-staves": 656,
+        "unique:class-talismans": 657,
+        "unique:class-two-hand-maces": 658,
+        "unique:class-wands": 659,
+        "unset-ring": 660,
+        "urn-relic": 661,
+        "utility-belt": 662,
+        "utility-wraps": 663,
+        "utzaal-cuirass": 664,
+        "vaal-crest-shield": 665,
+        "vaal-cuirass": 666,
+        "vaal-gloves": 667,
+        "vaal-greaves": 668,
+        "vaal-mitts": 669,
+        "vaal-tower-shield": 670,
+        "vaal-wraps": 671,
+        "vagabond-armour": 672,
+        "vase-relic": 673,
+        "veiled-mask": 674,
+        "velour-shoes": 675,
+        "velvet-cap": 676,
+        "venerable-defender": 677,
+        "veridical-chain": 678,
+        "vermeil-circlet": 679,
+        "veteran-sabatons": 680,
+        "vicious-talisman": 681,
+        "vile-robe": 682,
+        "viper-cap": 683,
+        "visceral-quiver": 684,
+        "visored-helm": 685,
+        "vitalic-ring": 686,
+        "volant-quiver": 687,
+        "volatile-wand": 688,
+        "voltaic-staff": 689,
+        "voodoo-focus": 690,
+        "votive-raiment": 691,
+        "wanderer-shoes": 692,
+        "war-spear": 693,
+        "war-wraps": 694,
+        "warded-helm": 695,
+        "warden-bow": 696,
+        "warding-quarterstaff": 697,
+        "warlock-leggings": 698,
+        "warlord-cuirass": 699,
+        "warmonger-bow": 700,
+        "warmonger-greathelm": 701,
+        "warpick": 702,
+        "warrior-greathelm": 703,
+        "waxed-jacket": 704,
+        "waxing-quarterstaff": 705,
+        "wayfarer-jacket": 706,
+        "weaver-leggings": 707,
+        "wicker-tiara": 708,
+        "wide-belt": 709,
+        "wildwood-talisman": 710,
+        "wingbeat-talisman": 711,
+        "winged-spear": 712,
+        "withered-wand": 713,
+        "wolfskin-mantle": 714,
+        "wooden-buckler": 715,
+        "wooden-club": 716,
+        "woven-cap": 717,
+        "woven-focus": 718,
+        "wrapped-cap": 719,
+        "wrapped-greathelm": 720,
+        "wrapped-quarterstaff": 721,
+        "wrapped-sandals": 722,
+        "wrath-sceptre": 723,
+        "wyrm-quarterstaff": 724,
+        "wyrmscale-coat": 725,
+        "zealot-bow": 726,
+        "zealot-gauntlets": 727
+      }
+    }
+  },
+  "shareTree": {
+    "endgame": {
+      "ordinal": 0,
+      "children": {
+        "fragments": {
+          "ordinal": 0,
+          "children": {}
+        },
+        "incubators": {
+          "ordinal": 1,
+          "children": {}
+        },
+        "logbooks": {
+          "ordinal": 2,
+          "children": {}
+        },
+        "pinnacle-keys": {
+          "ordinal": 3,
+          "children": {}
+        },
+        "tablets": {
+          "ordinal": 4,
+          "children": {}
+        },
+        "trials": {
+          "ordinal": 5,
+          "children": {
+            "baryas": {
+              "ordinal": 0,
+              "children": {}
+            },
+            "ultimatums": {
+              "ordinal": 1,
+              "children": {}
+            }
+          }
+        },
+        "vault-keys": {
+          "ordinal": 6,
+          "children": {}
+        },
+        "waystones": {
+          "ordinal": 7,
+          "children": {}
+        }
+      }
+    },
+    "crafting": {
+      "ordinal": 1,
+      "children": {
+        "bones": {
+          "ordinal": 0,
+          "children": {}
+        },
+        "catalysts": {
+          "ordinal": 1,
+          "children": {}
+        },
+        "currency": {
+          "ordinal": 2,
+          "children": {}
+        },
+        "emotions": {
+          "ordinal": 3,
+          "children": {}
+        },
+        "essences": {
+          "ordinal": 4,
+          "children": {}
+        },
+        "expedition": {
+          "ordinal": 5,
+          "children": {}
+        },
+        "omens": {
+          "ordinal": 6,
+          "children": {}
+        },
+        "shards": {
+          "ordinal": 7,
+          "children": {}
+        },
+        "socketables": {
+          "ordinal": 8,
+          "children": {
+            "runes": {
+              "ordinal": 0,
+              "children": {}
+            },
+            "socketables-other": {
+              "ordinal": 1,
+              "children": {}
+            },
+            "soul-cores": {
+              "ordinal": 2,
+              "children": {}
+            }
+          }
+        },
+        "temple": {
+          "ordinal": 9,
+          "children": {}
+        },
+        "trial": {
+          "ordinal": 10,
+          "children": {}
+        },
+        "verisium": {
+          "ordinal": 11,
+          "children": {}
+        }
+      }
+    },
+    "gems": {
+      "ordinal": 2,
+      "children": {
+        "blood-gems": {
+          "ordinal": 0,
+          "children": {}
+        },
+        "rune-gems": {
+          "ordinal": 1,
+          "children": {}
+        },
+        "uncut-skill-gems": {
+          "ordinal": 2,
+          "children": {}
+        },
+        "uncut-spirit-gems": {
+          "ordinal": 3,
+          "children": {}
+        },
+        "uncut-support-gems": {
+          "ordinal": 4,
+          "children": {}
+        }
+      }
+    },
+    "supplies": {
+      "ordinal": 3,
+      "children": {
+        "charms": {
+          "ordinal": 0,
+          "children": {}
+        },
+        "flasks": {
+          "ordinal": 1,
+          "children": {
+            "life": {
+              "ordinal": 0,
+              "children": {}
+            },
+            "mana": {
+              "ordinal": 1,
+              "children": {}
+            }
+          }
+        }
+      }
+    },
+    "equipment": {
+      "ordinal": 4,
+      "children": {
+        "normal-bases": {
+          "ordinal": 0,
+          "children": {
+            "armour": {
+              "ordinal": 0,
+              "children": {
+                "body-armour": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "boots": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "gloves": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "helmets": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "jewellery": {
+              "ordinal": 1,
+              "children": {
+                "amulets": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "belts": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "rings": {
+                  "ordinal": 2,
+                  "children": {}
+                }
+              }
+            },
+            "jewels": {
+              "ordinal": 2,
+              "children": {}
+            },
+            "offhands": {
+              "ordinal": 3,
+              "children": {
+                "bucklers": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "foci": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "quivers": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "shields": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "one-hand": {
+              "ordinal": 4,
+              "children": {
+                "one-hand-maces": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "sceptres": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "spears": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "wands": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "relics": {
+              "ordinal": 5,
+              "children": {}
+            },
+            "two-hand": {
+              "ordinal": 6,
+              "children": {
+                "bows": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "crossbows": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "quarterstaves": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "staves": {
+                  "ordinal": 3,
+                  "children": {}
+                },
+                "talismans": {
+                  "ordinal": 4,
+                  "children": {}
+                },
+                "two-hand-maces": {
+                  "ordinal": 5,
+                  "children": {}
+                }
+              }
+            }
+          }
+        },
+        "unique-equipment": {
+          "ordinal": 1,
+          "children": {
+            "armour": {
+              "ordinal": 0,
+              "children": {
+                "body-armour": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "boots": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "gloves": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "helmets": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "jewellery": {
+              "ordinal": 1,
+              "children": {
+                "amulets": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "belts": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "rings": {
+                  "ordinal": 2,
+                  "children": {}
+                }
+              }
+            },
+            "jewels": {
+              "ordinal": 2,
+              "children": {}
+            },
+            "offhands": {
+              "ordinal": 3,
+              "children": {
+                "bucklers": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "foci": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "quivers": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "shields": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "one-hand": {
+              "ordinal": 4,
+              "children": {
+                "one-hand-maces": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "sceptres": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "spears": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "wands": {
+                  "ordinal": 3,
+                  "children": {}
+                }
+              }
+            },
+            "relics": {
+              "ordinal": 5,
+              "children": {}
+            },
+            "two-hand": {
+              "ordinal": 6,
+              "children": {
+                "bows": {
+                  "ordinal": 0,
+                  "children": {}
+                },
+                "crossbows": {
+                  "ordinal": 1,
+                  "children": {}
+                },
+                "quarterstaves": {
+                  "ordinal": 2,
+                  "children": {}
+                },
+                "staves": {
+                  "ordinal": 3,
+                  "children": {}
+                },
+                "talismans": {
+                  "ordinal": 4,
+                  "children": {}
+                },
+                "two-hand-maces": {
+                  "ordinal": 5,
+                  "children": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "other": {
+      "ordinal": 5,
+      "children": {
+        "other-items": {
+          "ordinal": 0,
+          "children": {}
+        },
+        "quest-items": {
+          "ordinal": 1,
+          "children": {}
+        },
+        "special-items": {
+          "ordinal": 2,
+          "children": {}
+        }
+      }
+    }
+  }
 }

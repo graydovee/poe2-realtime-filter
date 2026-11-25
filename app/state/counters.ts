@@ -7,6 +7,6 @@ export const counters = {
   library: 0,
   catalog: 0,
   market: 0,
-  /** 本次编辑是否更换过基础过滤器，保存时带给后端。 */
+  /** 本次编辑是否选择或清除了基础过滤器，保存时带给后端。 */
   baseFilterChanged: false,
 };

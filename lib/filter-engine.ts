@@ -289,13 +289,10 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   const hidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
   const matched = new Set<string>();
   const applied = new Map<string, { rule: FilterRule; count: number }>();
-  const followsBaseline = rawRules.some((rule) => rule.enabled && rule.followBaseline);
-  const inherited = baseline !== null && followsBaseline ? inspectBaseStyles(baseline) : {};
-  const warnings = rawRules.flatMap((rule) => {
-    const warning = rule.enabled && rule.followBaseline ? inherited[rule.id]?.warning : undefined;
-    return warning ? [warning] : [];
-  });
-  if (standalone && followsBaseline) warnings.push("跟随基础过滤器的规则使用游戏默认样式。");
+  const baselineEffectItemIds = new Set(rules.flatMap(({ baselineEffectItemId }) => baselineEffectItemId === undefined ? [] : [baselineEffectItemId]));
+  const inherited = baseline !== null && baselineEffectItemIds.size ? inspectBaseStyles(baseline, baselineEffectItemIds) : {};
+  const warnings = Object.values(inherited).flatMap(({ warning }) => warning ? [warning] : []);
+  if (standalone && baselineEffectItemIds.size) warnings.push("跟随基础过滤器的规则使用游戏默认样式。");
   const soundFiles = new Set<string>();
   const exaltedValues = new Map(ITEM_CATALOG.map((item) => {
     const price = item.priceable ? snapshot.prices[item.id] : undefined;
@@ -314,7 +311,8 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     const selectedItems = useItems
       ? [...new Set(itemIds)].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item))
       : ITEM_CATALOG.filter((item) => !item.matcher.class);
-    const actions = rule.followBaseline ? inherited[rule.id]?.actions ?? [] : effectLines(rule, options.distinguishCustom ?? false);
+    const sourceItemId = rule.baselineEffectItemId;
+    const actions = sourceItemId === undefined ? effectLines(rule, options.distinguishCustom ?? false) : inherited[sourceItemId]?.actions ?? [];
     // 整类条目排在它覆盖的逐件物品前面，后面的规则才能判断自己有没有被覆盖。
     const compacted = useItems && !usePrice ? compactClassMatches(new Set(selectedItems.map((item) => item.id)), skipped) : [];
     const compactedMembers = new Set(compacted.flatMap((match) => match.members.map((item) => item.id)));
@@ -356,7 +354,7 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     }
     if (emittedCount) {
       applied.set(rule.id, { rule, count: emittedCount });
-      if (!rule.followBaseline && rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
+      if (sourceItemId === undefined && rule.effects.sound && rule.effects.sound.type !== "builtin") soundFiles.add(rule.effects.sound.fileName);
     } else if (eligibleCount) {
       coveredRules.push({ ruleId: rule.id, ruleName: rule.name });
     }

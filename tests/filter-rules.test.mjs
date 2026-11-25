@@ -233,7 +233,8 @@ test("旧方案里的锚点价格点读成普通计价单位", () => {
   const [rule] = validateProfile(legacy).rules;
   assert.deepEqual(rule.target.range, { min: { amount: 1, currency: "chaos" }, max: { amount: 1, currency: "annulment" } });
   assert.equal(rule.autoRange, undefined);
-  assert.equal(rule.followBaseline, true, "默认价格档默认沿用基础过滤器里对应通货的样式");
+  assert.equal(rule.baselineEffectItemId, "chaos-orb", "默认价格档沿用基础过滤器里对应通货的样式");
+  assert.equal(rule.followBaseline, undefined);
   // 单位必须是四种之一；没见过的单位直接报错。
   const bad = { ...DEFAULT_PROFILE, rules: [{ ...makeRule(), target: { range: { min: { amount: 1, currency: "annulment-orb" } } } }] };
   assert.throws(() => validateProfile(bad), /价格下限无效/);

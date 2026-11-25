@@ -93,7 +93,6 @@ export function RuleEditor({
   onRemove: () => void;
 }) {
   const openPicker = useAppStore((state) => state.openPicker);
-  const setRuleSound = useAppStore((state) => state.setRuleSound);
   const conditionId = useId();
 
   const hasItems = rule.target.itemIds.length > 0;
@@ -231,7 +230,7 @@ export function RuleEditor({
 
       <section aria-label="显示与特效" className="border-t border-line p-1 pt-4">
         <h3 className="mb-3 text-xs font-semibold tracking-wide text-ink-muted">显示与特效</h3>
-        <EffectSection rule={rule} presets={presets} base={base} onChange={onChange} onSound={(file) => setRuleSound(rule.id, file)} />
+        <EffectSection rule={rule} presets={presets} base={base} />
       </section>
     </div>
   );

@@ -133,9 +133,11 @@ export type FilterRule = {
   name: string;
   enabled: boolean;
   hidden: boolean;
-  /** 默认价格档尚未自定义特效：生成时沿用基础过滤器里对应通货的样式。界面上不体现。 */
+  /** 以该目录物品在当前基础过滤器中的样式为准；不要求它出现在规则目标中。 */
+  baselineEffectItemId?: string;
+  /** 旧方案字段。true 在读取时迁移，false 保护手动保存的旧价格档样式。 */
   followBaseline?: boolean;
-  /** 选中的完整特效预设 id（仅用于回显，生成器只读 effects）。 */
+  /** 固定特效预设的回显 ID；生成器只读 effects。 */
   effectPresetId?: string;
   target: RuleTarget;
   effects: RuleEffects;
@@ -163,6 +165,8 @@ export type FilterProfile = {
 /** 一套完整特效：光柱 + 地图图标 + 字体 + 音效。 */
 export type EffectPreset = {
   id: string;
+  /** 已确认在当前基础过滤器中使用这套样式的目录物品。 */
+  sourceItemIds?: string[];
   beam?: string;
   icon?: string;
   font?: RuleFont;

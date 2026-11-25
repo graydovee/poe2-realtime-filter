@@ -173,7 +173,7 @@ export function SchemeDialogs() {
             <Textarea
               required
               className="min-h-28 font-mono text-xs"
-              placeholder="粘贴 POE2F1. 开头的分享码"
+              placeholder="粘贴 POE2F 开头的分享码"
               maxLength={1404096}
               value={shareCode}
               disabled={busy}

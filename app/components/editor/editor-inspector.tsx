@@ -2,13 +2,14 @@
 
 import { scrollToModule } from "../../hooks/navigation";
 import { requestLeaveEditor } from "../../hooks/use-shortcuts";
+import { ruleEffectsPending, shownRuleEffects } from "../../state/editor";
 import { useAppStore } from "../../state/store";
 import { SoundPreviewButton } from "../sound-preview";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { Separator } from "../ui/separator";
-import { EffectSummary, LootScene } from "./appearance-preview";
+import { effectSourceLabel, EffectSummary, LootScene } from "./appearance-preview";
 
 type SummaryRow = { label: string; value: string; warning?: boolean; jump: () => void };
 
@@ -86,8 +87,12 @@ export function EditorInspector() {
   const generate = useAppStore((state) => state.generate);
 
   const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
-  const shownEffects = active ? (active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects) : {};
-  const customFile = active?.effects.sound?.type === "custom" ? customSounds[active.id] : undefined;
+  const awaitingEffects = useAppStore((state) => Boolean(active && ruleEffectsPending(active, state)));
+  const sourceId = active?.baselineEffectItemId;
+  const sourceStyle = sourceId ? baseInspection?.styles[sourceId] : undefined;
+  const previewBase = sourceId && (!sourceStyle || sourceStyle.warning) ? undefined : base;
+  const shownEffects = active ? shownRuleEffects(active, baseInspection) : {};
+  const customFile = active && shownEffects.sound?.type === "custom" ? customSounds[active.id] : undefined;
 
   return (
     <div className="flex h-full flex-col">
@@ -97,10 +102,13 @@ export function EditorInspector() {
             <h3 className="text-xs font-semibold text-ink-muted">实时预览</h3>
             {active && <SoundPreviewButton sound={shownEffects.sound} file={customFile} base={base} />}
           </div>
-          {active ? (
+          {sourceId && <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">特效来源 · {effectSourceLabel(sourceId)}</p>}
+          {awaitingEffects ? (
+            <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器特效…</p>
+          ) : active ? (
             <>
               <LootScene effects={shownEffects} label={active.name || "示例物品"} />
-              <EffectSummary effects={shownEffects} base={base} />
+              <EffectSummary effects={shownEffects} base={previewBase} />
             </>
           ) : (
             <EmptyState compact title="还没有规则" description="新增一条规则后，这里会显示它在游戏里的掉落效果。" />

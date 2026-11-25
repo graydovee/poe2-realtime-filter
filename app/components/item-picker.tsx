@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronDown, ChevronRight, Coins, Gem, Package, SearchX, Shield, X } from "lucide-react";
 
+import { canFollowBaselineItem } from "../../lib/baseline-effects";
 import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, itemLabel, searchCatalog, type CatalogNode } from "../../lib/catalog";
 import { cn } from "../../lib/cn";
 import { FILTER_ITEMS_BY_ID, PICKER_ITEMS } from "../../lib/data";
@@ -95,11 +96,12 @@ function ItemCard({ item, selected, selectedOnly, onToggle }: {
 
 type TreeRow = { node: CatalogNode; depth: number; open: boolean };
 
-function ItemPicker({ itemIds, onToggle, onClear }: {
-  itemIds: string[];
-  onToggle: (toggle: ItemPickerToggle) => void;
-  onClear: () => void;
-}) {
+type ItemPickerProps = { itemIds: string[]; items?: ItemDefinition[]; flat?: boolean } & (
+  | { onToggle: (toggle: ItemPickerToggle) => void; onClear: () => void; onPick?: never }
+  | { onPick: (id: string) => void; onToggle?: never; onClear?: never }
+);
+
+function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onClear, onPick }: ItemPickerProps) {
   const [query, setQuery] = useState("");
   const [path, setPath] = useState<string[]>([]);
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -108,15 +110,16 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const search = query.trim();
-  const tree = useMemo(() => buildCatalogTree(PICKER_ITEMS), []);
+  const tree = useMemo(() => buildCatalogTree(items), [items]);
   const selected = useMemo(() => new Set(itemIds), [itemIds]);
-  const matching = useMemo(() => searchCatalog(PICKER_ITEMS, query), [query]);
+  const matching = useMemo(() => searchCatalog(items, query), [items, query]);
   const current = catalogNode(tree, path) ?? tree;
   const selectedItems = useMemo(
     () => [...selected].map((id) => FILTER_ITEMS_BY_ID.get(id)).filter((item): item is ItemDefinition => Boolean(item)),
     [selected],
   );
-  const visibleItems = selectedOnly ? searchCatalog(selectedItems, query) : search ? matching : current.items;
+  const visibleItems = selectedOnly ? searchCatalog(selectedItems, query) : search || flat ? matching : current.items;
+  const hasVisibleItems = visibleItems.length > 0;
   const scope = search ? matching : catalogItems(current);
   const stackables = scope.filter((item) => item.stackable);
   const canBatch = Boolean(search || path.length);
@@ -167,7 +170,7 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
   }
 
   function toggle(items: ItemDefinition[], checked: boolean, label: string, key: string) {
-    onToggle({ ids: items.map((item) => item.id), checked, label, key });
+    onToggle?.({ ids: items.map((item) => item.id), checked, label, key });
   }
 
   const virtualizer = useVirtualizer({
@@ -186,27 +189,29 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [hasVisibleItems]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [query, path, selectedOnly]);
 
   const childNodes = [...current.children].sort((a, b) => groupOrder(a.key) - groupOrder(b.key));
-  const showCategories = !selectedOnly && !search && childNodes.length > 0;
+  const showCategories = !flat && !selectedOnly && !search && childNodes.length > 0;
 
   return (
-    <div className="grid gap-3 md:grid-cols-[14.5rem_minmax(0,1fr)]">
-      <nav aria-label="物品分类" className="max-h-[min(26rem,52dvh)] overflow-y-auto overscroll-contain rounded-md border border-line bg-surface-2/50 p-1.5">
+    <div className={cn("grid gap-3", !flat && "md:grid-cols-[14.5rem_minmax(0,1fr)]")}>
+      {!flat && <nav aria-label="物品分类" className="max-h-[min(26rem,52dvh)] overflow-y-auto overscroll-contain rounded-md border border-line bg-surface-2/50 p-1.5">
         {/* 根节点固定展开，始终排在第一行。 */}
         <>
           <div className="flex h-8 items-center gap-1.5 rounded-sm px-1.5">
             <span className="w-4 shrink-0" />
-            <Checkbox
-              aria-label="选择全部分类"
-              checked={selectedItems.length === 0 ? false : selectedItems.length === totals.get("") ? true : "indeterminate"}
-              onCheckedChange={(checked) => toggle(PICKER_ITEMS, checked === true, "全部分类", "")}
-            />
+            {onToggle && (
+              <Checkbox
+                aria-label="选择全部分类"
+                checked={selectedItems.length === 0 ? false : selectedItems.length === totals.get("") ? true : "indeterminate"}
+                onCheckedChange={(checked) => toggle(items, checked === true, "全部分类", "")}
+              />
+            )}
             <button
               type="button"
               aria-current={!path.length ? "location" : undefined}
@@ -242,11 +247,13 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
                 >
                   {open ? <ChevronDown aria-hidden="true" className="size-3.5" /> : <ChevronRight aria-hidden="true" className="size-3.5" />}
                 </button>
-                <Checkbox
-                  aria-label={`选择分类 ${name}`}
-                  checked={chosen === 0 ? false : chosen === total ? true : "indeterminate"}
-                  onCheckedChange={(checked) => toggle(catalogItems(node), checked === true, name, id)}
-                />
+                {onToggle && (
+                  <Checkbox
+                    aria-label={`选择分类 ${name}`}
+                    checked={chosen === 0 ? false : chosen === total ? true : "indeterminate"}
+                    onCheckedChange={(checked) => toggle(catalogItems(node), checked === true, name, id)}
+                  />
+                )}
                 <button
                   type="button"
                   aria-current={active ? "location" : undefined}
@@ -262,7 +269,7 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
             );
           })}
         </>
-      </nav>
+      </nav>}
 
       <div className="flex min-w-0 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -273,17 +280,19 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
             placeholder="搜索中文或英文物品名"
             onChange={(event) => setQuery(event.target.value)}
           />
-          <Button
-            size="sm"
-            variant={selectedOnly ? "secondary" : "ghost"}
-            aria-pressed={selectedOnly}
-            onClick={() => setSelectedOnly(!selectedOnly)}
-          >
-            已选 {selected.size} 项
-          </Button>
+          {onToggle && (
+            <Button
+              size="sm"
+              variant={selectedOnly ? "secondary" : "ghost"}
+              aria-pressed={selectedOnly}
+              onClick={() => setSelectedOnly(!selectedOnly)}
+            >
+              已选 {selected.size} 项
+            </Button>
+          )}
         </div>
 
-        {!selectedOnly && (
+        {!flat && !selectedOnly && (
           <nav aria-label="当前分类" className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-ink-muted">
             <button type="button" onClick={() => navigate([])} className={cn("cursor-pointer rounded-sm px-1 py-0.5 hover:text-ink", !path.length && "text-gold-bright")}>
               全部分类
@@ -305,7 +314,7 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
           </nav>
         )}
 
-        {!selectedOnly && (canBatch || stackables.length > 0) && (
+        {onToggle && !selectedOnly && (canBatch || stackables.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-1.5">
             {canBatch && <span className="mr-auto px-1 text-xs text-ink-muted">已选 {count(scope)} / {scope.length}</span>}
             {canBatch && (
@@ -347,30 +356,41 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
                   >
                     <span className="min-w-0">
                       <span className="line-clamp-2 text-sm leading-snug text-ink">{name}</span>
-                      <span className="text-xs text-ink-muted">已选 {chosen} / {items.length}</span>
+                      <span className="text-xs text-ink-muted">
+                      {onPick ? `${items.length} 项物品` : `已选 ${chosen} / ${items.length}`}
+                    </span>
                     </span>
                     <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`选择分类 ${name}`}
-                    aria-pressed={chosen === items.length ? true : chosen > 0 ? "mixed" : false}
-                    onClick={() => toggle(items, chosen !== items.length, name, child.path.join("/"))}
-                    className={cn(
-                      "w-12 shrink-0 cursor-pointer border-l border-line text-xs transition-colors hover:bg-gold/10",
-                      chosen ? "text-gold-bright" : "text-ink-muted",
-                    )}
-                  >
-                    {chosen === items.length ? "已选" : chosen > 0 ? "部分" : "全选"}
-                  </button>
+                  {onToggle && (
+                    <button
+                      type="button"
+                      aria-label={`选择分类 ${name}`}
+                      aria-pressed={chosen === items.length ? true : chosen > 0 ? "mixed" : false}
+                      onClick={() => toggle(items, chosen !== items.length, name, child.path.join("/"))}
+                      className={cn(
+                        "w-12 shrink-0 cursor-pointer border-l border-line text-xs transition-colors hover:bg-gold/10",
+                        chosen ? "text-gold-bright" : "text-ink-muted",
+                      )}
+                    >
+                      {chosen === items.length ? "已选" : chosen > 0 ? "部分" : "全选"}
+                    </button>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        {visibleItems.length > 0 && (
-          <div ref={scrollRef} className="h-[min(26rem,52dvh)] overflow-y-auto overscroll-contain rounded-md border border-line bg-surface-2/50 p-2" aria-label={selectedOnly ? "已选物品" : "物品列表"}>
+        {hasVisibleItems && (
+          <div
+            ref={scrollRef}
+            className={cn(
+              "max-h-[min(26rem,52dvh)] overflow-y-auto overscroll-contain rounded-md border border-line bg-surface-2/50 p-2",
+              !flat && "h-[min(26rem,52dvh)]",
+            )}
+            aria-label={selectedOnly ? "已选物品" : "物品列表"}
+          >
             <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
               {virtualizer.getVirtualItems().map((row) => {
                 const item = visibleItems[row.index];
@@ -390,7 +410,15 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
                     className="pointer-events-none grid gap-2 pr-1"
                   >
                     <div style={{ gridColumn: row.lane + 1 }} className="pointer-events-auto h-full">
-                      <ItemCard item={item} selected={checked} selectedOnly={selectedOnly} onToggle={() => toggle([item], !checked, label, item.id)} />
+                      <ItemCard
+                        item={item}
+                        selected={checked}
+                        selectedOnly={selectedOnly}
+                        onToggle={() => {
+                          if (onPick) onPick(item.id);
+                          else toggle([item], !checked, label, item.id);
+                        }}
+                      />
                     </div>
                   </div>
                 );
@@ -399,7 +427,7 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
           </div>
         )}
 
-        {visibleItems.length === 0 && (selectedOnly || search || childNodes.length === 0) && (
+        {!hasVisibleItems && (flat || selectedOnly || search || childNodes.length === 0) && (
           <EmptyState
             compact
             className="rounded-md border border-line"
@@ -407,7 +435,7 @@ function ItemPicker({ itemIds, onToggle, onClear }: {
             title={selectedOnly && !search ? "选中的物品显示在这里" : "试试其他物品名称"}
           />
         )}
-        {selectedOnly && itemIds.length > 0 && (
+        {onClear && selectedOnly && itemIds.length > 0 && (
           <Button size="sm" variant="ghost" className="self-start" onClick={onClear}>
             清空选择
           </Button>
@@ -426,13 +454,14 @@ function applyToggle(current: string[], toggle: ItemPickerToggle) {
   return [...next];
 }
 
-/** 选择物品的对话框。规则物品和跳过名单共用，改动即时生效，关闭即完成。 */
+/** 选择规则物品、跳过物品或单个特效来源。点选即时生效。 */
 export function ItemPickerDialog() {
   const target = useAppStore((state) => state.picker);
   const closePicker = useAppStore((state) => state.closePicker);
   const profile = useAppStore((state) => state.profile);
   const activeRuleId = useAppStore((state) => state.activeRuleId);
   const updateRule = useAppStore((state) => state.updateRule);
+  const setRuleAppearance = useAppStore((state) => state.setRuleAppearance);
   const toggleSkipped = useAppStore((state) => state.toggleSkipped);
   const clearSkipped = useAppStore((state) => state.clearSkipped);
 
@@ -458,6 +487,40 @@ export function ItemPickerDialog() {
         }
       >
         <ItemPicker itemIds={profile.skippedItemIds} onToggle={toggleSkipped} onClear={clearSkipped} />
+      </ConfirmDialog>
+    );
+  }
+
+  if (typeof target !== "string") {
+    const rule = profile.rules.find((entry) => entry.id === target.ruleId);
+    if (!rule) return null;
+    const candidates = target.itemIds
+      ? target.itemIds.flatMap((id) => FILTER_ITEMS_BY_ID.get(id) ?? [])
+      : PICKER_ITEMS;
+    return (
+      <ConfirmDialog
+        open
+        onOpenChange={(open) => {
+          if (!open) closePicker();
+        }}
+        size={target.itemIds ? "lg" : "xl"}
+        title={target.itemIds ? "选择预设来源" : "选择特效来源物品"}
+        description={target.itemIds
+          ? "这些物品在当前基础过滤器中使用此预设。选择一个作为特效来源。"
+          : profile.baseFilter
+            ? "选择物品后，这条规则将使用该物品在基础过滤器中的特效。"
+            : "绑定来源物品后，选择基础过滤器前将使用游戏默认样式。"}
+        footer={<Button onClick={closePicker}>取消</Button>}
+      >
+        <ItemPicker
+          items={candidates.filter(canFollowBaselineItem)}
+          itemIds={rule.baselineEffectItemId ? [rule.baselineEffectItemId] : []}
+          flat={Boolean(target.itemIds)}
+          onPick={(itemId) => {
+            setRuleAppearance(rule.id, { itemId });
+            closePicker();
+          }}
+        />
       </ConfirmDialog>
     );
   }

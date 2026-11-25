@@ -14,6 +14,7 @@ execFileSync(
     "lib/catalog.ts",
     "lib/default-profile.ts",
     "lib/profile-validation.ts",
+    "lib/rule-id.ts",
     "worker/tencent-market.ts",
     "--outDir", output,
     "--module", "commonjs",
@@ -36,7 +37,9 @@ export const { searchCatalog } = require(path.join(output, "lib/catalog.js"));
 export const { groupName, groupOrder, itemLabel } = require(path.join(output, "lib/catalog.js"));
 export const pricing = require(path.join(output, "lib/pricing.js"));
 export const data = require(path.join(output, "lib/data.js"));
+export const catalogView = require(path.join(output, "lib/catalog-view.js"));
 export const DEFAULT_PROFILE = require(path.join(output, "lib/default-profile.js")).DEFAULT_PROFILE;
+export const { newRuleId } = require(path.join(output, "lib/rule-id.js"));
 export const cleanup = () => rmSync(output, { recursive: true, force: true });
 
 export const DIVINE = 1000; // 1D = 1000E

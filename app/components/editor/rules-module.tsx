@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ChevronDown, ClipboardPaste, Copy, Plus, Sparkles } from "lucide-react";
 
-import { DEFAULT_EFFECT_ITEMS } from "../../../lib/baseline-effects";
 import type { FilterRule, RuleEffects } from "../../../lib/types";
+import { ruleEffectsPending, shownRuleEffects } from "../../state/editor";
 import { useAppStore, useEditorMarket } from "../../state/store";
 import { Button } from "../ui/button";
 import {
@@ -30,13 +30,14 @@ export function RulesModule() {
   const updateRule = useAppStore((state) => state.updateRule);
   const removeRule = useAppStore((state) => state.removeRule);
   const undoRemoveRule = useAppStore((state) => state.undoRemoveRule);
-  const setRuleSound = useAppStore((state) => state.setRuleSound);
+  const setRuleAppearance = useAppStore((state) => state.setRuleAppearance);
   const addRule = useAppStore((state) => state.addRule);
   const { selected: market } = useEditorMarket();
   const [copiedTarget, setCopiedTarget] = useState<Pick<FilterRule, "target">>();
   const [copiedEffects, setCopiedEffects] = useState<{ effects: RuleEffects; file?: File }>();
 
   const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
+  const awaitingEffects = useAppStore((state) => Boolean(active && ruleEffectsPending(active, state)));
 
   function removeActive() {
     if (!active) return;
@@ -77,8 +78,9 @@ export function RulesModule() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
+          disabled={awaitingEffects}
           onSelect={() => {
-            const effects = active.followBaseline ? baseInspection?.styles[active.id]?.effects ?? {} : active.effects;
+            const effects = shownRuleEffects(active, baseInspection);
             setCopiedEffects({
               effects: structuredClone(effects),
               file: effects.sound?.type === "custom" ? customSounds[active.id] : undefined,
@@ -93,12 +95,7 @@ export function RulesModule() {
           disabled={!copiedEffects}
           onSelect={() => {
             if (!copiedEffects) return;
-            setRuleSound(active.id, copiedEffects.file);
-            updateRule(active.id, {
-              effects: structuredClone(copiedEffects.effects),
-              effectPresetId: undefined,
-              followBaseline: Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS, active.id) ? false : undefined,
-            });
+            setRuleAppearance(active.id, { effects: structuredClone(copiedEffects.effects), file: copiedEffects.file });
             toast.success("已应用特效");
           }}
         >

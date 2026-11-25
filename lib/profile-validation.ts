@@ -1,4 +1,4 @@
-import { DEFAULT_EFFECT_ITEMS } from "./baseline-effects";
+import { canFollowBaselineItem } from "./baseline-effects";
 import { FILTER_ITEMS_BY_ID, STYLE_LABELS } from "./data";
 import { dropConditionsIssue } from "./drop-conditions";
 import { normalizeProfile } from "./profile";
@@ -22,7 +22,9 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  ids.add(rule.id);
  if(typeof rule.name!=='string'||!rule.name.trim()||rule.name.length>100||/[\r\n]/.test(rule.name))throw new Error('规则名称需要1–100个字符');
  if(typeof rule.enabled!=='boolean'||typeof rule.hidden!=='boolean')throw new Error('无效规则');
- if(rule.followBaseline!==undefined&&(typeof rule.followBaseline!=='boolean'||!Object.prototype.hasOwnProperty.call(DEFAULT_EFFECT_ITEMS,rule.id)))throw new Error('无效的基础特效跟随设置');
+ if(rule.followBaseline!==undefined&&rule.followBaseline!==false)throw new Error('无效的基础特效跟随设置');
+ const source=rule.baselineEffectItemId;
+ if(source!==undefined&&(typeof source!=='string'||!canFollowBaselineItem(FILTER_ITEMS_BY_ID.get(source))))throw new Error('无效的基础特效参考物品');
  if(rule.effectPresetId!==undefined&&(typeof rule.effectPresetId!=='string'||rule.effectPresetId.length>60||!/^[a-zA-Z0-9_-]+$/.test(rule.effectPresetId)))throw new Error('无效特效预设');
  if(!rule.target||typeof rule.target!=='object')throw new Error('规则缺少适用物品');
  const itemIds=rule.target.itemIds;

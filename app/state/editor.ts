@@ -4,16 +4,27 @@ import { toast } from "sonner";
 import type { BaseInspection } from "../../lib/baseline-effects";
 import { explain, fileToBase64, local, readSound, type LocalScheme } from "../../lib/desktop";
 import { DEFAULT_PROFILE } from "../../lib/default-profile";
-import { FALLBACK_SNAPSHOT } from "../../lib/data";
+import { FALLBACK_SNAPSHOT, legacyEffectItemId } from "../../lib/data";
 import { normalizeProfile } from "../../lib/profile";
-import type { BaseFilter, FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot } from "../../lib/types";
+import { newRuleId } from "../../lib/rule-id";
+import type { BaseFilter, FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot, RuleEffects } from "../../lib/types";
 import { counters } from "./counters";
 import type { AppState } from "./store";
 import type { EditorDialog, Generated, ItemPickerToggle, PickerTarget } from "./types";
 
 type RemovedRule = { rule: FilterRule; index: number; sound?: File };
+type RuleAppearance = { itemId: string } | { effects: RuleEffects; presetId?: string; file?: File };
 
 const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+export function shownRuleEffects(rule: FilterRule, inspection?: BaseInspection): RuleEffects {
+  const itemId = rule.baselineEffectItemId;
+  return itemId ? inspection?.styles[itemId]?.effects ?? {} : rule.effects;
+}
+
+export function ruleEffectsPending(rule: FilterRule, state: Pick<EditorState, "profile" | "baseInspection" | "baseStylesError">) {
+  return Boolean(rule.baselineEffectItemId && state.profile.baseFilter && !state.baseInspection && !state.baseStylesError);
+}
 
 /** 打开已保存的方案时把旧写法（锚点价格点）读成当前格式；读不了就原样交给后续校验报错。 */
 function readableProfile(profile: FilterProfile): FilterProfile {
@@ -69,9 +80,9 @@ export type EditorActions = {
   setActiveRuleId: (id: string | undefined) => void;
   toggleSkipped: (toggle: ItemPickerToggle) => void;
   clearSkipped: () => void;
+  setRuleAppearance: (id: string, appearance: RuleAppearance) => void;
   setRuleSound: (id: string, file: File | undefined) => void;
-  /** `markChanged: false` 用于「清除基础过滤器」，不把方案标记为更换过基础过滤器。 */
-  setBaseFilter: (base?: BaseFilter, options?: { markChanged?: boolean }) => void;
+  setBaseFilter: (base?: BaseFilter) => void;
   setBaseFilterOpen: (open: boolean) => void;
   loadBaseInspection: () => Promise<void>;
   loadCatalog: (server: GameServer) => Promise<void>;
@@ -147,7 +158,9 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     })),
 
   addRule: () => {
-    const id = `rule-${globalThis.crypto.randomUUID()}`;
+    const { profile, lastRemoved } = get();
+    // 避开已有规则和「撤销删除」暂存的那一条，免得撤销之后出现重复 id。
+    const id = newRuleId([...profile.rules.map((rule) => rule.id), ...(lastRemoved ? [lastRemoved.rule.id] : [])]);
     set((state) => ({
       dirty: true,
       activeRuleId: id,
@@ -233,39 +246,39 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
 
   clearSkipped: () => get().update("skippedItemIds", []),
 
+  setRuleAppearance: (id, appearance) =>
+    set((state) => {
+      const index = state.profile.rules.findIndex((rule) => rule.id === id);
+      if (index < 0) return state;
+      const rule = state.profile.rules[index];
+      const fixed = "effects" in appearance ? appearance : undefined;
+      const itemId = "itemId" in appearance ? appearance.itemId : undefined;
+      if (itemId && itemId === rule.baselineEffectItemId) return state;
+      const customSounds = { ...state.customSounds };
+      if (fixed?.file && fixed.effects.sound?.type === "custom") customSounds[id] = fixed.file;
+      else delete customSounds[id];
+      const rules = [...state.profile.rules];
+      rules[index] = {
+        ...rule,
+        baselineEffectItemId: itemId,
+        // 旧版默认价格档的 ID 仍可用于兼容读取，显式固定后不能再据此迁移。
+        followBaseline: fixed && legacyEffectItemId(id) ? false : undefined,
+        effectPresetId: fixed?.presetId,
+        effects: fixed?.effects ?? {},
+      };
+      return { dirty: true, customSounds, profile: { ...state.profile, rules } };
+    }),
+
   setRuleSound: (id, file) => {
-    if (!file) {
-      set((state) => {
-        if (!(id in state.customSounds)) return state;
-        const customSounds = { ...state.customSounds };
-        delete customSounds[id];
-        return { customSounds };
-      });
-      return;
-    }
-    const rule = get().profile.rules.find((entry) => entry.id === id);
-    // 沿用基础样式的规则改成自定义音效时，把沿用的光柱、图标、字体一起接过来，免得只剩音效。
-    const kept = rule?.followBaseline ? get().baseInspection?.styles[id]?.effects ?? {} : rule?.effects ?? {};
-    set((state) => ({
-      dirty: true,
-      customSounds: { ...state.customSounds, [id]: file },
-      profile: {
-        ...state.profile,
-        rules: state.profile.rules.map((entry) =>
-          entry.id === id
-            ? {
-                ...entry,
-                followBaseline: rule?.followBaseline === undefined ? undefined : false,
-                effects: { ...kept, sound: { type: "custom", fileName: safeSoundName(file.name) } },
-              }
-            : entry,
-        ),
-      },
-    }));
+    const state = get();
+    const rule = state.profile.rules.find((entry) => entry.id === id);
+    if (!file || !rule || ruleEffectsPending(rule, state)) return;
+    const effects = shownRuleEffects(rule, state.baseInspection);
+    state.setRuleAppearance(id, { effects: { ...effects, sound: { type: "custom", fileName: safeSoundName(file.name) } }, file });
   },
 
-  setBaseFilter: (base, options) => {
-    if (options?.markChanged !== false) counters.baseFilterChanged = true;
+  setBaseFilter: (base) => {
+    counters.baseFilterChanged = true;
     counters.inspection += 1;
     set((state) => ({
       dirty: true,
@@ -279,15 +292,15 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   setBaseFilterOpen: (baseFilterOpen) => set({ baseFilterOpen }),
 
   loadBaseInspection: async () => {
-    const base = get().profile.baseFilter;
-    set({ baseInspection: undefined, baseStylesError: "" });
-    if (get().view !== "editor" || !base) return;
+    const { view, profile: { baseFilter: base } } = get();
     const request = ++counters.inspection;
+    set({ baseInspection: undefined, baseStylesError: "" });
+    if (view !== "editor" || !base) return;
     try {
       const inspection = await local<BaseInspection>("base_styles", { base });
       if (request === counters.inspection) set({ baseInspection: inspection });
     } catch (cause) {
-      if (request === counters.inspection) set({ baseStylesError: explain(cause) });
+      if (request === counters.inspection) set({ baseStylesError: explain(cause) || "无法读取基础过滤器特效。" });
     }
   },
 
@@ -326,13 +339,14 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
 
   openDraft: async (scheme, target) => {
     set({ schemeBusy: true });
+    const draft = scheme ? readableProfile(scheme.profile) : undefined;
     const soundFiles: Record<string, File> = {};
     const missing = new Set<string>();
-    if (scheme) {
+    if (scheme && draft) {
       const reads = new Map<string, Promise<File>>();
       await Promise.all(
-        scheme.profile.rules.map(async (rule) => {
-          const sound = rule.effects.sound;
+        draft.rules.map(async (rule) => {
+          const sound = rule.baselineEffectItemId ? undefined : rule.effects.sound;
           if (sound?.type !== "custom") return;
           let file = reads.get(sound.fileName);
           if (!file) {
@@ -358,8 +372,8 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       schemeId: scheme?.id ?? null,
       schemeName: scheme?.name ?? "",
       leagueCatalog: catalog,
-      profile: scheme
-        ? { ...readableProfile(scheme.profile), server: target }
+      profile: draft
+        ? { ...draft, server: target }
         : { ...structuredClone(DEFAULT_PROFILE), server: target, league, originalLeague: league },
       customSounds: soundFiles,
       activeRuleId: undefined,

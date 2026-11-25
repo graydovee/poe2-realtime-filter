@@ -1,5 +1,37 @@
+import rulesData from "../data/default-rules.json";
+import { legacyEffectItemId } from "./data";
 import { DEFAULT_PROFILE } from "./default-profile";
 import type { FilterProfile, FilterRule, PriceCurrency, PricePoint, PriceRange } from "./types";
+
+const legacyEffectSnapshots = new Map(rulesData.rules.map((rule) => [rule.id, rule]));
+
+/** 对比旧快照的完整内容；JSON 对象里的字段顺序不代表编辑。 */
+function sameSnapshot(value: unknown, expected: unknown): boolean {
+  if (value === expected) return true;
+  if (!value || !expected || typeof value !== "object" || typeof expected !== "object" || Array.isArray(value) || Array.isArray(expected)) return false;
+  const saved = value as Record<string, unknown>;
+  const original = expected as Record<string, unknown>;
+  const keys = Object.keys(original);
+  return Object.keys(saved).length === keys.length && keys.every((key) =>
+    Object.prototype.hasOwnProperty.call(saved, key) && sameSnapshot(saved[key], original[key]));
+}
+
+function normalizeRuleEffects(rule: FilterRule) {
+  const legacyItemId = legacyEffectItemId(rule.id);
+  if (rule.baselineEffectItemId === undefined && legacyItemId !== undefined) {
+    const snapshot = rule.followBaseline === undefined ? legacyEffectSnapshots.get(rule.id) : undefined;
+    if (rule.followBaseline === true || (snapshot && rule.effectPresetId === snapshot.effectPresetId
+      && sameSnapshot(rule.effects, snapshot.effects))) {
+      rule.baselineEffectItemId = legacyItemId;
+    }
+  }
+  if (rule.baselineEffectItemId !== undefined) {
+    if (typeof rule.followBaseline === "boolean") delete rule.followBaseline;
+    delete rule.effectPresetId;
+    rule.effects = {};
+  }
+  // 固定样式的显式 false 要保留，否则再次读取时可能被当成旧快照迁移。
+}
 
 type LegacyPoint = PricePoint & { referenceItemId?: string };
 
@@ -46,12 +78,13 @@ export function normalizeProfile(input: unknown): FilterProfile {
     } as FilterRule;
     // 价格档早已是普通价格区间，旧方案里的这个开关不再有意义。
     delete (rule as { autoRange?: boolean }).autoRange;
+    normalizeRuleEffects(rule);
     return rule;
   });
   const skippedItemIds = Array.isArray(raw.skippedItemIds) ? raw.skippedItemIds : [];
   const variantId = (id: unknown) => typeof id === "string" && /^(base|unique):/.test(id);
   const version3 = raw.schemaVersion === 3 || skippedItemIds.some(variantId) || rules.some((rule) =>
-    rule.target.dropConditions !== undefined || rule.target.itemIds.some(variantId),
+    rule.target.dropConditions !== undefined || rule.target.itemIds.some(variantId) || variantId(rule.baselineEffectItemId),
   );
   return {
     ...DEFAULT_PROFILE,

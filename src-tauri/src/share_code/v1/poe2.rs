@@ -1,15 +1,20 @@
-//! Wire layout for `{"alg":"poe2","p":1}`.
+//! Wire layout for `{"alg":"poe2","p":1}` and `{"alg":"poe2","p":2}`, written up to v0.5.12.
 //! A little-endian u32 metadata length, JSON [name, packed profile], then list data
 //! in rule order followed by skipped items. Packed objects start with a presence
 //! mask followed by values in field order. Lists use [mode, count, reference, size].
+//! Only `unpack` runs outside the tests; the packer stays to build inputs for it.
 
 use super::{Share, MAX_JSON};
 use serde_json::{json, Map, Value};
-use std::{collections::HashMap, sync::LazyLock};
+#[cfg(test)]
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 // Index is the wire ID. Keep this snapshot independent of the live item catalog.
 const ITEMS: &str = include_str!("poe2-p1-items.txt");
 static ITEM_IDS: LazyLock<Vec<&'static str>> = LazyLock::new(|| ITEMS.lines().collect());
+// Only the packer looks ids up, and it stays for the tests.
+#[cfg(test)]
 static ITEM_INDEX: LazyLock<HashMap<&'static str, usize>> = LazyLock::new(|| {
     ITEM_IDS
         .iter()
@@ -183,6 +188,7 @@ const SUBSET_BITMAP: usize = 5;
 
 type Descriptor = [usize; 4];
 
+#[cfg(test)]
 pub(super) fn pack(share: &Share) -> Option<Vec<u8>> {
     let mut profile = share.profile.clone();
     let mut history = Vec::new();
@@ -251,6 +257,7 @@ pub(super) fn unpack(bytes: &[u8]) -> Option<Share> {
     data.is_empty().then_some(share)
 }
 
+#[cfg(test)]
 fn encode_list(list: &[usize], history: &[Vec<usize>]) -> (usize, usize, Vec<u8>) {
     let mut best = (DELTA, 0, encode_deltas(list.iter().copied(), true));
     let mut consider = |mode, reference, bytes: Vec<u8>| {
@@ -284,6 +291,7 @@ fn encode_list(list: &[usize], history: &[Vec<usize>]) -> (usize, usize, Vec<u8>
     best
 }
 
+#[cfg(test)]
 fn subsequence_positions(list: &[usize], previous: &[usize]) -> Option<Vec<usize>> {
     if list.len() >= previous.len() {
         return None;
@@ -336,6 +344,7 @@ fn decode_list(descriptor: Descriptor, bytes: &[u8], history: &[Vec<usize>]) -> 
     (list.len() == count).then_some(list)
 }
 
+#[cfg(test)]
 fn encode_deltas(values: impl Iterator<Item = usize>, signed: bool) -> Vec<u8> {
     let mut previous = 0;
     let mut bytes = Vec::new();
@@ -390,6 +399,7 @@ fn decode_deltas(mut bytes: &[u8], count: usize, limit: usize, signed: bool) -> 
     bytes.is_empty().then_some(result)
 }
 
+#[cfg(test)]
 fn bitmap(indices: &[usize], count: usize) -> Vec<u8> {
     let mut bitmap = vec![0; count.div_ceil(8)];
     for &index in indices {
@@ -415,7 +425,9 @@ fn bitmap_positions(bytes: &[u8], count: usize) -> Option<Vec<usize>> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{encode_payload, LegacyBody};
     use super::*;
+    use crate::share_code::decode;
     use sha2::{Digest, Sha256};
 
     #[test]
@@ -477,11 +489,11 @@ mod tests {
         };
         let packed = pack(&share).unwrap();
         assert_eq!(unpack(&packed).unwrap(), share);
-        let specialized = super::super::encode(&share).unwrap();
+        let specialized = encode_payload(LegacyBody::Poe2, &packed).unwrap();
         let json = serde_json::to_vec(&share).unwrap();
-        let generic = super::super::encode_payload(super::super::Codec::BrotliJson, &json).unwrap();
+        let generic = encode_payload(LegacyBody::BrotliJson, &json).unwrap();
         assert!(specialized.len() < generic.len() / 2);
-        assert_eq!(super::super::decode(&specialized).unwrap(), share);
+        assert_eq!(decode(&specialized).unwrap().share, share);
     }
 
     #[test]

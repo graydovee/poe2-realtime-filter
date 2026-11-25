@@ -301,7 +301,7 @@ export function BaseFilterModule() {
               </DropdownMenuContent>
             </DropdownMenu>
             {(base || hint) && (
-              <Button size="sm" variant="ghost" onClick={() => setBaseFilter(undefined, { markChanged: false })}>
+              <Button size="sm" variant="ghost" onClick={() => setBaseFilter()}>
                 <Trash2 aria-hidden="true" />
                 清除基础过滤器
               </Button>

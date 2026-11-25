@@ -3,8 +3,8 @@ import type { GameServer, LeagueCatalog, MarketSnapshot } from "../../lib/types"
 
 export type View = "manager" | "editor";
 
-/** 物品选择器正在编辑哪一份名单。 */
-export type PickerTarget = "rule" | "skipped";
+/** 物品选择器正在编辑的条件、跳过名单或特效来源。 */
+export type PickerTarget = "rule" | "skipped" | { kind: "effect-source"; ruleId: string; itemIds?: string[] };
 
 export type EditorDialog = "saveName" | "discard";
 

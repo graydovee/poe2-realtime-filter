@@ -3,16 +3,13 @@
  * 只在开发构建且地址带 ?mock=1 时接入（见 lib/desktop.ts）：界面逻辑走真实的 lib/，
  * Tauri 命令返回内存里的演示数据。生产构建不会包含这个文件。
  */
-import effectData from "../../data/neversink-effects.json";
-import type { BaseInspection } from "../../lib/baseline-effects";
+import { inspectBaseFilter } from "../../lib/baseline-effects";
 import type { Library } from "../../lib/desktop";
 import { DEFAULT_RULES } from "../../lib/data";
-import { pickEffects } from "../../lib/effect-labels";
 import { generateFilter } from "../../lib/filter-engine";
 import type {
   BaseFilter,
   Currency,
-  EffectPreset,
   FilterProfile,
   FilterRule,
   GameServer,
@@ -240,14 +237,40 @@ let nextId = 6;
 
 const schemeById = (id: unknown) => library.schemes.find((entry) => entry.id === id);
 
-/** 给基础过滤器自带的四个价格档各配一套「跟随基础过滤器」时的特效，外加完整预设画廊。 */
-function inspection(): BaseInspection {
-  const presets = effectData.styles.default as EffectPreset[];
-  const styles: BaseInspection["styles"] = {};
-  DEFAULT_RULES.forEach((rule, index) => {
-    styles[rule.id] = { effects: pickEffects(presets[(index * 14 + 3) % presets.length]), actions: [] };
-  });
-  return { styles, presets };
+/** 画廊和生成预览读取同一份演示基底，涵盖单一来源、多个来源和无法绑定的预设。 */
+function mockBaseline(base: BaseFilter) {
+  if (base.kind === "local") return STALE_BASE_TEXT;
+  const regular = base.kind === "downloaded" && base.entry.endsWith("1-REGULAR.filter");
+  return [
+    "Show",
+    '\tBaseType == "Divine Orb"',
+    "\tSetFontSize 45",
+    regular ? "\tPlayEffect Purple" : "\tPlayEffect Red",
+    regular ? "\tMinimapIcon 1 Purple Star" : "\tMinimapIcon 0 Red Star",
+    "\tPlayAlertSound 6 300",
+    "",
+    "Show",
+    '\tBaseType == "Orb of Annulment"',
+    regular ? "\tSetFontSize 38" : "\tSetFontSize 42",
+    "\tSetBorderColor 0 240 190 255",
+    "\tPlayEffect Green",
+    "",
+    "Show",
+    '\tBaseType == "Exalted Orb" "Chaos Orb"',
+    regular ? "\tSetFontSize 40" : "\tSetFontSize 44",
+    "\tPlayEffect Blue",
+    "\tMinimapIcon 1 Blue Diamond",
+    "\tPlayAlertSound 3 300",
+    "",
+    "Show",
+    '\tBaseType == "Vaal Orb"',
+    "\tItemLevel >= 60",
+    "\tSetFontSize 34",
+    "\tSetBorderColor 255 140 0 255",
+    "",
+    "Show",
+    "",
+  ].join("\n");
 }
 
 type Handler = (args: Args) => unknown | Promise<unknown>;
@@ -260,23 +283,28 @@ const handlers: Record<string, Handler> = {
   local_catalog: () => clone(LEAGUE),
   local_market: ({ league, server }) => market(String(league), server as GameServer | undefined),
   refresh_market: async () => delay(900),
-  base_styles: () => inspection(),
+  base_styles: ({ base }) => inspectBaseFilter(mockBaseline(base as BaseFilter), {}),
   preview: ({ profile: value }) => {
     const profile = value as FilterProfile;
-    // 选了那份过期的本地文件时，带着它的正文生成，用来演示基础过滤器与游戏版本不兼容的提示。
-    const baseline = JSON.stringify(profile.baseFilter) === JSON.stringify(LOCAL_BASE) ? STALE_BASE_TEXT : null;
-    return { ...generateFilter(profile, baseline, market(profile.league, profile.server ?? "international")), market: market(profile.league) };
+    const baseline = profile.baseFilter ? mockBaseline(profile.baseFilter) : null;
+    const snapshot = market(profile.league, profile.server ?? "international");
+    return { ...generateFilter(profile, baseline, snapshot), market: snapshot };
   },
   scheme_save: ({ edit }) => {
-    const value = edit as { id: string | null; name: string; profile: FilterProfile };
+    const value = edit as { id: string | null; name: string; profile: FilterProfile; baseFilterChanged?: boolean };
     const existing = value.id ? schemeById(value.id) : undefined;
+    const draft = clone(value.profile);
     if (existing) {
+      if (value.baseFilterChanged === false) {
+        draft.baseFilter = existing.profile.baseFilter;
+        draft.baseFilterHint = existing.profile.baseFilterHint;
+      }
       existing.name = value.name;
-      existing.profile = clone(value.profile);
-      return value.id;
+      existing.profile = draft;
+      return existing.id;
     }
     const id = `scheme-${nextId++}`;
-    library.schemes.push({ id, name: value.name, profile: clone(value.profile), autoRefresh: false, installed: null, status: "" });
+    library.schemes.push({ id, name: value.name, profile: draft, autoRefresh: false, installed: null, status: "" });
     return id;
   },
   scheme_copy: ({ id }) => {

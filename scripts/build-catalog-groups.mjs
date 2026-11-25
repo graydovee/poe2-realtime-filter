@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { applyCatalogMechanics } from "./apply-catalog-mechanics.mjs";
+import { writeCatalogWithShareData } from "./lib/catalog-data.mjs";
 
 const clientRoot = process.argv[2];
 if (!clientRoot) throw new Error("Usage: node scripts/build-catalog-groups.mjs <client-version-directory>");
@@ -69,11 +71,7 @@ function categoryPath(item) {
 const catalogFile = path.resolve("data/item-catalog.json");
 const catalog = JSON.parse(fs.readFileSync(catalogFile, "utf8"));
 for (const item of catalog.items) item.categoryPath = categoryPath(item);
-fs.writeFileSync(catalogFile, JSON.stringify(catalog, null, 2) + "\n");
-console.log("Grouped " + catalog.items.length + " items using client ItemClass metadata");
-// 分组之后按来源玩法细分通货与材料：先跑 scripts/build-item-mechanics.mjs 更新映射，
-// 这里负责把映射写回 categoryPath（离线、可重复执行）。
-if (!process.argv.includes("--skip-mechanics")) {
-  const { execFileSync } = await import("node:child_process");
-  execFileSync(process.execPath, ["scripts/apply-catalog-mechanics.mjs"], { stdio: "inherit" });
-}
+// 先应用玩法分组，再按最终的选择器树分配槽位与分类路径序号，避免给中间路径分配编号。
+if (!process.argv.includes("--skip-mechanics")) applyCatalogMechanics(catalog);
+await writeCatalogWithShareData(catalogFile, catalog);
+console.log("Grouped " + catalog.items.length + " items using client ItemClass metadata and synchronized share slots and category path ordinals");

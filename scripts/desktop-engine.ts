@@ -2,7 +2,7 @@ import { toExalted } from "../lib/pricing";
 import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
 import { inspectBaseFilter } from "../lib/baseline-effects";
-import { FALLBACK_SNAPSHOT, ITEM_CATALOG } from "../lib/data";
+import { FALLBACK_SNAPSHOT, ITEM_CATALOG, shareCatalog } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
 import type { LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
@@ -26,6 +26,7 @@ function catalog(input: { economyLeagues?: Array<{ name: string; displayName?: s
 const api = {
   types: () => NINJA_TYPES,
   catalog,
+  shareCatalog,
   snapshot: (input: Parameters<typeof internationalSnapshot>[0]) => internationalSnapshot(input, ITEM_CATALOG),
   tencentCatalog,
   tencentSnapshot: (input: Parameters<typeof tencentSnapshot>[0]) => tencentSnapshot(input, ITEM_CATALOG),

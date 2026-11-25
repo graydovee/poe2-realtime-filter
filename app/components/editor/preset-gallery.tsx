@@ -6,9 +6,12 @@ import { describeEffects, pickEffects } from "../../../lib/effect-labels";
 import type { EffectPreset } from "../../../lib/types";
 import { cn } from "../../../lib/cn";
 import { SearchInput } from "../ui/input";
-import { LootScene } from "./appearance-preview";
+import { effectSourceLabel, LootScene } from "./appearance-preview";
 
 function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active: boolean; onSelect: () => void }) {
+  const effects = pickEffects(preset);
+  const sources = preset.sourceItemIds ?? [];
+  const source = sources.length === 1 ? effectSourceLabel(sources[0]) : sources.length > 1 ? `选择来源物品 · ${sources.length} 项` : "固定特效";
   return (
     <button
       type="button"
@@ -19,13 +22,14 @@ function PresetCard({ preset, active, onSelect }: { preset: EffectPreset; active
         active ? "border-gold/70 bg-gold/8" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2",
       )}
     >
-      <LootScene effects={pickEffects(preset)} label="示例" compact />
-      <span className="line-clamp-2 min-h-8 px-0.5 text-xs leading-snug text-ink-muted">{describeEffects(pickEffects(preset))}</span>
+      <LootScene effects={effects} label="示例" compact />
+      <span className="line-clamp-2 min-h-8 px-0.5 text-xs leading-snug text-ink-muted">{describeEffects(effects)}</span>
+      <span className="max-w-full truncate px-0.5 text-xs text-ink-faint" title={source}>{source}</span>
     </button>
   );
 }
 
-/** 特效预设画廊：带搜索的网格，点选即应用。 */
+/** 特效预设画廊：可以按特效或来源物品筛选。 */
 export function PresetGallery({
   presets,
   selectedId,
@@ -36,9 +40,10 @@ export function PresetGallery({
   onSelect: (preset: EffectPreset) => void;
 }) {
   const [query, setQuery] = useState("");
-  const search = query.trim();
+  const search = query.trim().toLocaleLowerCase();
   const filtered = search
-    ? presets.filter((preset) => describeEffects(pickEffects(preset)).includes(search))
+    ? presets.filter((preset) => describeEffects(pickEffects(preset)).toLocaleLowerCase().includes(search) ||
+        preset.sourceItemIds?.some((id) => effectSourceLabel(id).toLocaleLowerCase().includes(search)))
     : presets;
 
   return (
@@ -46,7 +51,7 @@ export function PresetGallery({
       <SearchInput
         value={query}
         aria-label="筛选特效预设"
-        placeholder="筛选预设，例如 星形 / 40号 / 白边"
+        placeholder="筛选预设，例如 星形 / 40号 / 崇高石"
         onChange={(event) => setQuery(event.target.value)}
       />
       <div className="grid max-h-[22rem] grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 overflow-y-auto overscroll-contain pr-1">
@@ -60,7 +65,7 @@ export function PresetGallery({
         )}
       </div>
       <p className="text-xs leading-relaxed text-ink-muted">
-        点选即应用，右侧预览会跟着更新；应用后可在「高级外观设置」里调整单项特效。
+        带来源的预设会随基础过滤器更新，固定特效可以在「高级外观设置」里调整。
       </p>
     </div>
   );

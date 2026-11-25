@@ -68,9 +68,9 @@ jobs:
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
           @'
-          - 基础过滤器用了游戏已经改名的物品类别时不再安装，预览里直接提示行号和原因。例如 2025 年 12 月之前的 NeverSink 里的 "Socketable"（已改名为 "Augment"），游戏会报「找不到与 "Socketable" 完全相符的物品种类」。遇到这种提示，把基础过滤器换成当前版本即可。
-          - 基础过滤器是 NeverSink、且比应用内置的参考版本（0.10.4）旧时，预览里给出提醒。
-          - 修正 v0.5.11 的问题：全选石板时生成了一条会匹配到别的物品的类别条件。石板恢复为逐件匹配。
+          - 分享码改用顺序二进制正文和物品分类树，缩短包含大量物品的方案分享码。已发布的 POE2F1 分享码仍可导入。
+          - 整类选择用分类路径保存，零散选择用稳定槽位保存。同一方案中的重复选择集合会复用。
+          - 规则可以跟随基础过滤器中指定物品的特效。更换基础过滤器时会重新解析该物品的颜色、图标和音效等样式。
           - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
           '@ | Set-Content -Encoding utf8NoBOM release-notes.md
           gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md
