@@ -219,8 +219,6 @@ function RefreshSettings({ library, busy }: { library: Library; busy: boolean })
   const intervalDraft = useAppStore((state) => state.intervalDraft);
   const patch = useAppStore((state) => state.patchManager);
   const updateSettings = useAppStore((state) => state.updateSettings);
-  const setAutostart = useAppStore((state) => state.setAutostart);
-  const autostartHint = useId();
   return (
     <Panel className="border-line/80 bg-surface-2/60" bodyClassName="p-4">
       <h3 className="text-sm font-semibold text-ink">刷新设置</h3>
@@ -256,17 +254,32 @@ function RefreshSettings({ library, busy }: { library: Library; busy: boolean })
         disabled={busy}
         onCheckedChange={(paused) => void updateSettings(library.settings.intervalMinutes, paused)}
       />
+    </Panel>
+  );
+}
+
+/** 开机启动与刷新无关，单独一张卡片，结构和另外两张设置卡片一致。 */
+function StartupSettings({ library, busy }: { library: Library; busy: boolean }) {
+  const setAutostart = useAppStore((state) => state.setAutostart);
+  const description = useId();
+  // 读不到启动项时开关不可用，说明文字换成原因。
+  const unavailable = library.autostart === null;
+  return (
+    <Panel className="border-line/80 bg-surface-2/60" bodyClassName="p-4">
+      <h3 className="text-sm font-semibold text-ink">启动</h3>
+      <p id={description} className="mt-1 text-sm leading-relaxed text-ink-muted">
+        {unavailable
+          ? "无法读取当前用户的启动项，暂时不能切换。"
+          : "开启后，登录 Windows 时客户端直接在托盘中运行，不打开窗口。双击托盘图标或选择「打开过滤器编辑器」即可打开。"}
+      </p>
       <Switch
-        label="开机启动"
         className="mt-3"
-        describedBy={autostartHint}
+        label="开机启动"
+        describedBy={description}
         checked={library.autostart === true}
-        disabled={busy || library.autostart === null}
+        disabled={busy || unavailable}
         onCheckedChange={(enabled) => void setAutostart(enabled)}
       />
-      <p id={autostartHint} className="mt-1 text-xs leading-relaxed text-ink-muted">
-        {library.autostart === null ? "无法读取当前用户的启动项。" : "登录 Windows 后在托盘中启动，不打开窗口。"}
-      </p>
     </Panel>
   );
 }
@@ -320,7 +333,7 @@ function FilterDirectory({ library, busy }: { library: Library; busy: boolean })
   );
 }
 
-/** 方案库的检查器：选中方案的详情与操作；下方常驻刷新设置和过滤器目录。 */
+/** 方案库的检查器：选中方案的详情与操作；下方常驻刷新、启动和过滤器目录三张设置卡片。 */
 export function ManagerInspector() {
   const library = useAppStore((state) => state.library);
   const busy = useAppStore((state) => state.managerBusy);
@@ -347,6 +360,7 @@ export function ManagerInspector() {
         <Overview library={library} busy={busy} server={library.server} />
       )}
       <RefreshSettings library={library} busy={busy} />
+      <StartupSettings library={library} busy={busy} />
       <FilterDirectory library={library} busy={busy} />
     </div>
   );
