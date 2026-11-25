@@ -1,6 +1,6 @@
 {
   "name": "poe2-realtime-filter",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "private": true,
   "description": "Path of Exile 2 loot filter editor with selectable base filters.",
   "scripts": {

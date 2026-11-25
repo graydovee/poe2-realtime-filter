@@ -2932,7 +2932,7 @@ dependencies = [
 
 [[package]]
 name = "poe2-realtime-filter"
-version = "0.5.14"
+version = "0.5.15"
 dependencies = [
  "base64 0.22.1",
  "brotli",
