@@ -29,6 +29,8 @@ export function baseLabel(base?: BaseFilter, hint?: string) {
       return `${base.name} · ${base.source === "online" ? "国际服订阅" : "WeGame 订阅"}`;
     case "downloaded":
       return `${base.name} · ${base.source} · ${base.version}`;
+    case "imported":
+      return `${base.name} · 来自方案包`;
   }
 }
 

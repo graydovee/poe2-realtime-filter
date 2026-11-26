@@ -45,7 +45,7 @@ fn pack_with(share: &Share, catalog: &Catalog) -> Result<Vec<u8>> {
             fields.remove("effects");
             fields.remove("effectPresetId");
         } else if let Some(effects) = fields.get_mut("effects").and_then(Value::as_object_mut) {
-            // Older profiles can use null for empty font and sound settings.
+            // A stored profile can carry null for empty font and sound settings.
             for key in ["font", "sound"] {
                 if effects.get(key).is_some_and(Value::is_null) {
                     effects.remove(key);

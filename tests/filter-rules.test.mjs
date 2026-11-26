@@ -10,7 +10,7 @@ test.after(cleanup);
 const { generateFilter } = engine;
 const profile = (patch) => ({ ...DEFAULT_PROFILE, ...patch });
 
-test("默认 4 条价格规则复刻基础过滤器里四枚通货的特效", () => {
+test("默认 4 条价格档复刻基础过滤器里四枚通货的特效", () => {
   const generated = generateFilter(profile({ skippedItemIds: [] }), snapshot);
   assert.equal(generated.appliedRules.length, 4);
   const baseline = readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8");
@@ -92,7 +92,7 @@ test("generated filter bytes stay stable when only the market timestamp changes"
   assert.notEqual(generateFilter(config, snapshot).filterFile, generateFilter(config, nextMarket).filterFile);
 });
 
-test("规则按列表顺序首个命中，后面的规则不再覆盖", () => {
+test("规则按列表顺序首个命中，后面的规则不覆盖", () => {
   const generated = generateFilter(
     profile({
       rules: [
@@ -134,16 +134,16 @@ test("隐藏是规则选项，隐藏块仍可带特效", () => {
   assert.ok(block.includes("PlayEffect White"));
 });
 
-test("跳过名单里的物品不参与任何规则", () => {
+test("跳过物品里的物品不参与任何规则", () => {
   const generated = generateFilter(
     profile({ skippedItemIds: ["divine-orb"], rules: [makeRule({ hidden: true, target: { range: { min: { amount: 1, currency: "exalted" } } } })] }),
     snapshot,
   );
   const blocks = ruleBlocks(generated.filterFile);
-  assert.ok(!blocks.some((block) => block.includes("Divine Orb")), "跳过名单物品不应被规则命中");
+  assert.ok(!blocks.some((block) => block.includes("Divine Orb")), "跳过物品物品不应被规则命中");
   assert.ok(blocks.some((block) => block.includes("Chaos Orb")), "其他物品仍应被隐藏规则命中");
   assert.equal(generated.safetyReport.exclusionViolations.length, 0);
-  assert.ok(generated.safetyReport.warnings.some((warning) => warning.includes("跳过名单")));
+  assert.ok(generated.safetyReport.warnings.some((warning) => warning.includes("跳过物品")));
 });
 
 test("隐藏高价值物品会让安全检查失败", () => {
@@ -155,13 +155,13 @@ test("隐藏高价值物品会让安全检查失败", () => {
   assert.deepEqual(generated.safetyReport.hiddenHighValueItems, ["Divine Orb"]);
 });
 
-test("缺少汇率时价格规则不生效，并提示行情不可用", () => {
+test("缺少汇率时价格档不生效，并提示行情不可用", () => {
   const generated = generateFilter(profile({}), { ...snapshot, rates: undefined, prices: {} });
   assert.equal(generated.appliedRules.length, 0);
   assert.ok(generated.safetyReport.warnings.some((warning) => warning.includes("缺少有效报价或汇率")));
 });
 
-test("快照赛季不一致时价格规则不生效", () => {
+test("快照赛季不一致时价格档不生效", () => {
   const generated = generateFilter(profile({ league: "Season A" }), snapshot);
   assert.equal(generated.appliedRules.length, 0);
   assert.ok(generated.filterFile.includes("# League: Season A"));
@@ -188,7 +188,7 @@ test("默认价格档是普通的相邻区间，每件有报价的通货与材�
   assert.equal(tierOf.get("Chaos Orb"), "default-chaos");
   assert.equal(tierOf.get("Orb of Annulment"), "default-annulment");
   assert.equal(tierOf.get("Divine Orb"), "default-divine");
-  // 区间是普通数值：把「混沌石价格档」的上限放宽到 1D，1 枚剥离石（100E）就归到它，不再归剥离石档。
+  // 区间是普通数值：把「混沌石价格档」的上限放宽到 1D，1 枚剥离石（100E）就归到它。
   const widened = DEFAULT_PROFILE.rules.map((rule) => (rule.id === "default-chaos" ? { ...rule, target: { ...rule.target, range: { min: rule.target.range.min, max: { amount: 1, currency: "divine" } } } } : rule));
   const edited = ruleBlocks(generateFilter(profile({ skippedItemIds: [], rules: widened }), snapshot).filterFile);
   assert.ok(edited.some((block) => block.startsWith("Show # poe2-filter rule: default-chaos / Orb of Annulment")));
@@ -210,8 +210,8 @@ test("剥离石作为计价单位时按它的行情报价折算", () => {
   assert.ok(!blocks.some((block) => block.includes("/ Divine Orb")), "上限不含 1D");
 });
 
-test("旧方案里的锚点价格点读成普通计价单位", () => {
-  const legacy = {
+test("锚点价格点读成计价单位", () => {
+  const saved = {
     ...DEFAULT_PROFILE,
     rules: [{
       id: "default-chaos",
@@ -230,7 +230,7 @@ test("旧方案里的锚点价格点读成普通计价单位", () => {
       effects: {},
     }],
   };
-  const [rule] = validateProfile(legacy).rules;
+  const [rule] = validateProfile(saved).rules;
   assert.deepEqual(rule.target.range, { min: { amount: 1, currency: "chaos" }, max: { amount: 1, currency: "annulment" } });
   assert.equal(rule.autoRange, undefined);
   assert.equal(rule.baselineEffectItemId, "chaos-orb", "默认价格档沿用基础过滤器里对应通货的样式");
@@ -255,7 +255,7 @@ test("未切割宝石按等级各自匹配、覆盖和跳过", () => {
   assert.deepEqual(covered.safetyReport.coveredRules, [{ ruleId: "again", ruleName: "二十级" }]);
   assert.deepEqual(covered.appliedRules.map((entry) => entry.ruleId), ["high", "other"]);
   assert.equal(ruleBlocks(covered.filterFile).length, 2);
-  // 跳过名单只排除选中的那个等级。
+  // 跳过物品只排除选中的那个等级。
   const all = ["uncut-skill-gem-20", "uncut-skill-gem-19", "uncut-skill-gem-1"];
   const skipped = ruleBlocks(generateFilter(profile({ skippedItemIds: ["uncut-skill-gem-20"], rules: [makeRule({ target: levels(all) })] }), snapshot).filterFile);
   assert.deepEqual(skipped.map((block) => block.match(/GemLevel = (\d+)/)[1]), ["19", "1"]);

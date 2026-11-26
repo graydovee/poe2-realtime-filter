@@ -92,7 +92,7 @@ export function SchemeDialogs() {
         }}
         busy={busy}
         title={`卸载「${scheme?.name ?? ""}」的过滤器？`}
-        description="卸载后可在方案列表里重新安装。"
+        description="卸载后可在方案库里重新安装。"
         size="sm"
         footer={
           <>

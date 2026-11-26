@@ -14,7 +14,7 @@ use windows_sys::Win32::{
 /// Launch quietly into the tray instead of opening the window.
 pub const TRAY_ARGUMENT: &str = "--tray";
 const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-// The same entry name the earlier tray client wrote, so turning it on replaces a stale path.
+// Turning it on replaces whatever path the entry held before.
 const ENTRY: &str = "poe2-filter";
 
 fn wide(text: &str) -> Vec<u16> {

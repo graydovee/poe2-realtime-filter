@@ -18,6 +18,8 @@ import type {
 } from "../../lib/types";
 
 type Args = Record<string, unknown>;
+/** 选择列表比方案里存的来源多一个登记时间，只有方案包导入的副本带。 */
+type ScannedFilter = BaseFilter & { registeredAt?: number };
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -53,7 +55,7 @@ const LOCAL_BASE: BaseFilter = {
 
 /**
  * 上面那份本地文件的缩影：一份过期的 NeverSink。游戏在 2025 年 12 月把物品类别 Socketable 改名成了 Augment，
- * 0.8.3 还在用旧名字，游戏会拒绝加载。选了它的方案，预览里就能看到「基础过滤器与当前游戏版本不兼容」。
+ * 0.8.3 用的是游戏改名前的类别名，游戏会拒绝加载。选了它的方案，预览里就能看到「基础过滤器与当前游戏版本不兼容」。
  */
 const STALE_BASE_TEXT = [
   "# NeverSink's Indepth Loot Filter - for Path of Exile 2 (fixture)",
@@ -91,6 +93,15 @@ const BASES: BaseFilter[] = [
     name: "订阅的过滤器",
   },
 ];
+
+/** 方案包带进来的副本，只出现在选择列表里。 */
+const IMPORTED: ScannedFilter = {
+  kind: "imported",
+  id: "3f2a91bea8b3c1d40e7f6a5b4c3d2e1f",
+  entry: "OnlineFilters/4pQrzmUJ",
+  name: "NeverSink-6uberplu-poe2",
+  registeredAt: Date.now() / 1000,
+};
 
 /** 行情照着 2026-11 的 poe.ninja 抄的（单位 E）：未切割宝石只有部分等级有报价，而且各等级价格互不相干。 */
 const PRICES: Array<[itemId: string, exalted: number]> = [
@@ -238,7 +249,7 @@ let nextId = 6;
 
 const schemeById = (id: unknown) => library.schemes.find((entry) => entry.id === id);
 
-/** 画廊和生成预览读取同一份演示基底，涵盖单一来源、多个来源和无法绑定的预设。 */
+/** 画廊和生成预览读取同一份演示用的基础过滤器，涵盖单一来源、多个来源和无法绑定的预设。 */
 function mockBaseline(base: BaseFilter) {
   if (base.kind === "local") return STALE_BASE_TEXT;
   const regular = base.kind === "downloaded" && base.entry.endsWith("1-REGULAR.filter");
@@ -369,8 +380,35 @@ const handlers: Record<string, Handler> = {
   },
   scan_base_filters: async () => {
     await delay(700);
-    return clone(BASES);
+    return clone([...BASES, IMPORTED]);
   },
+  scheme_export_package: () => false,
+  scheme_import_package: () => ({ ids: [] }),
+  /** 确认框的每一种情况：新导入、重名、更新、被占用、最新、另一个服务器，以及两种基础过滤器选择。 */
+  pick_scheme_package: () => ({
+    path: "D:\\Downloads\\开荒到终局 方案包.zip",
+    title: "开荒到终局",
+    current: "international" as GameServer,
+    catalog: LEAGUE,
+    plan: {
+      server: "international" as GameServer,
+      sounds: 2,
+      review: true,
+      needsLeague: true,
+      schemes: [
+        { state: "new", index: 0, name: "开荒速刷", rules: 6, conflict: null },
+        { state: "new", index: 1, name: "终极打宝-自动更新物价", rules: 6, conflict: "终极打宝-自动更新物价 副本" },
+        { state: "update", index: 2, name: "终极打法", localName: "终局策略", blocked: false },
+        { state: "update", index: 3, name: "赛季冲刺", localName: "中期发育", blocked: true },
+        { state: "latest", index: 4, name: "日常清图" },
+        { state: "foreign", index: 5, name: "Boss 农场", localName: "Boss 农场" },
+      ],
+      bases: [
+        { state: "updateCopy", index: 0, name: "NeverSink-6uberplu-poe2" },
+        { state: "choose", index: 1, name: "订阅的过滤器", source: "国际服订阅" },
+      ],
+    },
+  }),
   source_filters: async ({ cachedOnly }) => {
     await delay(cachedOnly ? 200 : 900);
     return clone(BASES.slice(0, 2));

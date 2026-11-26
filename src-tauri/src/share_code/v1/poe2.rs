@@ -1,8 +1,8 @@
-//! Wire layout for `{"alg":"poe2","p":1}` and `{"alg":"poe2","p":2}`, written up to v0.5.12.
+//! Wire layout for `{"alg":"poe2","p":1}` and `{"alg":"poe2","p":2}`.
 //! A little-endian u32 metadata length, JSON [name, packed profile], then list data
 //! in rule order followed by skipped items. Packed objects start with a presence
 //! mask followed by values in field order. Lists use [mode, count, reference, size].
-//! Only `unpack` runs outside the tests; the packer stays to build inputs for it.
+//! `unpack` reads the layout; `pack` builds inputs for its tests.
 
 use super::{Share, MAX_JSON};
 use serde_json::{json, Map, Value};
@@ -13,7 +13,7 @@ use std::sync::LazyLock;
 // Index is the wire ID. Keep this snapshot independent of the live item catalog.
 const ITEMS: &str = include_str!("poe2-p1-items.txt");
 static ITEM_IDS: LazyLock<Vec<&'static str>> = LazyLock::new(|| ITEMS.lines().collect());
-// Only the packer looks ids up, and it stays for the tests.
+// Only the packer, used by tests, looks IDs up.
 #[cfg(test)]
 static ITEM_INDEX: LazyLock<HashMap<&'static str, usize>> = LazyLock::new(|| {
     ITEM_IDS
@@ -122,7 +122,7 @@ fn transform_object(layout: Layout, value: Value, pack: bool) -> Option<Value> {
                 values.push(transform_field(layout, field, value, pack)?);
             }
         }
-        // A newer field must survive sharing, so the caller falls back to JSON.
+        // A field outside this layout makes the caller fall back to JSON.
         if !object.is_empty() {
             return None;
         }
@@ -425,7 +425,7 @@ fn bitmap_positions(bytes: &[u8], count: usize) -> Option<Vec<usize>> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{encode_payload, LegacyBody};
+    use super::super::{encode_payload, Body};
     use super::*;
     use crate::share_code::decode;
     use sha2::{Digest, Sha256};
@@ -489,9 +489,9 @@ mod tests {
         };
         let packed = pack(&share).unwrap();
         assert_eq!(unpack(&packed).unwrap(), share);
-        let specialized = encode_payload(LegacyBody::Poe2, &packed).unwrap();
+        let specialized = encode_payload(Body::Poe2, &packed).unwrap();
         let json = serde_json::to_vec(&share).unwrap();
-        let generic = encode_payload(LegacyBody::BrotliJson, &json).unwrap();
+        let generic = encode_payload(Body::BrotliJson, &json).unwrap();
         assert!(specialized.len() < generic.len() / 2);
         assert_eq!(decode(&specialized).unwrap().share, share);
     }

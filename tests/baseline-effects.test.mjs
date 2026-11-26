@@ -5,7 +5,7 @@ import { baseStyles, blockFor, cleanup, data, DEFAULT_PROFILE, generateOnBase, i
 
 const { DEFAULT_EFFECT_ITEMS } = data;
 
-const legacyRules = JSON.parse(readFileSync('data/default-rules.json', 'utf8')).rules;
+const snapshotRules = JSON.parse(readFileSync('data/default-rules.json', 'utf8')).rules;
 const validWith = (...rules) => validateProfile({ ...DEFAULT_PROFILE, rules });
 
 test.after(cleanup);
@@ -187,11 +187,11 @@ test('an explicit reference supplies full current actions and sound to a differe
   }
 });
 
-test('legacy follow flags and exact historical snapshots migrate to canonical item references', () => {
+test('follow flags and matching effect snapshots resolve to item references', () => {
   // JSON object order can change when saved by the desktop store.
   const reverseKeys = (value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value).reverse().map(([key, entry]) => [key, reverseKeys(entry)])) : value;
-  const snapshots = legacyRules.map((rule) => ({
+  const snapshots = snapshotRules.map((rule) => ({
     ...rule, name: `Edited ${rule.id}`, target: { ...rule.target, itemIds: ['regal-orb'] }, effects: reverseKeys(rule.effects),
   }));
   const migrated = validWith(...snapshots).rules;
@@ -205,14 +205,14 @@ test('legacy follow flags and exact historical snapshots migrate to canonical it
     assert.deepEqual(rule.target.itemIds, snapshots[i].target.itemIds);
   }
   assert.deepEqual(validWith(...migrated).rules, migrated);
-  const [explicit] = validWith({ ...legacyRules[0], followBaseline: true, effects: { beam: 'Green' } }).rules;
+  const [explicit] = validWith({ ...snapshotRules[0], followBaseline: true, effects: { beam: 'Green' } }).rules;
   assert.equal(explicit.baselineEffectItemId, DEFAULT_EFFECT_ITEMS[explicit.id]);
   assert.equal(explicit.effectPresetId, undefined);
   assert.deepEqual(explicit.effects, {});
 });
 
-test('edited and unrelated legacy snapshots remain fixed, including an exact snapshot marked false', () => {
-  const [old] = legacyRules;
+test('edited and unrelated snapshots remain fixed, including a matching snapshot marked false', () => {
+  const [old] = snapshotRules;
   for (const candidate of [
     { ...old, effectPresetId: 'look-default-0' },
     { ...old, effectPresetId: undefined },

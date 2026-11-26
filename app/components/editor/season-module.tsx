@@ -46,7 +46,7 @@ export function SeasonModule() {
     <Panel
       id="module-season"
       title="赛季与行情"
-      description="赛季决定行情、价格区间和生成版本。旧赛季方案会保留原有赛季，可手动切换。"
+      description="赛季决定行情、价格区间和生成版本。换赛季后方案保留原有赛季，可以手动切换。"
       bodyClassName="p-3"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

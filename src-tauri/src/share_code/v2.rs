@@ -39,7 +39,7 @@ impl ShareDecoder for Codec {
     }
 
     fn decode(&self, payload: Option<&str>) -> Result<DecodedShare> {
-        // A bare POE2F2 prefix was an unsupported version before the container split.
+        // A bare prefix carries no frame.
         let bytes = decode_base64(payload.ok_or(super::UNSUPPORTED_VERSION)?, MAX_PAYLOAD)?;
         let frame = frame::Frame::read(&bytes)?;
         let body = body_codec(frame.version)?;

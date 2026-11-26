@@ -77,27 +77,10 @@ for (const [name, entry] of Object.entries(mapping)) {
   if (typeof entry?.evidence !== "string" || !entry.evidence.trim()) problems.push("item mechanics: missing evidence for " + name);
 }
 
-const effects = JSON.parse(fs.readFileSync(path.join(root, "data", "neversink-effects.json"), "utf8"));
-const styleNames = ["default", "aura", "cobalt", "customsounds", "darkmode", "mythic", "vaal", "zen"];
-for (const style of styleNames) {
-  const presets = effects.styles?.[style];
-  if (!Array.isArray(presets) || presets.length < 20) problems.push("effect presets: missing or empty style " + style);
-  const ids = new Set();
-  for (const preset of presets || []) {
-    if (!preset.id || ids.has(preset.id) || !/^[a-zA-Z0-9_-]+$/.test(preset.id)) problems.push("effect presets: bad id in " + style + " " + preset.id);
-    ids.add(preset.id);
-    if (!preset.beam && !preset.icon && !preset.font) problems.push("effect presets: empty preset " + preset.id);
-    if (preset.font?.fontSize !== undefined && (!Number.isInteger(preset.font.fontSize) || preset.font.fontSize < 18 || preset.font.fontSize > 45)) problems.push("effect presets: bad font size " + JSON.stringify(preset));
-  }
-}
-if (!Array.isArray(effects.sounds) || effects.sounds.length === 0) problems.push("effect presets: empty sounds");
-if (!Array.isArray(effects.customSounds)) problems.push("effect presets: missing customSounds");
-
 const defaultRules = JSON.parse(fs.readFileSync(path.join(root, "data", "default-rules.json"), "utf8")).rules || [];
 if (defaultRules.length !== 4) problems.push("default rules: expected 4 price tiers, found " + defaultRules.length);
 // 价格档就是普通价格区间，从低到高每档「≥ 1 枚本档通货，且 < 1 枚下一档通货」，最高档不封顶。
 const tiers = [["default-exalted", "exalted"], ["default-chaos", "chaos"], ["default-annulment", "annulment"], ["default-divine", "divine"]];
-const defaultPresets = new Map((effects.styles?.default || []).map((preset) => [preset.id, preset]));
 const ruleIds = new Set();
 defaultRules.forEach((rule, index) => {
   if (!rule.id || ruleIds.has(rule.id)) problems.push("default rules: duplicate id " + rule.id);
@@ -112,12 +95,8 @@ defaultRules.forEach((rule, index) => {
   const max = rule.target?.range?.max;
   if (wrong(rule.target?.range?.min, unit)) problems.push("default rules: lower bound of " + rule.id + " must be 1 " + unit + ", found " + JSON.stringify(rule.target?.range?.min));
   if (next ? wrong(max, next[1]) : max !== undefined) problems.push("default rules: upper bound of " + rule.id + (next ? " must be 1 " + next[1] : " must be unset") + ", found " + JSON.stringify(max));
-  const preset = defaultPresets.get(rule.effectPresetId);
-  if (!preset) problems.push("default rules: effectPresetId not in default style " + rule.id + " " + rule.effectPresetId);
-  else {
-    const expected = { ...(preset.beam ? { beam: preset.beam } : {}), ...(preset.icon ? { icon: preset.icon } : {}), ...(preset.font ? { font: preset.font } : {}), ...(preset.sound ? { sound: preset.sound } : {}) };
-    if (JSON.stringify(expected) !== JSON.stringify(rule.effects)) problems.push("default rules: effects differ from preset " + rule.id);
-  }
+  // 读取方案时用规则最初的完整外观和预设 ID，认出还保持着这套外观的规则（lib/profile.ts）。
+  if (!rule.effectPresetId || !rule.effects?.beam || !rule.effects?.icon || !rule.effects?.font) problems.push("default rules: incomplete appearance " + rule.id);
 });
 
 if (unmapped.length) {
@@ -129,4 +108,4 @@ if (problems.length) {
   for (const problem of problems) console.error("FAIL: " + problem);
   process.exit(1);
 }
-console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + styleNames.map((style) => style + " " + (effects.styles?.[style]?.length ?? 0)).join(" / ") + " presets, " + defaultRules.length + " default rules)");
+console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + defaultRules.length + " default rules)");

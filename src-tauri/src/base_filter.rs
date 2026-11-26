@@ -22,11 +22,15 @@ const DOWNLOAD_SOURCES: &[DownloadSource] = &[DownloadSource {
     zipball: "https://api.github.com/repos/NeverSinkDev/NeverSink-Filter-for-PoE2/zipball/",
     asset: "https://github.com/NeverSinkDev/NeverSink-Filter-for-PoE2/releases/download/",
 }];
-const MAX_FILTER: usize = 8 * 1024 * 1024;
+pub(crate) const MAX_FILTER: usize = 8 * 1024 * 1024;
 const MAX_ARCHIVE: usize = 32 * 1024 * 1024;
 const MAX_EXTRACTED: usize = 160 * 1024 * 1024;
+/// The base filter registry, next to `library.json`.
+const REGISTRY: &str = "base-filters.json";
+/// Copies stored from scheme packages, below `base-filters/`.
+pub(crate) const IMPORTED: &str = "imported";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
 pub enum BaseFilter {
     Local {
@@ -45,13 +49,30 @@ pub enum BaseFilter {
         entry: String,
         name: String,
     },
+    /// A copy in the data directory, identified by its entry in the base filter registry.
+    Imported {
+        id: String,
+        entry: String,
+        name: String,
+    },
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SubscriptionSource {
     Online,
     WeGame,
+}
+
+/// Where a base filter came from. It rides along in scheme packages for matching and for
+/// display; it never names a path on this machine.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum BaseOrigin {
+    Local {},
+    Subscribed { source: SubscriptionSource },
+    Downloaded { source: String, version: String },
+    Imported {},
 }
 
 impl SubscriptionSource {
@@ -117,8 +138,13 @@ fn read_filter_text(path: &Path) -> Result<String> {
     let bytes = read_limited(path, MAX_FILTER).map_err(|error| {
         format!("无法读取基础过滤器「{display}」，请检查文件或重新选择。{error}")
     })?;
-    let text =
-        String::from_utf8(bytes).map_err(|_| format!("基础过滤器「{display}」不是 UTF-8 文本"))?;
+    filter_text(&bytes, &display)
+}
+
+/// Accepts filter text from a file or from a scheme package.
+pub(crate) fn filter_text(bytes: &[u8], display: &str) -> Result<String> {
+    let text = String::from_utf8(bytes.to_vec())
+        .map_err(|_| format!("基础过滤器「{display}」不是 UTF-8 文本"))?;
     let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
     if text.lines().any(|line| {
         let line = line.trim().to_ascii_lowercase();
@@ -141,7 +167,7 @@ fn read_filter_text(path: &Path) -> Result<String> {
     Ok(text.to_owned())
 }
 
-fn safe_relative(path: &Path) -> bool {
+pub(crate) fn safe_relative(path: &Path) -> bool {
     let mut components = path.components().peekable();
     components.peek().is_some()
         && components.all(|component| match component {
@@ -176,7 +202,8 @@ impl BaseFilter {
         match self {
             Self::Local { name, .. }
             | Self::Subscribed { name, .. }
-            | Self::Downloaded { name, .. } => name,
+            | Self::Downloaded { name, .. }
+            | Self::Imported { name, .. } => name,
         }
     }
 
@@ -210,6 +237,11 @@ impl BaseFilter {
                 }
                 (resolved, Some(canonical_root))
             }
+            Self::Imported { id, entry, name }
+                if valid_base_id(id) && safe_relative(Path::new(entry)) =>
+            {
+                return load_imported(data_root, id, entry, name);
+            }
             _ => return Err("基础过滤器来源无效，请重新选择".into()),
         };
         Ok(Baseline {
@@ -220,6 +252,24 @@ impl BaseFilter {
             game_root: None,
         })
     }
+}
+
+fn load_imported(data_root: &Path, id: &str, entry: &str, name: &str) -> Result<Baseline> {
+    let root = data_root.join("base-filters").join(IMPORTED).join(id);
+    let missing = || format!("无法读取已导入的基础过滤器「{name}」，请重新选择");
+    let canonical_root = root.canonicalize().map_err(|_| missing())?;
+    let resolved = root.join(entry).canonicalize().map_err(|_| missing())?;
+    if !resolved.starts_with(&canonical_root) {
+        return Err("已导入的基础过滤器路径无效".into());
+    }
+    Ok(Baseline {
+        text: read_filter_text(&resolved)?,
+        name: name.to_owned(),
+        path: resolved,
+        cache_root: Some(canonical_root.clone()),
+        // The copy's root also answers sound references that were relative to the game directory.
+        game_root: Some(canonical_root),
+    })
 }
 
 fn file_name(path: &Path) -> Result<String> {
@@ -361,10 +411,242 @@ pub fn scan(directory: &Path) -> Result<Vec<BaseFilter>> {
             BaseFilter::Local { path, .. } => path.as_path(),
             BaseFilter::Subscribed { entry, .. } => entry.as_path(),
             BaseFilter::Downloaded { entry, .. } => Path::new(entry),
+            BaseFilter::Imported { entry, .. } => Path::new(entry),
         };
         (base.name().to_lowercase(), location.to_owned())
     });
     Ok(options)
+}
+
+pub fn new_base_id() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
+}
+
+pub(crate) fn valid_base_id(id: &str) -> bool {
+    id.len() == 32
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+pub fn origin_of(base: &BaseFilter) -> BaseOrigin {
+    match base {
+        BaseFilter::Local { .. } => BaseOrigin::Local {},
+        BaseFilter::Subscribed { source, .. } => BaseOrigin::Subscribed { source: *source },
+        BaseFilter::Downloaded {
+            source, version, ..
+        } => BaseOrigin::Downloaded {
+            source: source.clone(),
+            version: version.clone(),
+        },
+        BaseFilter::Imported { .. } => BaseOrigin::Imported {},
+    }
+}
+
+/// A filter the picker lists. Copies stored from scheme packages also tell when they arrived.
+#[derive(Serialize)]
+pub struct ScannedFilter {
+    #[serde(flatten)]
+    pub base: BaseFilter,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub registered_at: Option<u64>,
+}
+
+/// A short source description for messages. Never a path.
+pub fn source_label(base: &BaseFilter) -> String {
+    match base {
+        BaseFilter::Local { .. } => "本地文件".into(),
+        BaseFilter::Subscribed { source, .. } => match source {
+            SubscriptionSource::Online => "国际服订阅",
+            SubscriptionSource::WeGame => "WeGame 订阅",
+        }
+        .into(),
+        BaseFilter::Downloaded {
+            source, version, ..
+        } => format!(
+            "{} · {version}",
+            DownloadSource::find(source)
+                .map(|known| known.label)
+                .unwrap_or(source.as_str())
+        ),
+        BaseFilter::Imported { .. } => "方案包导入的副本".into(),
+    }
+}
+
+/// The same subscription entry, or the same file of a download source. The download version
+/// and the game directory may differ.
+fn same_entry(left: &BaseFilter, right: &BaseFilter) -> bool {
+    let equal = |left: &str, right: &str| left.to_lowercase() == right.to_lowercase();
+    match (left, right) {
+        (
+            BaseFilter::Subscribed {
+                source: left_source,
+                entry: left_entry,
+                ..
+            },
+            BaseFilter::Subscribed {
+                source: right_source,
+                entry: right_entry,
+                ..
+            },
+        ) => {
+            left_source == right_source
+                && equal(
+                    &left_entry.to_string_lossy(),
+                    &right_entry.to_string_lossy(),
+                )
+        }
+        (
+            BaseFilter::Downloaded {
+                source: left_source,
+                entry: left_entry,
+                ..
+            },
+            BaseFilter::Downloaded {
+                source: right_source,
+                entry: right_entry,
+                ..
+            },
+        ) => equal(left_source, right_source) && equal(left_entry, right_entry),
+        _ => false,
+    }
+}
+
+/// One base filter this installation knows by ID. `base` says how this machine provides it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseRecord {
+    pub id: String,
+    /// The name it was shared under. Every list shows this one.
+    pub name: String,
+    pub base: BaseFilter,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<BaseOrigin>,
+    /// File set digest of an imported copy. It only tells whether the content changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Unix seconds.
+    #[serde(default)]
+    pub registered_at: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Registry {
+    #[serde(default)]
+    pub filters: Vec<BaseRecord>,
+}
+
+impl BaseRecord {
+    /// A record with a new identity.
+    pub fn new(base: &BaseFilter) -> Self {
+        Self {
+            id: new_base_id(),
+            name: base.name().to_owned(),
+            base: base.clone(),
+            origin: Some(origin_of(base)),
+            content: None,
+            registered_at: unix_now(),
+        }
+    }
+}
+
+impl Registry {
+    /// Registers `base` under a new identity.
+    pub fn register(&mut self, base: &BaseFilter) -> &mut BaseRecord {
+        self.filters.push(BaseRecord::new(base));
+        self.filters.last_mut().unwrap()
+    }
+
+    pub fn load(data_root: &Path) -> Result<Self> {
+        match fs::read(data_root.join(REGISTRY)) {
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map_err(|error| format!("基础过滤器表无法读取: {error}")),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+
+    pub fn save(&self, data_root: &Path) -> Result<()> {
+        crate::market::write_json(&data_root.join(REGISTRY), self)
+    }
+
+    pub fn get(&self, id: &str) -> Option<&BaseRecord> {
+        self.filters.iter().find(|record| record.id == id)
+    }
+
+    /// Replaces the record with the same ID.
+    pub fn insert(&mut self, record: BaseRecord) {
+        self.filters.retain(|current| current.id != record.id);
+        self.filters.push(record);
+    }
+
+    /// The record for `base`, registered on first use. Downloads that the tray upgraded and
+    /// subscriptions behind a moved game directory keep their identity.
+    pub fn record_for(&mut self, base: &BaseFilter) -> &mut BaseRecord {
+        let position = match base {
+            BaseFilter::Imported { id, .. } => {
+                self.filters.iter().position(|record| record.id == *id)
+            }
+            _ => self
+                .filters
+                .iter()
+                .position(|record| record.base == *base)
+                .or_else(|| {
+                    self.filters
+                        .iter()
+                        .position(|record| same_entry(&record.base, base))
+                }),
+        };
+        match position {
+            Some(position) => {
+                self.filters[position].base = base.clone();
+                &mut self.filters[position]
+            }
+            None => self.register(base),
+        }
+    }
+
+    /// Copies stored from scheme packages, each with the time it was registered.
+    pub fn stored(&self, data_root: &Path) -> Vec<(&BaseFilter, u64)> {
+        self.filters
+            .iter()
+            .filter_map(|record| match &record.base {
+                base @ BaseFilter::Imported { id, .. }
+                    if data_root
+                        .join("base-filters")
+                        .join(IMPORTED)
+                        .join(id)
+                        .is_dir() =>
+                {
+                    Some((base, record.registered_at))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn imported(&self, data_root: &Path) -> Vec<BaseFilter> {
+        self.stored(data_root)
+            .into_iter()
+            .map(|(base, _)| base.clone())
+            .collect()
+    }
+}
+
+pub(crate) fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or_default()
+}
+
+/// Every cached download. Within a source the newest version comes first.
+pub(crate) fn all_cached(data_root: &Path) -> Vec<BaseFilter> {
+    DOWNLOAD_SOURCES
+        .iter()
+        .flat_map(|source| cached_source(data_root, source.id).unwrap_or_default())
+        .collect()
 }
 
 struct DownloadSource {
@@ -853,7 +1135,7 @@ mod tests {
     }
 
     #[test]
-    fn scans_supported_filters_and_excludes_old_generated_markers() {
+    fn scans_supported_filters_and_excludes_generated_files() {
         let directory = tempfile::tempdir().unwrap();
         fs::write(
             directory.path().join("reference.FILTER"),

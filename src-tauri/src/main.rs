@@ -4,6 +4,7 @@ mod autostart;
 mod base_filter;
 mod engine;
 mod market;
+mod scheme_package;
 mod share_code;
 mod store;
 
@@ -18,7 +19,10 @@ use std::{
     sync::{mpsc, Mutex},
     time::Duration,
 };
-use store::{display_directory, digest, writable_directory, write_file, Edit, RefreshSettings, Server, Store};
+use store::{
+    display_directory, digest, writable_directory, write_file, Edit, PackageDecisions,
+    RefreshSettings, Server, Store,
+};
 use tauri::{tray::TrayIconBuilder, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -438,11 +442,28 @@ async fn save_filter_directory(app: tauri::AppHandle, directory: Option<String>)
 }
 
 #[tauri::command]
-async fn scan_base_filters(app: tauri::AppHandle) -> Result<Vec<BaseFilter>> {
+async fn scan_base_filters(app: tauri::AppHandle) -> Result<Vec<base_filter::ScannedFilter>> {
     on_worker(move || {
         let state = app.state::<Desktop>();
         let library = state.store.load()?;
-        base_filter::scan(&state.store.base_directory(&library))
+        // Copies stored from scheme packages are listed next to the game directory's filters.
+        let listed = |base, registered_at| base_filter::ScannedFilter {
+            base,
+            registered_at: (registered_at > 0).then_some(registered_at),
+        };
+        let mut options: Vec<_> = base_filter::scan(&state.store.base_directory(&library))?
+            .into_iter()
+            .map(|base| listed(base, 0))
+            .collect();
+        options.extend(
+            state
+                .store
+                .stored_filters()?
+                .into_iter()
+                .map(|(base, registered_at)| listed(base, registered_at)),
+        );
+        options.sort_by_cached_key(|option| option.base.name().to_lowercase());
+        Ok(options)
     })
     .await
 }
@@ -727,6 +748,130 @@ async fn scheme_download(app: tauri::AppHandle, id: String) -> Result<bool> {
         let bytes = store::filter_zip(&scheme.name, &text, sounds)?;
         store::write_file(&path, &bytes, replace)?;
         Ok(true)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn scheme_export_package(
+    app: tauri::AppHandle,
+    ids: Vec<String>,
+    title: Option<String>,
+) -> Result<bool> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let planned = {
+            let _guard = state.changes.lock().map_err(|error| error.to_string())?;
+            let library = state.store.load()?;
+            let schemes = ids
+                .iter()
+                .map(|id| Store::get(&library, id))
+                .collect::<Result<Vec<_>>>()?;
+            let mut registry = state.store.registry()?;
+            let planned = state
+                .store
+                .plan_package(&mut registry, &schemes, title)?;
+            // Identities stay registered, so a cancelled export reuses them next time.
+            state.store.save_registry(&registry)?;
+            planned
+        };
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_file_name(planned.file_name())
+            .add_filter("方案包", &["zip"])
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let path = file.into_path().map_err(|error| error.to_string())?;
+        let (path, replace) = match path.extension() {
+            Some(extension) if extension.eq_ignore_ascii_case("zip") => (path, true),
+            None => (path.with_extension("zip"), false),
+            _ => return Err("请选择 .zip 文件名".into()),
+        };
+        state.store.write_package_file(planned, &path, replace)?;
+        Ok(true)
+    })
+    .await
+}
+
+fn leagues(catalog: &Value) -> Vec<String> {
+    catalog["leagues"]
+        .as_array()
+        .map(|leagues| {
+            leagues
+                .iter()
+                .filter_map(|league| league["id"].as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn pick_scheme_package(app: tauri::AppHandle) -> Result<Option<Value>> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_title("选择方案包")
+            .add_filter("方案包", &["zip"])
+            .add_filter("所有文件", &["*"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let path = file.into_path().map_err(|error| error.to_string())?;
+        let package = state.store.open_package(&path)?;
+        let server = package.server();
+        let _guard = state.changes.lock().map_err(|error| error.to_string())?;
+        let library = state.store.load()?;
+        let registry = state.store.registry()?;
+        let catalog = state.market(server).catalog(false)?;
+        let plan = state
+            .store
+            .plan_import(&package, &library, &registry, &leagues(&catalog))?;
+        Ok(Some(json!({
+            "path": display_directory(&path),
+            "title": package.manifest.title,
+            "current": library.server,
+            "plan": plan,
+            "catalog": catalog,
+        })))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn scheme_import_package(
+    app: tauri::AppHandle,
+    path: String,
+    decisions: PackageDecisions,
+) -> Result<Value> {
+    on_worker(move || {
+        let state = app.state::<Desktop>();
+        let mut package = state.store.open_package(Path::new(&path))?;
+        let server = package.server();
+        let _guard = state.changes.lock().map_err(|error| error.to_string())?;
+        let mut library = state.store.load()?;
+        let mut registry = state.store.registry()?;
+        let catalog = state.market(server).catalog(false)?;
+        let ids = state.store.import_package(
+            &mut library,
+            &mut registry,
+            &mut package,
+            &decisions,
+            &leagues(&catalog),
+        )?;
+        // The table first: an updated scheme may point at a copy only it records.
+        state.store.save_registry(&registry)?;
+        if library.server != server {
+            library.server = server;
+        }
+        state.store.persist(&library)?;
+        let _ = state.schedule[&server].send(());
+        Ok(json!({ "ids": ids }))
     })
     .await
 }
@@ -1034,6 +1179,9 @@ fn main() {
             scheme_install,
             local_sound,
             scheme_download,
+            scheme_export_package,
+            pick_scheme_package,
+            scheme_import_package,
             update_status,
             check_update,
             update_download,

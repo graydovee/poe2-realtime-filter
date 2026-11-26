@@ -2,15 +2,13 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * 从 vendored 的 NeverSink 过滤器里抽取「完整特效预设」，并生成 4 条默认规则。
+ * 从 vendored 的 NeverSink 过滤器里抽取特效，生成 4 条默认规则。
  *
  *   node scripts/extract-neversink-effects.mjs
  *
  * 产物：
- *   data/neversink-effects.json —— 每套视觉风格各一份完整外观预设列表
- *                                  （光柱 + 地图图标 + 字体 + 音效，一个预设就是一套完整特效）
- *   data/default-rules.json     —— 崇高石 / 混沌石 / 剥离石 / 神圣石四条默认价格规则。
- *                                    区间就是普通价格点：每档「≥ 1 枚本档通货，且 < 1 枚下一档通货」。
+ *   data/default-rules.json —— 崇高石 / 混沌石 / 剥离石 / 神圣石四个默认价格档。
+ *                             区间就是普通价格点：每档「≥ 1 枚本档通货，且 < 1 枚下一档通货」。
  */
 
 const ROOT = path.resolve("vendor/neversink");
@@ -21,16 +19,9 @@ const DEFAULT_ANCHORS = [
   { itemId: "divine-orb", name: "Divine Orb", unit: "divine", ruleId: "default-divine", label: "神圣石价格档" },
 ];
 
-const styleDirs = readdirSync(ROOT, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && entry.name.startsWith("(STYLE)"))
-  .map((entry) => entry.name);
-
-const styles = new Map();
-styles.set("default", readdirSync(ROOT).filter((name) => name.endsWith(".filter")).sort().map((name) => ({ file: name, style: "default" })));
-for (const dir of styleDirs.sort()) {
-  const style = dir.replace("(STYLE) ", "").toLowerCase();
-  styles.set(style, readdirSync(path.join(ROOT, dir)).filter((name) => name.endsWith(".filter")).sort().map((name) => ({ file: path.join(dir, name), style })));
-}
+const files = readdirSync(ROOT).filter((name) => name.endsWith(".filter")).sort();
+const blocksOf = (file) => readFileSync(path.join(ROOT, file), "utf8")
+  .split(/(?=^(?:Show|Hide|Minimal)\b)/m).filter((block) => /^(?:Show|Hide|Minimal)\b/.test(block));
 
 const grab = (block, pattern) => {
   const match = pattern.exec(block);
@@ -65,63 +56,33 @@ function appearanceOf(block) {
   return { ...(beam ? { beam } : {}), ...(icon ? { icon } : {}), ...(font ? { font } : {}), ...(sound ? { sound } : {}) };
 }
 
-const presetSets = {};
-const sounds = new Map();
-const customSounds = new Set();
-let anchorAppearances;
-
-for (const [style, files] of styles) {
-  const looks = new Map();
-  for (const { file } of files) {
-    const text = readFileSync(path.join(ROOT, file), "utf8");
-    const blocks = text.split(/(?=^(?:Show|Hide|Minimal)\b)/m).filter((block) => /^(?:Show|Hide|Minimal)\b/.test(block));
-    for (const block of blocks) {
-      const appearance = appearanceOf(block);
-      if (!appearance) continue;
-      const key = JSON.stringify(appearance);
-      const entry = looks.get(key) ?? { appearance, count: 0 };
-      entry.count += 1;
-      looks.set(key, entry);
-      if (appearance.sound) {
-        const soundKey = JSON.stringify(appearance.sound);
-        sounds.set(soundKey, appearance.sound);
-        if (appearance.sound.type !== "builtin") customSounds.add(appearance.sound.fileName);
-      }
-    }
-  }
-  const ordered = [...looks.values()].sort((a, b) => b.count - a.count || JSON.stringify(a.appearance).localeCompare(JSON.stringify(b.appearance)));
-  presetSets[style] = ordered.map((entry, index) => ({
-    id: "look-" + style + "-" + String(index + 1).padStart(2, "0"),
-    ...entry.appearance,
-  }));
-
-  // 默认 4 条规则的外观取自 default 风格的 2-SEMI-STRICT。
-  if (style === "default") {
-    const semiStrict = files.find((entry) => entry.file.includes("2-SEMI-STRICT"));
-    const text = readFileSync(path.join(ROOT, semiStrict.file), "utf8");
-    const blocks = text.split(/(?=^(?:Show|Hide|Minimal)\b)/m).filter((block) => /^(?:Show|Hide|Minimal)\b/.test(block));
-    anchorAppearances = new Map();
-    for (const anchor of DEFAULT_ANCHORS) {
-      const block = blocks.find((candidate) => /^\s*BaseType == /m.test(candidate) && candidate.includes('"' + anchor.name + '"'));
-      if (!block) throw new Error("2-SEMI-STRICT 里找不到 " + anchor.name + " 的原始规则");
-      const appearance = appearanceOf(block);
-      const preset = presetSets.default.find((candidate) => JSON.stringify({ beam: candidate.beam, icon: candidate.icon, font: candidate.font, sound: candidate.sound }) === JSON.stringify(appearance));
-      if (!preset) throw new Error(anchor.name + " 的外观不在 default 预设集合里");
-      anchorAppearances.set(anchor.itemId, { appearance, presetId: preset.id });
-    }
+// 默认风格里每套不同的完整外观按出现次数排位，规则用自己那套的编号（effectPresetId）回指。
+const looks = new Map();
+for (const file of files) {
+  for (const block of blocksOf(file)) {
+    const appearance = appearanceOf(block);
+    if (!appearance) continue;
+    const key = JSON.stringify(appearance);
+    const entry = looks.get(key) ?? { appearance, count: 0 };
+    entry.count += 1;
+    looks.set(key, entry);
   }
 }
+const presets = [...looks.values()]
+  .sort((a, b) => b.count - a.count || JSON.stringify(a.appearance).localeCompare(JSON.stringify(b.appearance)))
+  .map((entry, index) => ({ id: "look-default-" + String(index + 1).padStart(2, "0"), ...entry.appearance }));
 
-const styleNames = ["default", ...styleDirs.map((dir) => dir.replace("(STYLE) ", "").toLowerCase()).sort()];
-const payload = {
-  version: 2,
-  generatedBy: "scripts/extract-neversink-effects.mjs",
-  sources: { styles: styleNames },
-  styles: Object.fromEntries(styleNames.map((style) => [style, presetSets[style]])),
-  sounds: [...sounds.values()],
-  customSounds: [...customSounds].sort(),
-};
-writeFileSync(path.resolve("data/neversink-effects.json"), JSON.stringify(payload, null, 2) + "\n");
+// 默认 4 条规则的外观取自 2-SEMI-STRICT。
+const semiStrict = blocksOf(files.find((file) => file.includes("2-SEMI-STRICT")));
+const anchorAppearances = new Map();
+for (const anchor of DEFAULT_ANCHORS) {
+  const block = semiStrict.find((candidate) => /^\s*BaseType == /m.test(candidate) && candidate.includes('"' + anchor.name + '"'));
+  if (!block) throw new Error("2-SEMI-STRICT 里找不到 " + anchor.name + " 的原始规则");
+  const appearance = appearanceOf(block);
+  const preset = presets.find((candidate) => JSON.stringify({ beam: candidate.beam, icon: candidate.icon, font: candidate.font, sound: candidate.sound }) === JSON.stringify(appearance));
+  if (!preset) throw new Error(anchor.name + " 的外观不在 default 预设集合里");
+  anchorAppearances.set(anchor.itemId, { appearance, presetId: preset.id });
+}
 
 const pricePoint = (unit) => ({ amount: 1, currency: unit });
 const rules = DEFAULT_ANCHORS.map((anchor, index) => {
@@ -139,5 +100,4 @@ const rules = DEFAULT_ANCHORS.map((anchor, index) => {
 });
 writeFileSync(path.resolve("data/default-rules.json"), JSON.stringify({ version: 3, generatedBy: "scripts/extract-neversink-effects.mjs", rules }, null, 2) + "\n");
 
-console.log("预设数量：" + styleNames.map((style) => style + " " + presetSets[style].length).join(" / "));
 console.log("默认规则预设：" + rules.map((rule) => rule.name + "=" + rule.effectPresetId).join("  "));

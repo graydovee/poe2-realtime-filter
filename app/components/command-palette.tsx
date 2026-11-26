@@ -5,9 +5,11 @@ import {
   ArrowLeft,
   ClipboardPaste,
   Eye,
+  FileArchive,
   FilePen,
   Layers,
   ListX,
+  PackagePlus,
   PackageSearch,
   PanelRight,
   Plus,
@@ -61,13 +63,29 @@ export function CommandPalette() {
     ];
     if (state.view === "manager") {
       const library = state.library;
-      commands.push({
-        id: "import",
-        label: "导入分享码…",
-        group: "方案",
-        icon: ClipboardPaste,
-        run: () => state.patchManager({ importOpen: true }),
-      });
+      commands.push(
+        {
+          id: "import",
+          label: "导入分享码…",
+          group: "方案",
+          icon: ClipboardPaste,
+          run: () => state.patchManager({ importOpen: true }),
+        },
+        {
+          id: "import-package",
+          label: "导入方案包…",
+          group: "方案",
+          icon: PackagePlus,
+          run: () => void state.pickPackage(),
+        },
+        {
+          id: "export-package",
+          label: "导出方案包…",
+          group: "方案",
+          icon: FileArchive,
+          run: () => state.openExport(),
+        },
+      );
       if (library) {
         commands.push({
           id: "new",

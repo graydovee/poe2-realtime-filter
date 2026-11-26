@@ -62,14 +62,15 @@ function validateRule(rule:FilterRule,ids:Set<string>){
 
 export function validateProfile(input:unknown):FilterProfile {
  const p=normalizeProfile(input);
- if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new Error('无效的基础过滤器');
+ if(!Number.isInteger(p.strictness)||p.strictness<0||p.strictness>6||!Object.prototype.hasOwnProperty.call(STYLE_LABELS,p.style)||!['cn','tw','us'].includes(p.locale))throw new Error('无效的方案设置');
  const base=p.baseFilter;
  const name=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=260&&!/[\x00-\x1f]/.test(value);
  const path=(value:unknown)=>typeof value==='string'&&value.length>0&&value.length<=32767&&!/[\x00-\x1f]/.test(value);
  if (base !== undefined) {
   const validLocation = base?.kind === 'local' && path(base.path)
    || base?.kind === 'subscribed' && ['online', 'wegame'].includes(base.source) && path(base.directory) && path(base.entry)
-   || base?.kind === 'downloaded' && name(base.source) && name(base.version) && path(base.entry);
+   || base?.kind === 'downloaded' && name(base.source) && name(base.version) && path(base.entry)
+   || base?.kind === 'imported' && /^[0-9a-f]{32}$/.test(base.id) && path(base.entry);
   if (!validLocation || !name(base.name)) throw new Error('无效的基础过滤器来源');
  }
  if(p.baseFilterHint!==undefined&&!name(p.baseFilterHint))throw new Error('无效的基础过滤器名称');
@@ -77,6 +78,6 @@ export function validateProfile(input:unknown):FilterProfile {
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');
  const ids=new Set<string>();
  for(const rule of p.rules)validateRule(rule,ids);
- if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!FILTER_ITEMS_BY_ID.has(id)))throw new Error('跳过名单无效');
+ if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!FILTER_ITEMS_BY_ID.has(id)))throw new Error('跳过物品无效');
  return JSON.parse(JSON.stringify(p));
 }

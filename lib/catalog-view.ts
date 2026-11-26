@@ -26,13 +26,13 @@ const classMatchPath = (path: string[]): string[] | undefined =>
 export type ClassMatch = { path: string[]; item: ItemDefinition; members: ItemDefinition[] };
 
 /**
- * 整类匹配登记表只登记与选择器分类相符的 Class 条件，没登记的照旧跳过：
+ * 整类匹配登记表只登记与选择器分类相符的 Class 条件，没登记的不做整类匹配：
  * - Stackable Currency：它的范围比「通货与材料」小（符文、灵魂核心不属于这个类别）；
  * - 「其他」、通货与材料根分类下的几个标记，和那里的逐件物品不是一回事；
  * - Instance Local Items：不是任务物品，和 Quest Items 挤在同一个分类里；
  * - Augment：目录把它放在石板分类下，但它是符文、灵魂核心那一类（游戏在 2025 年 12 月把 Socketable
  *   改名成了 Augment，见 GGG 的过滤器更新公告；NeverSink 0.10.4 里 Class == "Augment" 搭配的也是符文
- *   和灵魂核心）。石板对应的是 Tablet，这里不登记，石板照旧逐件输出。
+ *   和灵魂核心）。石板对应的是 Tablet，这里不登记，石板按逐件输出。
  * 类别和物品的对应关系由 tests/class-matches.test.mjs 对照内置的 NeverSink 过滤器核对。
  */
 const UNREGISTERED_CLASSES = new Set(["Instance Local Items", "Augment"]);
@@ -196,7 +196,7 @@ function indexShareGroups(groups: ShareGroups) {
   return indexed;
 }
 
-/** 只给新分类或首次进入分类的 ID 追加槽位。旧分类、别名和退役 ID 都留在原处。 */
+/** 只给新分类或首次进入分类的 ID 追加槽位。已有分类、别名和退役 ID 都留在原处。 */
 export function allocateShareGroups(previous: ShareGroups, view: ShareItems): ShareGroups {
   const indexed = indexShareGroups(previous);
   const groups = { ...previous };
@@ -266,7 +266,7 @@ const rootShareOrder = (key: string) => ROOT_SHARE_ORDER.get(key) ?? ROOT_SHARE_
 
 /** 按选择器的分类树追加同级序号，分类移走或消失后仍保留原路径。 */
 export function allocateShareTree(previous: ShareTreeData, previousGroups: ShareGroups, view: ShareItems): ShareTreeData {
-  // 先校验旧分类的路径，避免丢失的旧序号被当成新路径重新分配。
+  // 先校验已有分类的路径，避免丢失的序号被当成新路径重新分配。
   indexShareTree(previous, indexShareGroups(previousGroups));
   const merge = (existing: ShareTreeData, node: CatalogNode): ShareTreeData => {
     const siblings = new Map(Object.entries(existing));
@@ -281,7 +281,7 @@ export function allocateShareTree(previous: ShareTreeData, previousGroups: Share
   return merge(previous, buildCatalogTree(view.pickerItems));
 }
 
-/** 导出用当前槽位和分类树。导入仍可访问旧路径和别名，退役槽位投影为 null。 */
+/** 导出用当前槽位和分类树。导入可访问已有路径和别名，退役槽位投影为 null。 */
 export function projectShareCatalog(groups: ShareGroups, view: ShareItems, ordinals: unknown): ShareCatalog {
   const indexed = indexShareGroups(groups);
   const { tree, groupPaths } = indexShareTree(ordinals, indexed);

@@ -3,12 +3,11 @@ use crate::share_code::decode;
 use serde_json::json;
 
 const BROTLI_PREFIX: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjF9.";
-const LEGACY: &str = "POE2F1.eyJuYW1lIjoi5omT5a6dIiwicHJvZmlsZSI6eyJzY2hlbWFWZXJzaW9uIjoyLCJsZWFndWUiOiJTdGFuZGFyZCIsInJ1bGVzIjpbXSwic2tpcHBlZEl0ZW1JZHMiOlsiYWxiaW5vLXJob2EtZmVhdGhlciJdfX0";
+const JSON_VECTOR: &str = "POE2F1.eyJuYW1lIjoi5omT5a6dIiwicHJvZmlsZSI6eyJzY2hlbWFWZXJzaW9uIjoyLCJsZWFndWUiOiJTdGFuZGFyZCIsInJ1bGVzIjpbXSwic2tpcHBlZEl0ZW1JZHMiOlsiYWxiaW5vLXJob2EtZmVhdGhlciJdfX0";
 // Produced independently with Node zlib, including CRC32 framing.
 const BROTLI_VECTOR: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjF9.8d8ILRt2AGAchXGzE562KCuun6YtDsEGHBAH2WATDzpE3lK__kVpH7IJb_9GgJmmdVi6-urkwOkgv35BC0vCADTwkJUo2IMqwGJgsBpuPkIrfOIA3kYKlAD3QShIFnKJYNwTrs-pLr6QOtaW27dJCytSJPsB";
 const POE2_VECTOR: &str = "POE2F1.eyJhbGciOiJwb2UyIiwicCI6MX0.tG4EFQsXgCoAAABbIuaJk-WunSIsWzM4NywyLCJTdGFuZGFyZCIsW10sWzAsMSwwLDFdXV0kAw";
 
-// Produced by the v0.5.12 encoder before POE2F2 existed; nothing writes these any more.
 const SERVER_BROTLI_VECTOR: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjJ9.H7qOQBeHASCcBXZbcmi394SBaSetjKh25Av2bxrhTcRBnhRyedgZCrE2U_9OKWuWiMJOw2CnhIVY1josXX3XWyhFDGZ8s3m5B5tPMBGJ1qVMoXMrjmxQRQ6HZoHiCYG-4cZJdhvCdIHvQplYHhgRnw2ZwRTBXACgXnrcOhxYd5Ek2SwDGEn8G7PcCJP8T0tyvG7tLf8tvlQEGdQMDNJ-Su5OxtQ8y7yEz2isj36ItJ2okMTQSryLiisApP-UpVocnR0dAu5QHsOjSK0cr1vDq-XfV6TsmSq3a03fQj8";
 const SERVER_POE2_VECTOR: &str = "POE2F1.eyJhbGciOiJwb2UyIiwicCI6Mn0.XczV-xejABAsC2w3HyjgzUZptjkKXmKhFyU3uCJPLbZl2Je3zYdyGwimcnnCNgUx5U8LgnTzsDM0y8bKm6ULZ2bideE2GdvbHD1ZzXo0ovhAqISsR4LRk20Pn2LimxIURcxwBgxmIW7toPltiV8QjbQWRvoMyn8Br3s45IxSf6GhVFFcOuSSW9H0MUD5L6SkV02ZRwhkyfs1AQ";
 const DROP_CONDITIONS_VECTOR: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjN9.ElCTgBcGAmAsDmwbSfkxUbrtQdCwHgS1tlSZzYhI-pDFHG4ILUIbhp7SStDH0WTp6Wsdlq6-RzfDQPl3gwbdN8akrYGGGOTr9g6FQXw3yr2OIJoQLEEHLvjpNeee1Zu_g4MpBAp8kBqShIAOsgATOlO14hTUE30fGwj6EmIF5ZVmWC_HKMHZpRrMR8t8udkwgMRg8Uq4f4WVnbgEuwqCcIbDmHJJgKQNM4LuGav5_HsQsuEjE8xsE3VyoW5MOyYAxx9-AbBiCEr-iEmhXffKrMLmDXEBancDsgAycS43kfu1BQYisG55Aa7R5GvznVykHxnNkNr84Q5m0rjOJK8souS_x7DKs4lfuWbn1uwuyMil1mqxGmMG5U31gRi9ULhOls2QZIH6";
@@ -46,7 +45,7 @@ fn with_drop_conditions() -> Share {
 }
 
 #[test]
-fn legacy_brotli_checks_crc_and_exact_stream_end() {
+fn brotli_checks_crc_and_exact_stream_end() {
     let payload = URL_SAFE_NO_PAD
         .decode(BROTLI_VECTOR.strip_prefix(BROTLI_PREFIX).unwrap())
         .unwrap();
@@ -68,11 +67,11 @@ fn legacy_brotli_checks_crc_and_exact_stream_end() {
 }
 
 #[test]
-fn legacy_json_header_codecs_still_decode() {
+fn json_header_codecs_decode() {
     let server_share = with_server();
     let drop_share = with_drop_conditions();
     for (code, expected) in [
-        (LEGACY, plain()),
+        (JSON_VECTOR, plain()),
         (BROTLI_VECTOR, plain()),
         (POE2_VECTOR, plain()),
         (SERVER_BROTLI_VECTOR, server_share.clone()),
@@ -85,13 +84,16 @@ fn legacy_json_header_codecs_still_decode() {
             "{code}"
         );
     }
-    assert_eq!(decode(&format!("  {LEGACY}\n")).unwrap().share, plain());
+    assert_eq!(
+        decode(&format!("  {JSON_VECTOR}\n")).unwrap().share,
+        plain()
+    );
 
-    // The same paths with fresh data, built the way v0.5.12 built them.
+    // The same bodies, built here.
     let share = with_server();
     let json = serde_json::to_vec(&share).unwrap();
     assert_eq!(
-        decode(&encode_payload(LegacyBody::ServerBrotliJson, &json).unwrap())
+        decode(&encode_payload(Body::ServerBrotliJson, &json).unwrap())
             .unwrap()
             .share,
         share
@@ -101,35 +103,35 @@ fn legacy_json_header_codecs_still_decode() {
     let mut packed = vec![1];
     packed.extend(poe2::pack(&core).unwrap());
     assert_eq!(
-        decode(&encode_payload(LegacyBody::ServerPoe2, &packed).unwrap())
+        decode(&encode_payload(Body::ServerPoe2, &packed).unwrap())
             .unwrap()
             .share,
         share
     );
     assert_eq!(
-        decode(&encode_payload(LegacyBody::ServerPoe2, &[2]).unwrap()).unwrap_err(),
+        decode(&encode_payload(Body::ServerPoe2, &[2]).unwrap()).unwrap_err(),
         "分享码的游戏服务器无效"
     );
     assert_eq!(
-        decode(&encode_payload(LegacyBody::ServerPoe2, &[]).unwrap()).unwrap_err(),
+        decode(&encode_payload(Body::ServerPoe2, &[]).unwrap()).unwrap_err(),
         "分享码缺少游戏服务器"
     );
     let json = serde_json::to_vec(&drop_share).unwrap();
     assert_eq!(
-        decode(&encode_payload(LegacyBody::DropConditionsJson, &json).unwrap())
+        decode(&encode_payload(Body::DropConditionsJson, &json).unwrap())
             .unwrap()
             .share,
         drop_share
     );
     let json = serde_json::to_vec(&plain()).unwrap();
     assert_eq!(
-        decode(&encode_payload(LegacyBody::BrotliJson, &json).unwrap())
+        decode(&encode_payload(Body::BrotliJson, &json).unwrap())
             .unwrap()
             .share,
         plain()
     );
     assert_eq!(
-        decode(&encode_payload(LegacyBody::Poe2, &poe2::pack(&plain()).unwrap()).unwrap())
+        decode(&encode_payload(Body::Poe2, &poe2::pack(&plain()).unwrap()).unwrap())
             .unwrap()
             .share,
         plain()
@@ -182,7 +184,7 @@ fn rejects_malformed_or_unsupported_headers() {
 }
 
 #[test]
-fn limits_legacy_json_bytes() {
+fn limits_json_bytes() {
     let mut share = plain();
     share.name.clear();
     let overhead = serde_json::to_vec(&share).unwrap().len();
@@ -190,7 +192,7 @@ fn limits_legacy_json_bytes() {
     share.name.push('é');
     let maximum = serde_json::to_vec(&share).unwrap();
     let raw_code = |bytes: &[u8]| format!("{PREFIX}.{}", URL_SAFE_NO_PAD.encode(bytes));
-    let brotli_code = |bytes: &[u8]| encode_payload(LegacyBody::BrotliJson, bytes).unwrap();
+    let brotli_code = |bytes: &[u8]| encode_payload(Body::BrotliJson, bytes).unwrap();
     assert_eq!(maximum.len(), MAX_JSON);
     for code in [raw_code(&maximum), brotli_code(&maximum)] {
         assert_eq!(decode(&code).unwrap().share, share);
@@ -206,7 +208,7 @@ fn limits_legacy_json_bytes() {
 }
 
 #[test]
-fn limits_legacy_server_poe2_expansion() {
+fn limits_server_poe2_expansion() {
     let mut core = plain();
     core.name.clear();
     let mut share = core.clone();
@@ -217,7 +219,7 @@ fn limits_legacy_server_poe2_expansion() {
     let server_code = |core: &Share| {
         let mut packed = vec![1];
         packed.extend(poe2::pack(core).unwrap());
-        encode_payload(LegacyBody::ServerPoe2, &packed).unwrap()
+        encode_payload(Body::ServerPoe2, &packed).unwrap()
     };
     assert_eq!(decode(&server_code(&core)).unwrap().share, share);
     core.name.push('a');

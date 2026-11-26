@@ -1,7 +1,22 @@
 "use client";
 
 import { useId } from "react";
-import { ArrowLeft, Copy, Download, Eye, EyeOff, FilePen, PackageOpen, Pencil, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  FileArchive,
+  FilePen,
+  PackageOpen,
+  PackagePlus,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Share2,
+  Trash2,
+} from "lucide-react";
 
 import { local, SERVER_LABELS, type Library, type LocalScheme } from "../../../lib/desktop";
 import type { GameServer } from "../../../lib/types";
@@ -15,6 +30,7 @@ import { Field } from "../ui/field";
 import { Input } from "../ui/input";
 import { Panel } from "../ui/panel";
 import { Switch } from "../ui/switch";
+import { Tooltip } from "../ui/tooltip";
 import { baseLabel, missingBaseHint, schemeIssue, schemeTone } from "./scheme-meta";
 
 function SchemeRules({ scheme }: { scheme: LocalScheme }) {
@@ -56,6 +72,7 @@ function SchemeDetail({ scheme, server, busy, offers }: {
   const downloadZip = useAppStore((state) => state.downloadZip);
   const downloadBase = useAppStore((state) => state.downloadBase);
   const runManager = useAppStore((state) => state.runManager);
+  const exportPackage = useAppStore((state) => state.exportPackage);
 
   const issue = schemeIssue(scheme.status);
   const missingBase = missingBaseHint(scheme);
@@ -115,6 +132,32 @@ function SchemeDetail({ scheme, server, busy, offers }: {
         <SchemeRules scheme={scheme} />
       </div>
 
+      {/* 分享以方案包为主：它带上基础过滤器和音效，对方导入后能直接编辑。 */}
+      <div className="mt-4 space-y-2 border-t border-line pt-4">
+        <h4 className="text-xs font-medium text-ink-muted">分享</h4>
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void exportPackage(scheme)}>
+          <FileArchive aria-hidden="true" />
+          导出方案包
+        </Button>
+        <p className="text-xs leading-relaxed text-ink-muted">
+          规则、基础过滤器和音效打成一个包，对方导入后可以直接编辑和安装。
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <Tooltip label="只带规则。基础过滤器和音效需要对方自己已经有。">
+            <Button className="w-full" disabled={busy} onClick={() => void shareScheme(scheme)}>
+              <Share2 aria-hidden="true" />
+              分享码
+            </Button>
+          </Tooltip>
+          <Tooltip label="生成可以直接放进游戏的过滤器，不能再编辑。">
+            <Button className="w-full" disabled={busy} onClick={() => void downloadZip(scheme)}>
+              <Download aria-hidden="true" />
+              下载 ZIP
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
+
       <div className="mt-4 grid grid-cols-2 gap-2">
         <Button variant="primary" className="col-span-2" disabled={busy} onClick={() => void openDraft(scheme, server)}>
           <FilePen aria-hidden="true" />
@@ -136,14 +179,6 @@ function SchemeDetail({ scheme, server, busy, offers }: {
         <Button disabled={busy} onClick={() => void copyScheme(scheme.id)}>
           <Copy aria-hidden="true" />
           复制
-        </Button>
-        <Button disabled={busy} onClick={() => void shareScheme(scheme)}>
-          <Share2 aria-hidden="true" />
-          分享码
-        </Button>
-        <Button disabled={busy} onClick={() => void downloadZip(scheme)}>
-          <Download aria-hidden="true" />
-          下载 ZIP
         </Button>
         {scheme.installed && (
           <>
@@ -174,6 +209,8 @@ function Overview({ library, busy, server }: { library: Library; busy: boolean; 
   const openDraft = useAppStore((state) => state.openDraft);
   const setSelectedSchemeId = useAppStore((state) => state.setSelectedSchemeId);
   const patch = useAppStore((state) => state.patchManager);
+  const pickPackage = useAppStore((state) => state.pickPackage);
+  const openExport = useAppStore((state) => state.openExport);
   const installed = library.schemes.filter((scheme) => scheme.installed).length;
   const attention = library.schemes.filter((scheme) => schemeTone(scheme) === "ember").length;
   return (
@@ -197,9 +234,17 @@ function Overview({ library, busy, server }: { library: Library; busy: boolean; 
           <Plus aria-hidden="true" />
           新建方案
         </Button>
+        <Button disabled={busy} onClick={() => void pickPackage()}>
+          <PackagePlus aria-hidden="true" />
+          导入方案包
+        </Button>
         <Button disabled={busy} onClick={() => patch({ importOpen: true })}>
           <PackageOpen aria-hidden="true" />
           导入分享码
+        </Button>
+        <Button disabled={busy} onClick={() => openExport()}>
+          <FileArchive aria-hidden="true" />
+          导出方案包…
         </Button>
       </div>
       {library.schemes.length > 0 && (

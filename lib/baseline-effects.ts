@@ -133,7 +133,7 @@ export function canFollowBaselineItem(item: ItemDefinition | undefined): item is
 function catalogProbe(item: ItemDefinition): Probe {
   const { baseType, gemLevel, rarity, nonUnique } = item.matcher;
   const [group, section] = item.categoryPath;
-  // 保留旧价格档的单份、无品质通货探针。其他物品只用目录有把握的条件，不假定其掉落属性。
+  // 通货用「Stackable Currency」加普通品质的探针。其他物品只用目录有把握的条件，不假定其掉落属性。
   const currency = group === "crafting" && item.stackable === true
     && (section === "currency" || (section === "shards" && item.category === "currency"));
   const className = item.matcher.class ?? CLASS_OF_ITEM.get(item.id)?.item.matcher.class ?? (currency ? "Stackable Currency" : undefined);

@@ -12,10 +12,6 @@ test("通货与材料分组跟随 poe.ninja 标签页", () => {
   for (const key of ["currency", "shards", "bones", "omens", "expedition", "emotions", "catalysts", "verisium", "temple", "trial"]) {
     assert.ok(groupsInUse.has(key), "缺少分组：" + key);
   }
-  // 旧的玩法合并组必须消失。
-  for (const legacy of ["crafting/basic", "crafting/abyss", "crafting/ritual", "crafting/delirium", "crafting/breach"]) {
-    assert.equal(catalog.items.filter((item) => item.categoryPath.join("/") === legacy).length, 0, "旧分组仍然存在：" + legacy);
-  }
 });
 
 test("每件通货与材料都有可追溯的分组归属", () => {

@@ -19,6 +19,14 @@ import { Switch } from "../ui/switch";
 const sources = [{ id: "neversink", name: "NeverSink" }] as const;
 type Source = (typeof sources)[number];
 type Picker = { kind: "scan" } | { kind: "source" } | { kind: "versions"; source: Source };
+/** 方案包导入的副本在这一组里列出。版本名只含字母、数字和 `-._`，不会和它重名。 */
+const IMPORTED_GROUP = "方案包导入";
+/** 扫描结果比方案里存的来源多一个登记时间，只有副本带。 */
+type ScannedFilter = BaseFilter & { registeredAt?: number };
+
+function registeredDate(seconds: number) {
+  return new Date(seconds * 1000).toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
 
 /** 收起时最多展示多少个跳过的物品。 */
 const PREVIEW_LIMIT = 12;
@@ -32,6 +40,8 @@ function filterLocation(base: BaseFilter) {
       return `${base.directory}\\${base.entry}`;
     case "downloaded":
       return `${base.source} · ${base.version} · ${base.entry}`;
+    case "imported":
+      return `${base.id.slice(0, 8)} · ${base.entry}`;
   }
 }
 
@@ -44,6 +54,8 @@ function filterSource(base: BaseFilter) {
       return base.source === "online" ? "国际服订阅" : "WeGame 订阅";
     case "downloaded":
       return `${sources.find((source) => source.id === base.source)?.name ?? base.source} · ${base.version}`;
+    case "imported":
+      return "来自方案包";
   }
 }
 
@@ -52,11 +64,11 @@ function itemLabel(id: string) {
   return item ? itemName(item, "cn") : id;
 }
 
-/** 选择基础过滤器的对话框：扫描游戏目录，或选一个下载来源再选版本。 */
+/** 选择基础过滤器的对话框：列出游戏目录和方案包导入的过滤器，或选一个下载来源再选版本。 */
 function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () => void }) {
   const setBaseFilter = useAppStore((state) => state.setBaseFilter);
   const [picker, setPicker] = useState<Picker>(initial);
-  const [options, setOptions] = useState<BaseFilter[]>([]);
+  const [options, setOptions] = useState<ScannedFilter[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -67,7 +79,7 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
     setError("");
     setNotice("");
     try {
-      setOptions(await local<BaseFilter[]>("scan_base_filters"));
+      setOptions(await local<ScannedFilter[]>("scan_base_filters"));
     } catch (cause) {
       setError(explain(cause));
     } finally {
@@ -104,17 +116,18 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
     else if (initial.kind === "versions") void loadSource(initial.source, false);
   }, [initial, scan, loadSource]);
 
-  const visibleOptions =
+  const visibleOptions: ScannedFilter[] =
     picker.kind === "scan" && hideSubscriptions ? options.filter((option) => option.kind !== "subscribed") : options;
-  const optionGroups = new Map<string, BaseFilter[]>();
+  const optionGroups = new Map<string, ScannedFilter[]>();
   for (const option of visibleOptions) {
-    const version = option.kind === "downloaded" ? option.version : "";
+    const version =
+      option.kind === "imported" ? IMPORTED_GROUP : option.kind === "downloaded" ? option.version : "";
     const group = optionGroups.get(version);
     if (group) group.push(option);
     else optionGroups.set(version, [option]);
   }
 
-  const title = picker.kind === "scan" ? "选择游戏内过滤器" : picker.kind === "source" ? "选择下载来源" : picker.source.name;
+  const title = picker.kind === "scan" ? "选择已有过滤器" : picker.kind === "source" ? "选择下载来源" : picker.source.name;
 
   return (
     <Dialog
@@ -126,7 +139,9 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
       <DialogContent aria-busy={busy || undefined}>
         <DialogHeader
           title={title}
-          description={picker.kind === "scan" ? "扫描游戏过滤器目录。选择后会替换当前的基础过滤器。" : undefined}
+          description={
+            picker.kind === "scan" ? "列出游戏目录里和方案包导入的过滤器。选中后替换当前的。" : undefined
+          }
         />
         {picker.kind === "source" ? (
           <div className="grid gap-2">
@@ -163,26 +178,36 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
             )}
             {!busy && optionGroups.size > 0 && (
               <div className="max-h-[50dvh] space-y-4 overflow-y-auto overscroll-contain py-1 pr-2 [scrollbar-gutter:stable]">
-                {[...optionGroups].map(([version, group]) => {
+                {[...optionGroups].map(([group, options]) => {
                   const names = new Map<string, number>();
-                  for (const option of group) names.set(option.name, (names.get(option.name) ?? 0) + 1);
+                  for (const option of options) names.set(option.name, (names.get(option.name) ?? 0) + 1);
                   return (
-                    <div key={version}>
-                      {version && <h4 className="mb-2 text-xs font-medium text-ink-muted">版本 {version}</h4>}
+                    <div key={group}>
+                      {group && (
+                        <h4 className="mb-2 text-xs font-medium text-ink-muted">
+                          {group === IMPORTED_GROUP ? group : `版本 ${group}`}
+                        </h4>
+                      )}
                       <ul className="space-y-1" role="list">
-                        {group.map((option) => {
+                        {options.map((option) => {
+                          const repeated = (names.get(option.name) ?? 0) > 1;
                           const detail =
                             option.kind === "subscribed"
                               ? option.source === "online" ? "国际服订阅" : "WeGame 订阅"
-                              : option.kind === "downloaded" && (names.get(option.name) ?? 0) > 1
+                              : option.kind === "downloaded" && repeated
                                 ? option.entry.split("/").slice(0, -1).join("/") || "默认目录"
+                                // 同名的两份副本用登记日期区分。
+                                : option.kind === "imported" && repeated && option.registeredAt
+                                  ? `导入于 ${registeredDate(option.registeredAt)}`
                                 : undefined;
                           return (
                             <li key={filterLocation(option)}>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setBaseFilter(option);
+                                  // 登记时间只用于显示，方案里只存来源。
+                                  const { registeredAt: _registered, ...base } = option;
+                                  setBaseFilter(base);
                                   onClose();
                                 }}
                                 className="flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md border border-line bg-surface-2 px-3 py-2 text-left transition-colors duration-150 hover:border-gold/50 hover:bg-surface-3"
@@ -279,7 +304,7 @@ export function BaseFilterModule() {
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" onClick={() => setPicker({ kind: "scan" })}>
               <FileSearch aria-hidden="true" />
-              选择游戏内过滤器
+              选择已有过滤器
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

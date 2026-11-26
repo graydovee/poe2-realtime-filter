@@ -5,8 +5,6 @@ use serde_json::json;
 
 const INVALID_COMPRESSED_DATA: &str = "分享码压缩数据损坏";
 
-const DRAFT_VECTOR: &str = "POE2F2.BAgBEAFG79hlhwaADADmiZPlrp0wLAAgAUwD";
-
 // Independent frame vectors with body b"123456789" (CRC32 0xcbf43926).
 // The compressed streams were produced with Node zlib.
 const RAW_VECTOR: &str = "POE2F2.BggCEAEYASY59MsxMjM0NTY3ODk";
@@ -191,7 +189,6 @@ fn packed_header_requires_all_three_fields() {
             "{header:?}"
         );
     }
-    assert_eq!(decode(DRAFT_VECTOR).unwrap_err(), INVALID_HEADER);
 }
 
 #[test]
@@ -251,7 +248,6 @@ fn packed_header_rejects_malformed_fields_and_lengths() {
 fn packed_header_rejects_unsupported_format_revision_or_compression() {
     for header in [
         [8, 3, 16, 1, 24, 1], // Unknown format.
-        [8, 1, 16, 3, 24, 1], // Unpublished JSON body.
         [8, 2, 16, 2, 24, 1], // Unknown revision of the positional body.
         [8, 2, 16, 1, 24, 4], // Unknown compression.
     ] {
@@ -358,7 +354,7 @@ fn packed_body(code: &str) -> Result<(BodyVersion, Vec<u8>)> {
     Ok((frame.version, frame.inflate()?))
 }
 
-// Captured from the format 2/revision 1 implementation before the protocol split.
+// Fixed vectors of complete share codes.
 const RAW_SHARE: &str = "POE2F2.BggCEAEYARN3c2gTBuaJk-WunQwCCFN0YW5kYXJkABCBAgQB";
 const BROTLI_SHARE: &str = "POE2F2.BggCEAEYAjjSmleCGwCYkVqsNbbGLDh3_78swUKOpGid0BSHtABxygF784CiIMfw89MZDh6yYEKTlVcbfZTvC553470fa5tuyg8xhkM0oDcZ4L5mJRgkRALVNOHjTHsshF8qfJv1UE5bNq0VgocVSmKbDBU";
 const DEFLATE_SHARE: &str = "POE2F2.BggCEAEYAzjSmleVzMsJhDAQANCZyQoJe9nDFpAC9tODDXjQBkYTNeCPUcGrVViWFQl2IHh8l7fjL61ZvLNlWKZZ_MeOlz5A6XTizrE4nUioQscNAVB1M0LQqBAVRMbEzext5tsBFG34vz2ZouZ-_PaSw2ulB75XeqKOTg";

@@ -90,7 +90,7 @@ impl Market {
             .get(url)
             .query(query)
             .header(header::ACCEPT, "application/json");
-        // A legacy exchange response may not have a usable source time. Request its body again.
+        // A cached exchange response without a usable source time has its body requested again.
         if let Some(previous) =
             previous.filter(|old| !track_quote_time || old.quote_time().is_some())
         {

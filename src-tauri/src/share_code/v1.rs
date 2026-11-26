@@ -1,4 +1,4 @@
-//! Reader for POE2F1 frames with or without a JSON header, written through v0.5.12.
+//! Reader for POE2F1 frames with or without a JSON header.
 
 mod poe2;
 
@@ -44,7 +44,7 @@ struct Header {
 }
 
 #[derive(Clone, Copy)]
-enum LegacyBody {
+enum Body {
     BrotliJson,
     Poe2,
     ServerBrotliJson,
@@ -52,7 +52,7 @@ enum LegacyBody {
     DropConditionsJson,
 }
 
-impl LegacyBody {
+impl Body {
     fn from_header(header: Header) -> Result<Self> {
         match (header.alg.as_str(), header.p) {
             ("br", 1) => Ok(Self::BrotliJson),
@@ -77,9 +77,9 @@ impl LegacyBody {
     }
 }
 
-/// Build old frames for the decoder tests.
+/// Build frames for the decoder tests.
 #[cfg(test)]
-fn encode_payload(body: LegacyBody, bytes: &[u8]) -> Result<String> {
+fn encode_payload(body: Body, bytes: &[u8]) -> Result<String> {
     let mut payload = crc32fast::hash(bytes).to_le_bytes().to_vec();
     Encoder::brotli(11, 20).write_payload(bytes, &mut payload)?;
     if payload.len() > MAX_PAYLOAD {
@@ -104,11 +104,11 @@ fn decode_payload(payload: &str) -> Result<Share> {
     if header.p == 0 || header.alg.is_empty() {
         return Err(INVALID_HEADER.into());
     }
-    let body = LegacyBody::from_header(header)?;
+    let body = Body::from_header(header)?;
     let bytes = inflate(&decode_base64(payload, MAX_PAYLOAD)?, Algorithm::Brotli)?;
     match body {
-        LegacyBody::BrotliJson => parse_json(&bytes),
-        LegacyBody::DropConditionsJson => {
+        Body::BrotliJson => parse_json(&bytes),
+        Body::DropConditionsJson => {
             let share = parse_json(&bytes)?;
             if share.profile["schemaVersion"].as_u64() != Some(3) {
                 return Err("分享码方案格式无效".into());
@@ -118,12 +118,12 @@ fn decode_payload(payload: &str) -> Result<Share> {
             }
             Ok(share)
         }
-        LegacyBody::ServerBrotliJson => {
+        Body::ServerBrotliJson => {
             let share = parse_json(&bytes)?;
             validate_server(&share.profile["server"])?;
             Ok(share)
         }
-        LegacyBody::ServerPoe2 => {
+        Body::ServerPoe2 => {
             let (&server, packed) = bytes.split_first().ok_or("分享码缺少游戏服务器")?;
             let server = match server {
                 0 => "international",
@@ -135,7 +135,7 @@ fn decode_payload(payload: &str) -> Result<Share> {
             check_json_size(&share, INFLATED_TOO_LARGE)?;
             Ok(share)
         }
-        LegacyBody::Poe2 => poe2::unpack(&bytes).ok_or_else(|| "PoE2 分享码结构无效或过大".into()),
+        Body::Poe2 => poe2::unpack(&bytes).ok_or_else(|| "PoE2 分享码结构无效或过大".into()),
     }
 }
 

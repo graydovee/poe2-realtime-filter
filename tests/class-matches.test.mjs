@@ -89,7 +89,7 @@ test("整类块用的类名都是游戏里真实存在的类名", () => {
 
 test("登记的类别确实对应它所代表分类里的物品", () => {
   // NeverSink 会把物品名单和 Class 条件写在同一个块里。如果它在某个类别下点过不少物品，
-  // 而我们登记给这个类别的分类一件都不在其中，对应关系就是错的：Augment 曾经被登记成石板，就是这样错的。
+  // 而我们登记给这个类别的分类一件都不在其中，对应关系就是错的。
   // 只有名字能看出对应的装备类型不在这里核对（类别名就是物品类型名）。
   const byClass = (className) => data.CLASS_MATCHES.filter((entry) => !/^(base|unique):class-/.test(entry.item.id) && entry.item.matcher.class === className);
   const tablets = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "endgame/tablets" && !item.matcher.class);
@@ -131,7 +131,7 @@ test("登记的类别确实对应它所代表分类里的物品", () => {
   }
 });
 
-test("石板照旧逐件输出，不生成 Class 条件", () => {
+test("石板按逐件输出，不生成 Class 条件", () => {
   const tablets = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "endgame/tablets" && !item.matcher.class);
   assert.equal(tablets.length, 8);
   const output = generateOnBase(build([itemRule("tablets", tablets.map((item) => item.id))]), null, snapshot);
@@ -140,7 +140,7 @@ test("石板照旧逐件输出，不生成 Class 条件", () => {
   assert.equal(ruleBlocks(output.filterFile).length, 8);
 });
 
-test("全选一个分类时输出一条整类块，不再逐件输出", () => {
+test("全选一个分类时输出一条整类块", () => {
   const output = generateOnBase(build([itemRule("omens", omenIds())]), null, snapshot);
   // 注释和逐件块一样用条目自己的名字，不另加「整类」标记。
   assert.deepEqual(ruleBlocks(output.filterFile), ['Show # poe2-filter rule: omens / Omen\n\tClass == "Omen"']);
@@ -159,12 +159,12 @@ test("带价格条件的规则不合并：整类条目没有行情", () => {
   assert.ok(blocks.every((block) => /\n\tBaseType == "Omen/.test(block)));
 });
 
-test("少选一件、或者这一类里有物品被跳过时，照旧逐件输出", () => {
+test("少选一件、或者这一类里有物品被跳过时，按逐件输出", () => {
   const ids = omenIds();
   const partial = generateOnBase(build([itemRule("omens", ids.slice(1))]), null, snapshot).filterFile;
   assert.equal(classLines(partial).length, 0);
   assert.equal(ruleBlocks(partial).length, 36);
-  // 跳过名单只在有基础过滤器时生效，所以这里带着基础过滤器生成。
+  // 跳过物品只在有基础过滤器时生效，所以这里带着基础过滤器生成。
   const skipped = engine.generateFilter(build([itemRule("omens", ids)], [ids[0]]), snapshot).filterFile;
   assert.equal(classLines(skipped).length, 0);
   assert.equal(ruleBlocks(skipped).length, 36);
@@ -207,7 +207,7 @@ test("只能整类选择的分类可以直接选", () => {
     'Hide # poe2-filter rule: logs / Expedition Logbook\n\tClass == "Expedition Logbook"',
   ]);
   assert.equal(output.appliedRules[0].itemCount, 1);
-  // 在跳过名单里的整类条目不生成规则。
+  // 在跳过物品里的整类条目不生成规则。
   const skipped = engine.generateFilter(build([itemRule("maps", ["class-waystones"])], ["class-waystones"]), snapshot);
   assert.equal(ruleBlocks(skipped.filterFile).length, 0);
 });

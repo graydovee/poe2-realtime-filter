@@ -26,7 +26,7 @@ export function ruleEffectsPending(rule: FilterRule, state: Pick<EditorState, "p
   return Boolean(rule.baselineEffectItemId && state.profile.baseFilter && !state.baseInspection && !state.baseStylesError);
 }
 
-/** 打开已保存的方案时把旧写法（锚点价格点）读成当前格式；读不了就原样交给后续校验报错。 */
+/** 打开已保存的方案时先规范化；读不了就原样交给后续校验报错。 */
 function readableProfile(profile: FilterProfile): FilterProfile {
   try {
     return normalizeProfile(profile);
@@ -261,7 +261,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       rules[index] = {
         ...rule,
         baselineEffectItemId: itemId,
-        // 旧版默认价格档的 ID 仍可用于兼容读取，显式固定后不能再据此迁移。
+        // 规则 ID 隐式跟随的四个价格档，显式固定后记下 false，读取时保留自己的样式。
         followBaseline: fixed && legacyEffectItemId(id) ? false : undefined,
         effectPresetId: fixed?.presetId,
         effects: fixed?.effects ?? {},

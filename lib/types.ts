@@ -135,7 +135,7 @@ export type FilterRule = {
   hidden: boolean;
   /** 以该目录物品在当前基础过滤器中的样式为准；不要求它出现在规则目标中。 */
   baselineEffectItemId?: string;
-  /** 旧方案字段。true 在读取时迁移，false 保护手动保存的旧价格档样式。 */
+  /** 为 true 时在读取阶段转成 `baselineEffectItemId`；为 false 时规则保留自己的样式。 */
   followBaseline?: boolean;
   /** 固定特效预设的回显 ID；生成器只读 effects。 */
   effectPresetId?: string;
@@ -143,10 +143,12 @@ export type FilterRule = {
   effects: RuleEffects;
 };
 
+/** 基础过滤器的来源。`imported` 是方案包带进来、存在安装目录里的副本，按基础过滤器表里的 ID 引用。 */
 export type BaseFilter =
   | { kind: "local"; path: string; name: string }
   | { kind: "subscribed"; source: "online" | "wegame"; directory: string; entry: string; name: string }
-  | { kind: "downloaded"; source: string; version: string; entry: string; name: string };
+  | { kind: "downloaded"; source: string; version: string; entry: string; name: string }
+  | { kind: "imported"; id: string; entry: string; name: string };
 
 export type FilterProfile = {
   server?: GameServer;
@@ -171,14 +173,6 @@ export type EffectPreset = {
   icon?: string;
   font?: RuleFont;
   sound?: PresetSound;
-};
-
-/** 从基础过滤器里抽取的完整特效预设（data/neversink-effects.json），按视觉风格分组。 */
-export type EffectPresets = {
-  version: number;
-  styles: Record<string, EffectPreset[]>;
-  sounds: PresetSound[];
-  customSounds: string[];
 };
 
 export type SafetyReport = {

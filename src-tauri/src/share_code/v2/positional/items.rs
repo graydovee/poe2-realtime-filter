@@ -348,7 +348,7 @@ pub(super) fn read_list<'a>(
         }
         _ => unreachable!("the low two bits select the list mode"),
     }
-    // Historical addresses can resolve to the same item after a move. Keep set semantics.
+    // Several addresses can resolve to the same item after a move. Keep set semantics.
     let mut seen = HashSet::new();
     ids.retain(|id| seen.insert(*id));
     Ok(ids)

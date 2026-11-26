@@ -13,7 +13,7 @@ import { effectSourceLabel, EffectSummary, LootScene } from "./appearance-previe
 
 type SummaryRow = { label: string; value: string; warning?: boolean; jump: () => void };
 
-/** 配置摘要：每一行都能跳到对应的模块。 */
+/** 方案摘要：每一行都能跳到对应的模块。 */
 function Summary() {
   const profile = useAppStore((state) => state.profile);
   const setBaseFilterOpen = useAppStore((state) => state.setBaseFilterOpen);
@@ -51,8 +51,8 @@ function Summary() {
   }
 
   return (
-    <section aria-label="配置摘要">
-      <h3 className="mb-1.5 px-1 text-xs font-semibold text-ink-muted">配置摘要</h3>
+    <section aria-label="方案摘要">
+      <h3 className="mb-1.5 px-1 text-xs font-semibold text-ink-muted">方案摘要</h3>
       <ul className="grid gap-0.5">
         {rows.map((row) => (
           <li key={row.label}>
@@ -73,7 +73,7 @@ function Summary() {
   );
 }
 
-/** 编辑器的检查器：当前规则在游戏里的实时效果、配置摘要，以及保存 / 预览 / 取消。 */
+/** 编辑器的检查器：当前规则在游戏里的实时效果、方案摘要，以及保存 / 预览 / 取消。 */
 export function EditorInspector() {
   const rules = useAppStore((state) => state.profile.rules);
   const activeRuleId = useAppStore((state) => state.activeRuleId);

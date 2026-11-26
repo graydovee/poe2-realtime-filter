@@ -5,7 +5,7 @@ import type { FilterProfile, FilterRule, PriceCurrency, PricePoint, PriceRange }
 
 const legacyEffectSnapshots = new Map(rulesData.rules.map((rule) => [rule.id, rule]));
 
-/** 对比旧快照的完整内容；JSON 对象里的字段顺序不代表编辑。 */
+/** 对比快照的完整内容；JSON 对象里的字段顺序不代表编辑。 */
 function sameSnapshot(value: unknown, expected: unknown): boolean {
   if (value === expected) return true;
   if (!value || !expected || typeof value !== "object" || typeof expected !== "object" || Array.isArray(value) || Array.isArray(expected)) return false;
@@ -30,12 +30,12 @@ function normalizeRuleEffects(rule: FilterRule) {
     delete rule.effectPresetId;
     rule.effects = {};
   }
-  // 固定样式的显式 false 要保留，否则再次读取时可能被当成旧快照迁移。
+  // 显式的 false 要保留：再次读取时，这条规则仍按自己的样式处理。
 }
 
 type LegacyPoint = PricePoint & { referenceItemId?: string };
 
-/** 旧方案用锚点通货 id 表示「1 枚剥离石」这类价格点，读成现在的计价单位。 */
+/** 用锚点通货 id 写的价格点（如「1 枚剥离石」），读成计价单位。 */
 const LEGACY_UNITS: Record<string, PriceCurrency> = {
   "exalted-orb": "exalted", "chaos-orb": "chaos", "orb-of-annulment": "annulment", "divine-orb": "divine",
 };
@@ -76,7 +76,7 @@ export function normalizeProfile(input: unknown): FilterProfile {
       },
       effects: candidate.effects ?? {},
     } as FilterRule;
-    // 价格档早已是普通价格区间，旧方案里的这个开关不再有意义。
+    // 读取时去掉 `autoRange`。
     delete (rule as { autoRange?: boolean }).autoRange;
     normalizeRuleEffects(rule);
     return rule;

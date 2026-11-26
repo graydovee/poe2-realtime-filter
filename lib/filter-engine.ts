@@ -171,7 +171,7 @@ function classMatchBlock(rule: FilterRule, match: ClassMatch, actions: string[])
 /**
  * 规则把某个分类的逐件物品全部选中时，换成登记表里对应的整类条目（嵌套时只取最大的那个）。
  * 带价格条件的规则不合并：整类条目没有行情，表达不了价格区间。
- * 这一类里有物品在跳过名单里时也不合并，否则整类块会盖掉基础过滤器对那件物品的处理。
+ * 这一类里有物品在跳过物品里时也不合并，否则整类块会盖掉基础过滤器对那件物品的处理。
  */
 function compactClassMatches(selected: Set<string>, skipped: Set<string>): ClassMatch[] {
   const full = CLASS_MATCHES.filter((match) =>
@@ -367,9 +367,9 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
   if (!snapshot.rates || snapshot.source === FALLBACK_SNAPSHOT.source) {
     warnings.push("当前赛季缺少有效报价或汇率，带价格条件的规则不会生效，未匹配的物品" + defaultDisplay + "。");
   }
-  if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格规则匹配。");
+  if (unpriced > 0) warnings.push(unpriced + " 个可匹配物品没有可靠当日价格，不会被价格条件命中。");
   if (ambiguous > 0) warnings.push(ambiguous + " 个类别/歧义匹配项" + defaultDisplay + "。");
-  if (skipped.size) warnings.push("跳过名单里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
+  if (skipped.size) warnings.push("跳过物品里的 " + skipped.size + " 件物品不参与自定义规则，保持基础过滤器效果。");
   if (baseline !== null) {
     const version = neversinkVersion(baseline);
     if (version && olderVersion(version, NEVERSINK_REFERENCE_VERSION.split(".").map(Number))) {

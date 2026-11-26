@@ -10,18 +10,17 @@ package poe2filter.share;
 //   CRC32   IEEE CRC32，小端 4 字节，对未压缩正文计算。
 //   载荷    按 compression 指定的方式编码，解压后正文上限为 1 MiB。
 //
-// 三个字段都必须显式写入且非零。未携带 compression 的早期草稿不属于此协议。
+// 三个字段都必须显式写入且非零。
 // 新的可选字段使用新的字段号，读端按线类型跳过。格式、正文版本或压缩算法未知时
-// 提示升级。新增正文版本时，解码器保留对已发布版本的支持。
+// 提示升级。新增正文版本时，解码器读取全部已发布版本。
 message ShareHeader {
   Format format = 1;
-  // 正文格式的版本。新增正式布局时分配新版本号。
+  // 正文格式的版本。新增布局时分配新版本号。
   uint32 revision = 2;
   Compression compression = 3;
 }
 
 enum Format {
-  reserved 1; // 未发布的 JSON 正文原型。
   FORMAT_UNSPECIFIED = 0;
   FORMAT_POSITIONAL_CATALOG_LISTS = 2;
 }

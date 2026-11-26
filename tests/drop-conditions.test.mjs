@@ -86,9 +86,9 @@ test("基底、同基底传奇和宝石从目录生成对应游戏条件", () =>
   assert.match(blocks.find((block) => block.includes("rule: ordinary")), /Rarity < Unique/);
 });
 
-test("不再有「宝石等级」掉落条件：等级属于物品本身", () => {
+test("无法识别的掉落条件被拒绝", () => {
   assert.throws(
-    () => profile(rule("legacy", ["uncut-skill-gem-1"], { gemLevel: { enabled: true, bounds: [{ op: "=", value: 1 }] } })),
+    () => profile(rule("unknown", ["uncut-skill-gem-1"], { unknownField: { enabled: true, bounds: [{ op: "=", value: 1 }] } })),
     /无法识别的掉落条件/,
   );
 });

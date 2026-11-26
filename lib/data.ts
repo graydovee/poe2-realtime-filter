@@ -72,7 +72,7 @@ export const shareCatalog = () => projectShareCatalog(catalogData.shareGroups, c
 
 const craftingItemIds = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "crafting" && !item.matcher.class).map((item) => item.id);
 
-/** 旧价格档的跟随开关以规则 ID 隐式指定这四件物品。 */
+/** 四个价格档各自跟随的通货，按规则 ID 对应。 */
 export const DEFAULT_EFFECT_ITEMS = {
   "default-exalted": "exalted-orb",
   "default-chaos": "chaos-orb",

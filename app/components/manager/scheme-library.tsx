@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, PackageOpen, Plus, RefreshCw, SearchX, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileArchive,
+  PackageOpen,
+  PackagePlus,
+  Plus,
+  RefreshCw,
+  SearchX,
+  X,
+} from "lucide-react";
 
 import { isDesktop, local, type LocalScheme } from "../../../lib/desktop";
 import { useAppStore } from "../../state/store";
@@ -13,6 +23,7 @@ import { SearchInput } from "../ui/input";
 import { Panel } from "../ui/panel";
 import { SchemeDialogs } from "./scheme-dialogs";
 import { missingBaseNames } from "./scheme-meta";
+import { PackageDialogs } from "./package-dialogs";
 import { SchemeRow } from "./scheme-row";
 
 /** 方案库主区：工具栏 + 按赛季分组的方案列表。 */
@@ -28,6 +39,8 @@ export function SchemeLibrary() {
   const patchManager = useAppStore((state) => state.patchManager);
   const openDraft = useAppStore((state) => state.openDraft);
   const refreshLeagueMarket = useAppStore((state) => state.refreshLeagueMarket);
+  const pickPackage = useAppStore((state) => state.pickPackage);
+  const openExport = useAppStore((state) => state.openExport);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -78,6 +91,10 @@ export function SchemeLibrary() {
           <Plus aria-hidden="true" />
           新建方案
         </Button>
+        <Button disabled={busy || !library} onClick={() => void pickPackage()}>
+          <PackagePlus aria-hidden="true" />
+          导入方案包
+        </Button>
         <Button disabled={busy || !library} onClick={() => patchManager({ importOpen: true })}>
           <PackageOpen aria-hidden="true" />
           导入分享码
@@ -89,6 +106,10 @@ export function SchemeLibrary() {
           placeholder="搜索方案"
           onChange={(event) => setQuery(event.target.value)}
         />
+        <Button disabled={busy || !library} onClick={() => openExport()}>
+          <FileArchive aria-hidden="true" />
+          导出方案包…
+        </Button>
       </div>
 
       {error && !managerDialog && !importTarget && (
@@ -117,12 +138,22 @@ export function SchemeLibrary() {
           <EmptyState
             icon={<PackageOpen className="size-5" aria-hidden="true" />}
             title="还没有方案"
-            description="新建一个方案，或粘贴分享码导入。"
+            description="新建一个方案，导入别人分享的方案包，或粘贴分享码。"
             action={
-              <Button variant="primary" disabled={busy} onClick={() => void openDraft(null, library.server)}>
-                <Plus aria-hidden="true" />
-                新建方案
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" disabled={busy} onClick={() => void openDraft(null, library.server)}>
+                  <Plus aria-hidden="true" />
+                  新建方案
+                </Button>
+                <Button disabled={busy} onClick={() => void pickPackage()}>
+                  <PackagePlus aria-hidden="true" />
+                  导入方案包
+                </Button>
+                <Button disabled={busy} onClick={() => patchManager({ importOpen: true })}>
+                  <PackageOpen aria-hidden="true" />
+                  导入分享码
+                </Button>
+              </div>
             }
           />
         )}
@@ -180,6 +211,7 @@ export function SchemeLibrary() {
           })}
       </Panel>
       <SchemeDialogs />
+      <PackageDialogs />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePen, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2, Copy, Download } from "lucide-react";
+import { FileArchive, FilePen, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2, Copy, Download } from "lucide-react";
 
 import { cn } from "../../../lib/cn";
 import type { LocalScheme } from "../../../lib/desktop";
@@ -43,6 +43,7 @@ export function SchemeRow({
   const shareScheme = useAppStore((state) => state.shareScheme);
   const downloadZip = useAppStore((state) => state.downloadZip);
   const downloadBase = useAppStore((state) => state.downloadBase);
+  const exportPackage = useAppStore((state) => state.exportPackage);
 
   const tone = schemeTone(scheme);
   const issue = schemeIssue(scheme.status);
@@ -127,6 +128,10 @@ export function SchemeRow({
               </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => void exportPackage(scheme)}>
+                <FileArchive aria-hidden="true" />
+                导出方案包
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => openManagerDialog("rename", scheme)}>
                 <Pencil aria-hidden="true" />
                 重命名

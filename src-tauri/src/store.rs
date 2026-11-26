@@ -1,3 +1,5 @@
+mod package;
+
 use crate::{
     base_filter::{self, BaseFilter, Baseline},
     engine::{self, Result},
@@ -18,7 +20,8 @@ use std::{
 };
 use uuid::Uuid;
 
-const AUDIO_MAX: usize = 8 * 1024 * 1024;
+pub use package::PackageDecisions;
+pub(crate) const AUDIO_MAX: usize = 8 * 1024 * 1024;
 const AUDIO_TOTAL_MAX: usize = 32 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -275,7 +278,7 @@ pub(crate) fn valid_windows_name(name: &str) -> bool {
         )
 }
 
-fn scheme_name(name: &str) -> Result<String> {
+pub(crate) fn scheme_name(name: &str) -> Result<String> {
     let name = name.trim();
     if name.encode_utf16().count() > 80 || !valid_windows_name(name) {
         return Err("方案名需要 1–80 个字符，且能用作 Windows 文件名".into());
@@ -283,7 +286,7 @@ fn scheme_name(name: &str) -> Result<String> {
     Ok(name.to_owned())
 }
 
-fn valid_audio(name: &str) -> bool {
+pub(crate) fn valid_audio(name: &str) -> bool {
     valid_windows_name(name)
         && name.len() <= 150
         && name.rsplit_once('.').is_some_and(|(stem, ext)| {
@@ -307,6 +310,7 @@ fn expand_filter(
     cache_root: Option<&Path>,
     parents: &mut Vec<PathBuf>,
     expanded: &mut String,
+    imports: &mut Vec<PathBuf>,
 ) -> Result<()> {
     static IMPORT: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r##"^Import[ \t]+"([^"\r\n]+)"(?:[ \t]+(Optional))?[ \t]*(?:#.*)?$"##).unwrap()
@@ -344,8 +348,9 @@ fn expand_filter(
             if cache_root.is_some_and(|root| !imported.starts_with(root)) {
                 return Err(format!("过滤器依赖「{reference}」超出基础过滤器目录"));
             }
+            imports.push(imported.clone());
             let content = base_filter::read_filter(&imported)?;
-            expand_filter(&imported, &content, cache_root, parents, expanded)?;
+            expand_filter(&imported, &content, cache_root, parents, expanded, imports)?;
             if !expanded.ends_with('\n') {
                 expanded.push('\n');
             }
@@ -421,6 +426,21 @@ fn paths_same(left: &str, right: &str) -> bool {
     left.to_lowercase() == right.to_lowercase()
 }
 
+fn decode_sounds(sounds: BTreeMap<String, String>) -> Result<BTreeMap<String, Vec<u8>>> {
+    sounds
+        .into_iter()
+        .map(|(name, encoded)| {
+            if encoded.len() > AUDIO_MAX * 4 / 3 + 4 {
+                return Err(format!("音效无效或超过 8 MB: {name}"));
+            }
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .map_err(|_| "音效编码无效")?;
+            Ok((name, bytes))
+        })
+        .collect()
+}
+
 impl Store {
     pub fn new(root: PathBuf, game: PathBuf) -> Self {
         Self {
@@ -451,11 +471,34 @@ impl Store {
         profile: Value,
         sounds: BTreeMap<String, String>,
     ) -> Result<String> {
+        let sounds = decode_sounds(sounds)?;
+        let scheme = self.prepare_scheme(
+            library,
+            Uuid::new_v4().to_string(),
+            raw_name,
+            profile,
+            sounds,
+        )?;
+        let id = scheme.id.clone();
+        library.schemes.push(scheme);
+        self.persist(library)?;
+        Ok(id)
+    }
+
+    /// Checks a new scheme against the library without adding it. `library` may already hold
+    /// other schemes of the same batch that were not written yet.
+    fn prepare_scheme(
+        &self,
+        library: &Library,
+        id: String,
+        raw_name: &str,
+        profile: Value,
+        sounds: BTreeMap<String, Vec<u8>>,
+    ) -> Result<Scheme> {
         let name = scheme_name(raw_name)?;
         let profile: Value = engine::call("validate", profile)?;
-        let id = Uuid::new_v4().to_string();
         let mut scheme = Scheme {
-            id: id.clone(),
+            id,
             name,
             profile,
             auto_refresh: true,
@@ -463,11 +506,9 @@ impl Store {
             status: String::new(),
             sounds: BTreeMap::new(),
         };
-        self.store_sounds(&mut scheme, sounds)?;
         self.check_unique(library, scheme.server(), &scheme.name, None)?;
-        library.schemes.push(scheme);
-        self.persist(library)?;
-        Ok(id)
+        self.store_sound_bytes(&mut scheme, sounds)?;
+        Ok(scheme)
     }
 
     pub fn duplicate(&self, library: &mut Library, id: &str) -> Result<String> {
@@ -604,7 +645,7 @@ impl Store {
             *Self::get_mut(library, id)? = old;
             if let Some((from, to)) = renamed {
                 move_file(&to, &from)
-                    .map_err(|rollback| format!("{error}，恢复旧文件名失败: {rollback}"))?;
+                    .map_err(|rollback| format!("{error}，恢复原文件名失败: {rollback}"))?;
             }
             return Err(error);
         }
@@ -671,8 +712,7 @@ impl Store {
             }
         }
         profile["server"] = json!(scheme.server());
-        // A scheme saved by an older version may still carry retired fields. Reading it in
-        // today's form, as the receiving side would, keeps them out of the code.
+        // Read the copy through the same validation the receiving side uses.
         let profile: Value = engine::call("validate", profile)?;
         Ok(Share {
             name: scheme.name.clone(),
@@ -701,13 +741,7 @@ impl Store {
         if let Some(fields) = share.profile.as_object_mut() {
             fields.remove("baseFilter");
             if let Some(name) = fields.get("baseFilterHint").and_then(Value::as_str) {
-                let name = name.to_lowercase();
-                // An unavailable directory leaves the reference available for manual selection.
-                let mut matching = base_filter::scan(&self.base_directory(library))
-                    .unwrap_or_default()
-                    .into_iter()
-                    .filter(|base| base.name().to_lowercase() == name);
-                if let (Some(base), None) = (matching.next(), matching.next()) {
+                if let Some(base) = self.resolve_hint(library, name) {
                     fields.insert("baseFilter".into(), json!(base));
                     fields.remove("baseFilterHint");
                 }
@@ -721,6 +755,29 @@ impl Store {
         )
     }
 
+    /// The one filter on this machine that answers to a shared name: in the game directory
+    /// first, then among the copies stored from scheme packages. `None` when none or several do.
+    fn resolve_hint(&self, library: &Library, hint: &str) -> Option<BaseFilter> {
+        let name = hint.to_lowercase();
+        // An unavailable directory leaves the reference available for manual selection.
+        let mut matching = base_filter::scan(&self.base_directory(library))
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|base| base.name().to_lowercase() == name);
+        match (matching.next(), matching.next()) {
+            (Some(base), None) => Some(base),
+            _ => {
+                let mut stored: Vec<_> = base_filter::Registry::load(&self.root)
+                    .unwrap_or_default()
+                    .imported(&self.root)
+                    .into_iter()
+                    .filter(|base| base.name().to_lowercase() == name)
+                    .collect();
+                (stored.len() == 1).then(|| stored.remove(0))
+            }
+        }
+    }
+
     pub fn missing(&self, scheme: &Scheme) -> Vec<String> {
         sound_names(&scheme.profile)
             .into_iter()
@@ -729,19 +786,21 @@ impl Store {
     }
 
     fn store_sounds(&self, scheme: &mut Scheme, sounds: BTreeMap<String, String>) -> Result<()> {
+        self.store_sound_bytes(scheme, decode_sounds(sounds)?)
+    }
+
+    fn store_sound_bytes(
+        &self,
+        scheme: &mut Scheme,
+        sounds: BTreeMap<String, Vec<u8>>,
+    ) -> Result<()> {
         let names = sound_names(&scheme.profile);
         scheme.sounds.retain(|name, _| names.contains(name));
         let mut total = 0;
-        for (name, encoded) in sounds {
-            if !valid_audio(&name)
-                || !names.contains(&name)
-                || encoded.len() > AUDIO_MAX * 4 / 3 + 4
-            {
+        for (name, bytes) in sounds {
+            if !valid_audio(&name) || !names.contains(&name) {
                 return Err(format!("音效无效或超过 8 MB: {name}"));
             }
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(encoded)
-                .map_err(|_| "音效编码无效")?;
             total += bytes.len();
             if bytes.is_empty() || bytes.len() > AUDIO_MAX || total > AUDIO_TOTAL_MAX {
                 return Err("单个音效最多 8 MB，合计最多 32 MB".into());
@@ -784,6 +843,24 @@ impl Store {
 
     pub fn source_cache(&self, source: &str) -> Result<Vec<BaseFilter>> {
         base_filter::cached_source(&self.root, source)
+    }
+
+    pub fn registry(&self) -> Result<base_filter::Registry> {
+        base_filter::Registry::load(&self.root)
+    }
+
+    /// Copies stored from scheme packages with their registration time, for the picker.
+    pub fn stored_filters(&self) -> Result<Vec<(BaseFilter, u64)>> {
+        Ok(self
+            .registry()?
+            .stored(&self.root)
+            .into_iter()
+            .map(|(base, registered_at)| (base.clone(), registered_at))
+            .collect())
+    }
+
+    pub fn save_registry(&self, registry: &base_filter::Registry) -> Result<()> {
+        registry.save(&self.root)
     }
 
     pub fn source_download(
@@ -839,7 +916,7 @@ impl Store {
         if profile["baseFilter"].is_null() {
             if let Some(name) = profile["baseFilterHint"].as_str() {
                 return Err(format!(
-                    "未能匹配基础过滤器「{name}」，请在编辑页选择或清除基础过滤器"
+                    "未能匹配基础过滤器「{name}」，请在编辑器里选择或清除基础过滤器"
                 ));
             }
             return Ok(None);
@@ -850,17 +927,24 @@ impl Store {
     }
 
     fn load_baseline(&self, base: &BaseFilter) -> Result<Baseline> {
+        self.load_baseline_parts(base).map(|(baseline, _)| baseline)
+    }
+
+    /// The expanded baseline, plus every file it imports in reading order.
+    fn load_baseline_parts(&self, base: &BaseFilter) -> Result<(Baseline, Vec<PathBuf>)> {
         let mut baseline = base.load(&self.root)?;
         let mut expanded = String::new();
+        let mut imports = Vec::new();
         expand_filter(
             &baseline.path,
             &baseline.text,
             baseline.cache_root.as_deref(),
             &mut Vec::new(),
             &mut expanded,
+            &mut imports,
         )?;
         baseline.text = expanded;
-        Ok(baseline)
+        Ok((baseline, imports))
     }
 
     // Imported rules can refer to absolute paths after expansion. Persist relative
@@ -1162,8 +1246,7 @@ impl Store {
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
         let baseline = self.baseline(&scheme.profile)?;
         let result = self.generate(&scheme.profile, baseline.as_ref(), market)?;
-        // 基础过滤器用了游戏已经改名的类别时，游戏会拒绝加载整份过滤器。把原因直接告诉用户，
-        // 而不是笼统的「未通过安全检查」。
+        // 基础过滤器用了游戏已经改名的类别时，游戏会拒绝加载整份过滤器。把原因直接告诉用户。
         let baseline_issues: Vec<&str> = result["safetyReport"]["baselineIssues"]
             .as_array()
             .map(|issues| issues.iter().filter_map(|issue| issue.as_str()).collect())
@@ -1341,7 +1424,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_library_and_cross_server_file_ownership() {
+    fn library_defaults_and_cross_server_file_ownership() {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
         let mut library: Library = serde_json::from_value(json!({
@@ -1513,8 +1596,7 @@ mod tests {
             assert!(used.insert(id.to_owned()));
             let prior = before.as_object_mut().unwrap();
             assert_ne!(prior.remove("id").unwrap(), id);
-            // The legacy fixed marker protects old local IDs during migration. Fresh IDs do
-            // not participate in that migration.
+            // `followBaseline` does not survive sharing.
             prior.remove("followBaseline");
         }
         sort_selection_sets(&mut expected);
@@ -1536,16 +1618,16 @@ mod tests {
                 "range": {"min": {"amount": 1, "currency": "exalted"}}},
             "effects": {}
         }, {
-            "id": "rule-0f3a1c2d-3e4f-4a5b-8c6d-0e1f2a3b4c5d", "name": "旧规则", "enabled": true, "hidden": false,
+            "id": "rule-0f3a1c2d-3e4f-4a5b-8c6d-0e1f2a3b4c5d", "name": "规则", "enabled": true, "hidden": false,
             "target": {"itemIds": ["chaos-orb"]}, "effects": {}
         }]);
         let id = store
-            .add(&mut library, "旧方案", draft, BTreeMap::new())
+            .add(&mut library, "方案", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let mut expected = scheme.profile.clone();
         expected["server"] = json!("international");
-        // What a library written before those fields were retired still holds.
+        // A stored profile may still carry retired fields.
         scheme.profile["rules"][0]["autoRange"] = json!(true);
         scheme.profile["rules"][0]["target"]["range"]["min"]["referenceItemId"] =
             json!("exalted-orb");
@@ -1683,7 +1765,7 @@ mod tests {
                 name: name.into(),
                 profile,
             }).unwrap();
-            // Legacy codes may carry a local path. Import must ignore it.
+            // A code may carry a local path. Import must ignore it.
             format!("POE2F1.{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes))
         };
         for (name, hint, kind, source) in [
@@ -2000,7 +2082,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
-        // 游戏在 2025 年 12 月把 Socketable 改名成了 Augment，旧版 NeverSink 里还在用旧名字，
+        // 游戏在 2025 年 12 月把 Socketable 改名成了 Augment，此前的 NeverSink 仍用原名，
         // 游戏会因此拒绝加载整份过滤器。
         let source = store.root.join("stale.filter");
         fs::create_dir_all(&store.root).unwrap();
@@ -2040,7 +2122,7 @@ mod tests {
             "{issue}"
         );
         let id = store
-            .add(&mut library, "旧基础过滤器", draft, BTreeMap::new())
+            .add(&mut library, "过期基础过滤器", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let error = store.prepare_filter(scheme, None).unwrap_err();
@@ -2082,7 +2164,7 @@ mod tests {
         let edit = Edit {
             base_filter_changed: None,
             id: Some(id.clone()),
-            name: "草稿旧名称".into(),
+            name: "草稿原名称".into(),
             profile: profile(&store),
             sounds: BTreeMap::new(),
         };

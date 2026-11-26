@@ -68,7 +68,7 @@ test("Tencent accepts the newest quote even when the upstream only flags its age
   assert.equal(third.snapshot.capturedAt, "2026-11-21T03:00:00.000Z");
 });
 
-test("Tencent recovers previous quotes from the legacy cached response", () => {
+test("Tencent recovers previous quotes from a cached response with `previousBody`", () => {
   const result = tencent.tencentSnapshot({
     league: "0.5.5", previousBody: [{ items: quotes }], lifetime: 3600000,
     body: [{ items: [row("Lesser Jeweller's Orb", 0.25, "e", { latest_datetime: "2026-11-23 11:30:00" })] }],

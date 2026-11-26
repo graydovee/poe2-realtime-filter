@@ -159,7 +159,7 @@ function catalogFixture(t) {
   };
 }
 
-test("玩法与掉落数据更新时追加新路径，保留旧别名和退役槽位", (t) => {
+test("玩法与掉落数据更新时追加新路径，保留已有别名和退役槽位", (t) => {
   const { workspace, catalogFile, writeFixture } = catalogFixture(t);
   const mechanics = readJson(path.join(root, "data/item-mechanics.json"));
   mechanics.items["Divine Orb"].mechanic = "omens";
@@ -247,7 +247,7 @@ test("客户端分类写入器也追加路径序号并保留原路径", (t) => {
   assert.equal(resolve(next, [0, 0]), "divine-orb");
 });
 
-test("父类和子类按当前槽位全选，移动与退役保留历史路径", () => {
+test("父类和子类按当前槽位全选，移动与退役保留已有路径", () => {
   const branch = ["branch"];
   const child = [...branch, "child"];
   const retiredPath = [...branch, "retired"];
@@ -316,7 +316,7 @@ test("数据校验拒绝缺号、重复路径和冲突的槽位", () => {
   assert.throws(() => projectShareCatalog({ 0: { ...group, slots: { item: 0, other: 0 } } }, empty, tree), /槽位 .*重复/);
 });
 
-test("数据校验要求同级序号连续、唯一，历史分类也必须保留路径", () => {
+test("数据校验要求同级序号连续、唯一，已有分类也必须保留路径", () => {
   const groups = {
     0: { path: ["branch", "a"], slots: { a: 0 } },
     1: { path: ["branch", "b"], slots: { b: 0 } },
@@ -339,7 +339,7 @@ test("数据校验要求同级序号连续、唯一，历史分类也必须保�
   assert.throws(() => project({ ...tree, "": shareEntry(2) }), /分享码分类/);
   const missing = { branch };
   assert.throws(() => project(missing), /分类 3 缺少路径序号/);
-  // 即使旧分类再次有当前成员，更新目录也不能重新分配丢失的历史路径。
+  // 即使已有分类再次有当前成员，更新目录也不能重新分配丢失的路径。
   assert.throws(() => allocateShareTree(missing, groups, selectable([{ id: "retired", categoryPath: ["other"] }])), /分类 3 缺少路径序号/);
 });
 
