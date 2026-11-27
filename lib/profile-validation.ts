@@ -1,12 +1,13 @@
 import { canFollowBaselineItem } from "./baseline-effects";
 import { FILTER_ITEMS_BY_ID, STYLE_LABELS } from "./data";
 import { dropConditionsIssue } from "./drop-conditions";
+import { mapIconShapes } from "./effect-labels";
 import { normalizeProfile } from "./profile";
 import type { BuiltinSound, FilterProfile, FilterRule, PricePoint } from "./types";
 
 const safeName=(value:string)=>value.replace(/[^a-zA-Z0-9._-]/g,'_');
 const beamPattern=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
-const iconPattern=/^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (Circle|Star|Diamond|Square|Pentagon|Hexagon|Triangle|Cross|Kite|UpsideDownHouse|Moon|Raindrop)$/;
+const iconPattern=new RegExp(`^[012] (Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey) (${mapIconShapes.join("|")})$`);
 const colorPattern=/^\d{1,3} \d{1,3} \d{1,3}( \d{1,3})?$/;
 const number=(value:unknown,min:number,max:number)=>typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max;
 const validBuiltinSound=(sound:BuiltinSound)=>sound.type==='builtin'&&Number.isInteger(sound.id)&&number(sound.id,1,16)&&number(sound.volume,0,300)&&(sound.positional===undefined||typeof sound.positional==='boolean');

@@ -428,11 +428,11 @@ export function BaseFilterModule() {
               <DropdownMenuContent>
                 <DropdownMenuItem disabled={fileBusy} onSelect={() => void pickFile()}>
                   <FolderOpen aria-hidden="true" />
-                  选择本地文件…
+                  选择本地文件
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPicker({ kind: "source" })}>
                   <Download aria-hidden="true" />
-                  下载过滤器…
+                  下载过滤器
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

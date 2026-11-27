@@ -13,6 +13,7 @@ import {
 } from "../../../lib/effect-labels";
 import type { BaseFilter, RuleEffects } from "../../../lib/types";
 import { cn } from "../../../lib/cn";
+import { mapIconPath } from "../../../lib/map-icon";
 import { SoundPreviewButton } from "../sound-preview";
 
 export function effectSourceLabel(itemId: string) {
@@ -23,16 +24,13 @@ export function effectSourceLabel(itemId: string) {
 /** 没有设置光柱时，预览里用一条暗淡的暖色光表示「沿用基础样式」。 */
 const FALLBACK_BEAM = "#8a7a5c";
 
-function MapIcon({ shape, color }: { shape: string; color: string }) {
+/** 游戏里的小地图图标，按形状取轮廓。 */
+export function MapIconGlyph({ shape, color, className }: { shape: string; color: string; className?: string }) {
+  const outline = mapIconPath(shape);
+  if (!outline) return null;
   return (
-    <svg viewBox="0 0 24 24" className="loot-icon" style={{ color }} aria-hidden="true">
-      {shape === "Star" ? (
-        <path fill="currentColor" d="m12 1 3.1 7.1 7.8.7-5.9 5.1 1.8 7.6L12 17.5 5.2 21.5 7 13.9 1.1 8.8l7.8-.7z" />
-      ) : shape === "Circle" ? (
-        <circle cx="12" cy="12" r="9" fill="currentColor" />
-      ) : (
-        <path d="M12 2 22 12 12 22 2 12z" fill="currentColor" />
-      )}
+    <svg viewBox="0 0 24 24" className={className} style={{ color }} aria-hidden="true">
+      <path d={outline} fill="currentColor" fillRule="evenodd" />
     </svg>
   );
 }
@@ -83,7 +81,7 @@ export function LootScene({
           {label}
         </span>
       </div>
-      {shape && <MapIcon shape={shape} color={beamColorValues[iconColor ?? ""] ?? "#9a9a9a"} />}
+      {shape && <MapIconGlyph shape={shape} color={beamColorValues[iconColor ?? ""] ?? "#9a9a9a"} className="loot-icon" />}
     </div>
   );
 }

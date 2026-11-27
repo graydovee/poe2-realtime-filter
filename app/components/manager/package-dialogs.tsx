@@ -71,7 +71,7 @@ function ExportDialog() {
           </Button>
           <Button variant="primary" disabled={busy || !selected.length} onClick={() => void exportSelected()}>
             <FileArchive aria-hidden="true" />
-            {busy ? "正在打包…" : "导出…"}
+            {busy ? "正在打包…" : "导出"}
           </Button>
         </>
       }

@@ -7,6 +7,7 @@ import { DEFAULT_PROFILE } from "../../lib/default-profile";
 import { FALLBACK_SNAPSHOT, legacyEffectItemId } from "../../lib/data";
 import { normalizeProfile } from "../../lib/profile";
 import { newRuleId } from "../../lib/rule-id";
+import { customSoundFileName, customSoundOptions } from "../../lib/sound-library";
 import type { BaseFilter, FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot, RuleEffects } from "../../lib/types";
 import { counters } from "./counters";
 import type { AppState } from "./store";
@@ -14,8 +15,6 @@ import type { EditorDialog, Generated, ItemPickerToggle, PickerTarget } from "./
 
 type RemovedRule = { rule: FilterRule; index: number; sound?: File };
 type RuleAppearance = { itemId: string } | { effects: RuleEffects; presetId?: string; file?: File };
-
-const safeSoundName = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "_");
 
 export function shownRuleEffects(rule: FilterRule, inspection?: BaseInspection): RuleEffects {
   const itemId = rule.baselineEffectItemId;
@@ -83,6 +82,7 @@ export type EditorActions = {
   clearSkipped: () => void;
   setRuleAppearance: (id: string, appearance: RuleAppearance) => void;
   setRuleSound: (id: string, file: File | undefined) => void;
+  pickRuleSound: (id: string, option: { fileName: string; file: File }) => void;
   setBaseFilter: (base?: BaseFilter) => void;
   setBaseFilterOpen: (open: boolean) => void;
   loadBaseInspection: () => Promise<void>;
@@ -275,7 +275,23 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     const rule = state.profile.rules.find((entry) => entry.id === id);
     if (!file || !rule || ruleEffectsPending(rule, state)) return;
     const effects = shownRuleEffects(rule, state.baseInspection);
-    state.setRuleAppearance(id, { effects: { ...effects, sound: { type: "custom", fileName: safeSoundName(file.name) } }, file });
+    // 和别的规则已经在用的音效同名时：内容相同就共用那一份，内容不同就另起一个名字，两边的音效互不覆盖。
+    const existing = customSoundOptions(
+      state.profile.rules.filter((entry) => entry.id !== id),
+      state.customSounds,
+    );
+    const fileName = customSoundFileName(file, existing);
+    const picked = existing.find((option) => option.fileName === fileName)?.file ?? file;
+    state.setRuleAppearance(id, { effects: { ...effects, sound: { type: "custom", fileName } }, file: picked });
+  },
+
+  /** 在下拉里选一个方案里已有的自定义音效，名字和文件都照原样用。 */
+  pickRuleSound: (id, option) => {
+    const state = get();
+    const rule = state.profile.rules.find((entry) => entry.id === id);
+    if (!rule || ruleEffectsPending(rule, state)) return;
+    const effects = shownRuleEffects(rule, state.baseInspection);
+    state.setRuleAppearance(id, { effects: { ...effects, sound: { type: "custom", fileName: option.fileName } }, file: option.file });
   },
 
   setBaseFilter: (base) => {

@@ -66,21 +66,21 @@ export function CommandPalette() {
       commands.push(
         {
           id: "import",
-          label: "导入分享码…",
+          label: "导入分享码",
           group: "方案",
           icon: ClipboardPaste,
           run: () => state.patchManager({ importOpen: true }),
         },
         {
           id: "import-package",
-          label: "导入方案包…",
+          label: "导入方案包",
           group: "方案",
           icon: PackagePlus,
           run: () => void state.pickPackage(),
         },
         {
           id: "export-package",
-          label: "导出方案包…",
+          label: "导出方案包",
           group: "方案",
           icon: FileArchive,
           run: () => state.openExport(),
@@ -190,7 +190,7 @@ export function CommandPalette() {
             <Command.Input
               autoFocus
               className="h-full w-full bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
-              placeholder="输入命令，或搜索规则和方案…"
+              placeholder="输入命令，或搜索规则和方案"
             />
           </div>
           <Command.List className="max-h-80 overflow-y-auto overscroll-contain p-2">

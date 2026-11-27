@@ -38,6 +38,7 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 - 三种字体由 `@fontsource/*` 提供，通过 `app/layout.tsx` 打包进客户端（CSP 只允许同源资源）。
 - 字号刻度：`xs` 12px、`sm` 13px、`base` 14px，正文行高 1.6；界面文字不小于 12px。
 - 界面文案全部中文；英文只保留品牌字标、过滤器语法和专有名词。
+- 按钮和菜单项的文字不带省略号；进行中的状态文字以省略号结尾（如「保存中…」「正在读取本地方案…」）。
 
 ## 形状、层级与动效
 
@@ -65,7 +66,7 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 
 - **顶栏**：方案库里可切换服务器；编辑中服务器只读显示。方案名是一个按钮，前面带铅笔图标，点开修改名称和描述；方案名右侧是未保存状态。
 - **检查器**：宽于 1180px 时停靠在右侧（默认 320px，可拖到 280–440px，展开状态记在本地）；更窄时默认收起，用顶栏按钮或 `Ctrl+\` 从侧边滑出。
-- **方案库**：工具栏左侧是「新建方案」和两个导入入口（方案包、分享码），搜索框旁是「导出方案包…」。方案卡片从上到下是名称和状态徽标、描述（有才显示，单行截断）、摘要；已安装的方案在摘要同一行的右端显示行情时间，放不下时折到下一行。方案详情的「分享」一节以「导出方案包」为唯一的大按钮，「分享码」和「下载 ZIP」是它下面并排的两个小按钮。
+- **方案库**：工具栏左侧是「新建方案」和两个导入入口（方案包、分享码），搜索框旁是「导出方案包」。方案卡片从上到下是名称和状态徽标、描述（有才显示，单行截断）、摘要；已安装的方案在摘要同一行的右端显示行情时间，放不下时折到下一行。方案详情的「分享」一节以「导出方案包」为唯一的大按钮，「分享码」和「下载 ZIP」是它下面并排的两个小按钮。
 - **编辑器**：三个模块自上而下——赛季与行情、基础过滤器（含跳过物品，默认折叠，需要处理时自动展开）、自定义规则。规则模块在内容区宽于 768px 时排成「规则列表 | 规则编辑器」两栏，更窄时规则列表变成一行可横向滚动的标签。
 - **容器查询**：规则模块和规则编辑器的断点按各自内容区宽度计算（`@container` / `@3xl:`），与窗口宽度无关，所以拖动检查器时会自然重排。查询条件相对祖先容器求值，列模板要写在容器的子元素上。
 - 最小窗口 720×600 下所有界面可用。
@@ -98,24 +99,26 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 ## 组件层
 
 - `app/components/ui/`：基础组件，Radix 无样式原语 + CVA 变体，写法与 shadcn/ui 一致。
-  - `button`（Button / IconButton）、`input`（Input / Textarea / SearchInput）、`select`、`switch`、`checkbox`、`field`
+  - `button`（Button / IconButton）、`input`（Input / Textarea / SearchInput）、`select`、`switch`、`checkbox`、`color`（ColorPicker 取色器、ColorPaletteSelect 调色盘）、`field`
   - `dialog`（Dialog / ConfirmDialog / SheetContent）、`dropdown-menu`、`popover`、`collapsible`（Disclosure）、`tabs`、`tooltip`
   - `badge`（Badge / Chip / StatusDot）、`panel`（Panel / CollapsiblePanel）、`progress`（ProgressBar）、`alert`、`empty-state`、`separator`、`kbd`、`segmented`、`error-boundary`、`toast`
 - `app/components/layout/`：`app-frame`、`top-bar`、`status-bar`、`inspector`。
 - `app/components/manager/`：`scheme-library`（按赛季分组的列表）、`scheme-row`、`scheme-info-dialog`（名称和描述）、`scheme-dialogs`（卸载、删除、分享码导入）、`package-dialogs`（导出方案包、导入方案包）、`manager-inspector`（方案详情 + 刷新、启动、过滤器目录三张设置卡片）。
-- `app/components/editor/`：`season-module`、`base-filter-module`、`rules-module`、`rule-list`、`rule-editor`、`effect-section`、`preset-gallery`、`appearance-preview`、`editor-inspector`。
+- `app/components/editor/`：`season-module`、`base-filter-module`、`rules-module`、`rule-list`、`rule-editor`、`effect-section`、`appearance-fields`、`preset-gallery`、`appearance-preview`、`editor-inspector`。
 - `app/components/`：`item-picker`（选择物品对话框）、`preview-view`（生成预览）、`sound-preview`、`desktop-update`、`command-palette`。
 - `app/state/`：zustand store，分界面、编辑器、方案库三个切片；`bridge.ts` 负责把 Tauri 事件接到 store。`app/page.tsx` 只负责选择视图。
-- 纯函数放在 `lib/`：`effect-labels.ts`（特效描述与颜色转换）、`filter-highlight.ts`（过滤器语法分词）。
+- 纯函数放在 `lib/`：`effect-labels.ts`（特效描述与颜色转换）、`color.ts`（过滤器颜色的读写和取色器换算）、`map-icon.ts`（地图图标形状的轮廓）、`filter-highlight.ts`（过滤器语法分词）。
 
 自定义规则编辑器的交互约定：
 
 - 每条规则由匹配条件、特效和隐藏开关组成。可以按物品、价格或两项同时筛选；物品条件和价格条件至少保留一个启用。
 - 选择物品在对话框里完成（`item-picker`），选好的物品以标签形式显示在条件卡片里，可以逐个移除。
 - 「完整特效预设」一次应用光柱、地图图标、字体和音效；预设画廊是非模态弹层，点选即应用，右侧检查器的实时预览跟着更新。展开「高级外观设置」可以调整单项特效。
+- 「高级外观设置」里的颜色都用色块选。光柱和地图图标的颜色点开固定调色盘：游戏给的 11 种颜色每格一种，下面标着名字，光柱的调色盘多一格「沿用基础」。文字、边框、背景颜色在文本框旁点开取色器：色面选饱和度和明度，滑块调色相和透明度，下面是预设颜色，改动即时反映到实时预览。地图图标分成形状、颜色、尺寸（大 / 中 / 小）三项，选了形状才有图标；新选形状时颜色默认跟光柱一致，尺寸默认「中」。光柱带一个「临时」开关，打开后只在物品掉落时短暂显示。
+- 音效下拉分「自定义音效」和「内置音效」两组：自定义音效是方案里各条规则已经选过的音频文件，每条规则都能直接选，组里最后一项是「选择文件」。下拉旁常驻一个「选择文件」按钮，选进来的文件立刻成为当前规则的自定义音效；它和别的规则在用的音效同名但内容不同时，自动另起一个名字。
 - 价格区间的两个端点都是普通的「数值 + 单位」输入，单位下拉来自 `PRICE_UNITS`（崇高石、混沌石、剥离石、神圣石）。四个默认价格档和其他规则用同一套控件：默认沿用的样式表现为预设卡上的高亮加一行说明，换一个预设或改任意一项就变成规则自己的特效。
 - 价格下限不低于上限时，价格卡下方显示一行红色提示。
-- 当前规则在游戏里的掉落效果（光柱、标签、地图图标）始终显示在检查器顶部，可以试听音效。
+- 当前规则在游戏里的掉落效果（光柱、标签、地图图标）始终显示在检查器顶部，可以试听音效。地图图标按游戏里的图标描摹轮廓，12 种形状各不相同。
 - 方案摘要在检查器里，点某一行会跳到对应的模块。
 
 物品选择器（`item-picker`）的交互约定：

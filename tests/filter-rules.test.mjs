@@ -43,6 +43,15 @@ test("没有填写的特效不生成动作，避免凭空出现的音效", () =>
   assert.equal(generated.soundFiles.length, 0);
 });
 
+test("地图图标接受 GGG 文档里的 12 种形状", () => {
+  const shapes = ["Circle", "Star", "Diamond", "Square", "Pentagon", "Hexagon", "Triangle", "Cross", "Kite", "UpsideDownHouse", "Moon", "Raindrop"];
+  const withIcon = (icon) => validateProfile(profile({ rules: [makeRule({ target: { itemIds: ["divine-orb"] }, effects: { icon } })] }));
+  for (const shape of shapes) assert.equal(withIcon("1 Red " + shape).rules[0].effects.icon, "1 Red " + shape);
+  for (const icon of ["3 Red Star", "1 Red moon", "1 Red Starfish", "1 Red", "1 Red Star "]) {
+    assert.throws(() => withIcon(icon), /无效地图图标/, icon + " 应判为无效");
+  }
+});
+
 test("物品集合与价格区间同时使用时取交集", () => {
   const currency = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "currency/currency").map((item) => item.id);
   const target = { itemIds: currency, range: { min: { amount: 1, currency: "exalted" }, max: { amount: 2, currency: "divine" } } };

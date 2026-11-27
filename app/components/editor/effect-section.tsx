@@ -1,8 +1,10 @@
 "use client";
 
+import { useRef } from "react";
 import { Sparkles, Upload } from "lucide-react";
 
 import { describeEffects, pickEffects } from "../../../lib/effect-labels";
+import { customSoundOptions } from "../../../lib/sound-library";
 import type { BaseFilter, EffectPreset, FilterRule, RuleEffects, RuleFont } from "../../../lib/types";
 import { cn } from "../../../lib/cn";
 import { ruleEffectsPending, shownRuleEffects } from "../../state/editor";
@@ -14,46 +16,12 @@ import { Input } from "../ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Select } from "../ui/select";
 import { effectSourceLabel } from "./appearance-preview";
+import { BeamField, MapIconField, RgbColorField } from "./appearance-fields";
 import { PresetGallery } from "./preset-gallery";
 
 const NONE = "__none";
-const CUSTOM_SOUND = "__custom";
-
-function ColorSwatch({ color }: { color?: string }) {
-  const parts = (color ?? "").split(/\s+/).map(Number);
-  const valid = parts.length >= 3 && parts.slice(0, 3).every((value) => Number.isFinite(value));
-  return (
-    <span
-      aria-hidden="true"
-      title={color || "沿用基础样式"}
-      className="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-surface-3"
-    >
-      <span
-        className="size-4 rounded-sm border border-line-strong/60"
-        style={{ background: valid ? "rgb(" + parts.slice(0, 3).join(",") + ")" : "transparent" }}
-      />
-    </span>
-  );
-}
-
-function SoundUpload({ label, fileName, onFile }: { label: string; fileName: string; onFile: (file: File | undefined) => void }) {
-  return (
-    <label className="flex min-w-0 cursor-pointer flex-wrap items-center gap-2">
-      <input
-        type="file"
-        className="peer sr-only"
-        accept="audio/mpeg,audio/wav,audio/ogg"
-        aria-label={label}
-        onChange={(event) => onFile(event.target.files?.[0])}
-      />
-      <span className={cn(buttonVariants({ size: "sm" }), "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold-bright")}>
-        <Upload aria-hidden="true" />
-        上传音效
-      </span>
-      <span className="min-w-0 max-w-48 truncate font-mono text-xs text-ink-muted">{fileName}</span>
-    </label>
-  );
-}
+const PICK_FILE = "__pick";
+const CUSTOM_PREFIX = "custom:";
 
 /** 「显示与特效」：完整特效预设，以及逐项的高级外观设置。 */
 export function EffectSection({
@@ -67,12 +35,16 @@ export function EffectSection({
 }) {
   const baseInspection = useAppStore((state) => state.baseInspection);
   const awaitingEffects = useAppStore((state) => ruleEffectsPending(rule, state));
+  const rules = useAppStore((state) => state.profile.rules);
   const customFile = useAppStore((state) => state.customSounds[rule.id]);
+  const customSounds = useAppStore((state) => state.customSounds);
   const galleryOpen = useAppStore((state) => state.presetGalleryOpen);
   const setGalleryOpen = useAppStore((state) => state.setPresetGalleryOpen);
   const openPicker = useAppStore((state) => state.openPicker);
   const setRuleAppearance = useAppStore((state) => state.setRuleAppearance);
   const setRuleSound = useAppStore((state) => state.setRuleSound);
+  const pickRuleSound = useAppStore((state) => state.pickRuleSound);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const sourceId = rule.baselineEffectItemId;
   const inherited = sourceId ? baseInspection?.styles[sourceId] : undefined;
@@ -90,10 +62,19 @@ export function EffectSection({
     !sound
       ? NONE
       : sound.type === "custom"
-        ? CUSTOM_SOUND
+        ? CUSTOM_PREFIX + sound.fileName
         : sound.type === "builtin"
           ? "builtin:" + sound.id
           : "base:" + sound.fileName;
+  // 方案里各条规则已经选过的自定义音效；当前这条规则的音效文件读不到时，也把名字列出来，看得出缺了什么。
+  const customOptions = customSoundOptions(rules, customSounds);
+  const customItems = [
+    ...customOptions.map((option) => ({ value: CUSTOM_PREFIX + option.fileName, label: option.fileName })),
+    ...(sound?.type === "custom" && !customOptions.some((option) => option.fileName === sound.fileName)
+      ? [{ value: CUSTOM_PREFIX + sound.fileName, label: sound.fileName }]
+      : []),
+    { value: PICK_FILE, label: "选择文件" },
+  ];
 
   function applyPreset(preset: EffectPreset) {
     const sources = preset.sourceItemIds ?? [];
@@ -182,81 +163,93 @@ export function EffectSection({
             留空的项{useBaseDefaults ? "沿用基础过滤器" : "使用游戏默认样式"}。{sourceId && "修改任意一项后，当前特效会固定下来。"}
           </p>
           <fieldset disabled={awaitingEffects} className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <Field label="光柱">
-              <Input
-                aria-label={`${rule.name} 光柱`}
-                placeholder={`PlayEffect，留空使用${defaultStyleLabel === "沿用基础" ? "基础样式" : "游戏默认样式"}`}
-                value={shownEffects.beam ?? ""}
-                onChange={(event) => editEffects({ beam: event.target.value })}
-              />
-            </Field>
-            <Field label="地图图标">
-              <Input
-                aria-label={`${rule.name} 地图图标`}
-                placeholder={`MinimapIcon，${defaultStyleLabel}`}
-                value={shownEffects.icon ?? ""}
-                onChange={(event) => editEffects({ icon: event.target.value })}
-              />
-            </Field>
+            <MapIconField
+              className="sm:col-span-2"
+              ruleName={rule.name}
+              value={shownEffects.icon}
+              beamColor={shownEffects.beam?.split(" ")[0]}
+              defaultLabel={defaultStyleLabel}
+              onChange={(icon) => editEffects({ icon })}
+            />
+            <BeamField
+              ruleName={rule.name}
+              value={shownEffects.beam}
+              defaultLabel={defaultStyleLabel}
+              onChange={(beam) => editEffects({ beam })}
+            />
             <Field label="字号" hint="18–45">
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={45}
-                  aria-label={`${rule.name} 字号`}
-                  placeholder={defaultStyleLabel}
-                  value={font.fontSize ?? ""}
-                  onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
-                />
-                <ColorSwatch color={font.textColor} />
-              </div>
+              <Input
+                type="number"
+                min={1}
+                max={45}
+                aria-label={`${rule.name} 字号`}
+                placeholder={defaultStyleLabel}
+                value={font.fontSize ?? ""}
+                onChange={(event) => editFont({ fontSize: event.target.value === "" ? undefined : Number(event.target.value) })}
+              />
             </Field>
             {colors.map(([key, label]) => (
-              <Field key={key} label={label}>
-                <div className="flex gap-2">
-                  <Input
-                    aria-label={`${rule.name} ${label}`}
-                    placeholder={`R G B (A)，${defaultStyleLabel}`}
-                    value={font[key] ?? ""}
-                    onChange={(event) => editFont({ [key]: event.target.value })}
-                  />
-                  <ColorSwatch color={font[key]} />
-                </div>
-              </Field>
+              <RgbColorField
+                key={key}
+                ruleName={rule.name}
+                label={label}
+                value={font[key]}
+                defaultLabel={defaultStyleLabel}
+                onChange={(value) => editFont({ [key]: value })}
+              />
             ))}
-            <Field label="音效" className="sm:col-span-2">
+            <Field label="音效">
               <div className="flex flex-col gap-2">
-                <Select
-                  ariaLabel={`${rule.name} 音效`}
-                  value={soundValue}
-                  onValueChange={(value) => {
-                    if (value === NONE) editEffects({ sound: undefined });
-                    else if (value === CUSTOM_SOUND)
-                      editEffects({ sound: { type: "custom", fileName: sound?.type === "custom" ? sound.fileName : "" } });
-                    else if (value.startsWith("builtin:")) {
-                      const id = Number(value.slice(8));
-                      editEffects({ sound: sound?.type === "builtin" && sound.id === id ? sound : { type: "builtin", id, volume: 300 } });
-                    }
-                  }}
-                  options={[
-                    { value: NONE, label: defaultStyleLabel },
-                    ...Array.from({ length: 16 }, (_, index) => ({ value: "builtin:" + (index + 1), label: "内置音效 " + (index + 1) })),
-                    ...(soundValue.startsWith("base:")
-                      ? [{ value: soundValue, label: "基础过滤器音效 · " + soundValue.slice(5) }]
-                      : []),
-                    { value: CUSTOM_SOUND, label: "自定义上传…" },
-                  ]}
-                />
-                {!base && !sourceId && (sound?.type === "neversink" || sound?.type === "baseline") && (
-                  <p className="text-xs text-ember">请选择内置音效或上传音效，替换「{sound.fileName}」。</p>
-                )}
-                {sound?.type === "custom" && (
-                  <SoundUpload
-                    label={`${rule.name} 自定义音效`}
-                    fileName={customFile?.name || sound.fileName || "选择 mp3 / wav / ogg"}
-                    onFile={(file) => setRuleSound(rule.id, file)}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    className="min-w-0 flex-1 basis-40"
+                    ariaLabel={`${rule.name} 音效`}
+                    value={soundValue}
+                    onValueChange={(value) => {
+                      if (value === NONE) editEffects({ sound: undefined });
+                      else if (value === PICK_FILE) fileInput.current?.click();
+                      else if (value.startsWith(CUSTOM_PREFIX)) {
+                        const option = customOptions.find((entry) => CUSTOM_PREFIX + entry.fileName === value);
+                        if (option) pickRuleSound(rule.id, option);
+                      } else if (value.startsWith("builtin:")) {
+                        const id = Number(value.slice(8));
+                        editEffects({ sound: sound?.type === "builtin" && sound.id === id ? sound : { type: "builtin", id, volume: 300 } });
+                      }
+                    }}
+                    options={[
+                      { value: NONE, label: defaultStyleLabel },
+                      ...(soundValue.startsWith("base:")
+                        ? [{ value: soundValue, label: "基础过滤器音效 · " + soundValue.slice(5) }]
+                        : []),
+                    ]}
+                    groups={[
+                      { label: "自定义音效", options: customItems },
+                      {
+                        label: "内置音效",
+                        options: Array.from({ length: 16 }, (_, index) => ({ value: "builtin:" + (index + 1), label: "内置音效 " + (index + 1) })),
+                      },
+                    ]}
                   />
+                  <label className="inline-flex shrink-0 cursor-pointer">
+                    <input
+                      ref={fileInput}
+                      type="file"
+                      className="peer sr-only"
+                      accept="audio/mpeg,audio/wav,audio/ogg"
+                      aria-label={`${rule.name} 自定义音效`}
+                      onChange={(event) => {
+                        setRuleSound(rule.id, event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    <span className={cn(buttonVariants({ size: "sm" }), "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold-bright")}>
+                      <Upload aria-hidden="true" />
+                      选择文件
+                    </span>
+                  </label>
+                </div>
+                {!base && !sourceId && (sound?.type === "neversink" || sound?.type === "baseline") && (
+                  <p className="text-xs text-ember">请选择内置音效或自定义音效，替换「{sound.fileName}」。</p>
                 )}
               </div>
             </Field>

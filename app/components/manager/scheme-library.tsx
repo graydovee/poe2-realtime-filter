@@ -108,7 +108,7 @@ export function SchemeLibrary() {
         />
         <Button disabled={busy || !library} onClick={() => openExport()}>
           <FileArchive aria-hidden="true" />
-          导出方案包…
+          导出方案包
         </Button>
       </div>
 

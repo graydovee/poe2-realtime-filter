@@ -250,7 +250,7 @@ function Overview({ library, busy, server }: { library: Library; busy: boolean; 
         </Button>
         <Button disabled={busy} onClick={() => openExport()}>
           <FileArchive aria-hidden="true" />
-          导出方案包…
+          导出方案包
         </Button>
       </div>
       {library.schemes.length > 0 && (
