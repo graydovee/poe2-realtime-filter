@@ -14,6 +14,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 发布说明要用完整的提交历史和全部标签。
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -67,9 +70,21 @@ jobs:
               signature = $signature
             } }
           } | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM latest.json
-          @'
-          - 「开机启动」移到方案库检查器单独的「启动」设置卡片里，不再和「暂停后台刷新」排在同一行。
-          - Windows x64 安装器在需要时联网安装 WebView2。行情刷新需要联网。
-          '@ | Set-Content -Encoding utf8NoBOM release-notes.md
-          gh release create $tag $filename latest.json --verify-tag --latest --title "PoE2 Realtime Filter $tag" --notes-file release-notes.md
+          # 发布说明出自提交信息。标题是打标签的那个提交的标题；摘要是标题去掉「发布 vX.Y.Z」后的部分，
+          # 正文是那个提交的正文，改动清单是自上一个版本标签以来每个提交的标题，发布提交本身不算。
+          # 提交信息让 git 直接写进文件、再按 UTF-8 读回，不经过控制台的编码转换。
+          git log -1 --format=%s HEAD --output=release-title.md
+          $subject = (Get-Content -Raw -Encoding utf8 release-title.md).Trim()
+          $title = $subject
+          $summary = $subject -replace '^发布\s+\S+\s*', ''
+          git log -1 --format=%b HEAD --output=release-body.md
+          $previous = git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname --merged HEAD | Where-Object { $_ -ne $tag } | Select-Object -First 1
+          $range = if ($previous) { "$previous..HEAD" } else { 'HEAD' }
+          git log --reverse --no-merges --format='- %s' $range --output=changes.txt
+          $changes = @(Get-Content -Encoding utf8 changes.txt | Where-Object { $_ -notmatch '^- 发布\s+v\d+\.\d+\.\d+' })
+          $body = (Get-Content -Raw -Encoding utf8 release-body.md).Trim()
+          $notes = @($summary, '') + $(if ($body) { @($body, '') } else { @() }) + $changes
+          $notes | Set-Content -Encoding utf8NoBOM release-notes.md
+          Get-Content -Encoding utf8 release-notes.md
+          gh release create $tag $filename latest.json --verify-tag --latest --title $title --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed' }
