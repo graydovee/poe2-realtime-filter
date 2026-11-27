@@ -8,6 +8,16 @@ use crate::engine::Result;
 use crate::share_code::Share;
 use serde_json::{Map, Number, Value};
 
+/// What the metadata record carries beyond the scheme settings. Revision 2 writes the
+/// description after the name, revision 3 also writes the edits of base filter rules after
+/// the rules.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Layout {
+    Plain,
+    Described,
+    Edits,
+}
+
 #[derive(Clone, Copy)]
 enum Kind {
     Bool,
@@ -27,15 +37,30 @@ const fn field(name: &'static str, kind: Kind) -> Field {
     (name, kind)
 }
 
-pub(super) fn pack(mut share: Share, max_rules: usize, described: bool) -> Result<Vec<u8>> {
+pub(super) fn pack(mut share: Share, max_rules: usize, layout: Layout) -> Result<Vec<u8>> {
     let profile = share.profile.as_object_mut().ok_or_else(invalid)?;
     let Some(Value::Array(rules)) = profile.remove("rules") else {
         return Err(invalid());
     };
+    // The edits and their switch leave the profile object. Only revision 3 writes them, as its
+    // own section: the switch first, then the count and the records.
+    let overlays = profile
+        .remove("overlays")
+        .unwrap_or_else(|| Value::Array(Vec::new()));
+    let edits = if layout == Layout::Edits {
+        Some(overlays.as_array().cloned().ok_or_else(invalid)?)
+    } else {
+        None
+    };
+    let edits_enabled = match profile.remove("editsEnabled") {
+        None | Some(Value::Bool(true)) => true,
+        Some(Value::Bool(false)) => false,
+        Some(_) => return Err(invalid()),
+    };
     check_limit(rules.len(), max_rules)?;
     let mut out = Vec::new();
     write_text(&mut out, &share.name);
-    if described {
+    if layout != Layout::Plain {
         write_text(&mut out, &share.description);
     }
     write_object(&mut out, profile, schema::PROFILE, None)?;
@@ -48,16 +73,29 @@ pub(super) fn pack(mut share: Share, max_rules: usize, described: bool) -> Resul
             None,
         )?;
     }
+    if let Some(edits) = edits {
+        check_limit(edits.len(), schema::MAX_OVERLAYS)?;
+        out.push(u8::from(edits_enabled));
+        put_uint(&mut out, edits.len());
+        for edit in &edits {
+            write_object(
+                &mut out,
+                edit.as_object().ok_or_else(invalid)?,
+                schema::OVERLAY,
+                None,
+            )?;
+        }
+    }
     Ok(out)
 }
 
-pub(super) fn unpack(bytes: &[u8], max_rules: usize, described: bool) -> Result<Share> {
+pub(super) fn unpack(bytes: &[u8], max_rules: usize, layout: Layout) -> Result<Share> {
     let mut input = Reader(bytes);
     let name = read_text(&mut input)?;
-    let description = if described {
-        read_text(&mut input)?
-    } else {
+    let description = if layout == Layout::Plain {
         String::new()
+    } else {
+        read_text(&mut input)?
     };
     let mut profile = read_object(&mut input, schema::PROFILE)?;
     let count = input.uint()?;
@@ -66,8 +104,23 @@ pub(super) fn unpack(bytes: &[u8], max_rules: usize, described: bool) -> Result<
     for _ in 0..count {
         rules.push(Value::Object(read_object(&mut input, schema::RULE)?));
     }
-    input.finish()?;
     profile.insert("rules".into(), Value::Array(rules));
+    if layout == Layout::Edits {
+        let enabled = match input.take(1)?[0] {
+            0 => false,
+            1 => true,
+            _ => return Err(invalid()),
+        };
+        profile.insert("editsEnabled".into(), Value::Bool(enabled));
+        let count = input.uint()?;
+        check_limit(count, schema::MAX_OVERLAYS)?;
+        let mut edits = Vec::with_capacity(count);
+        for _ in 0..count {
+            edits.push(Value::Object(read_object(&mut input, schema::OVERLAY)?));
+        }
+        profile.insert("overlays".into(), Value::Array(edits));
+    }
+    input.finish()?;
     Ok(Share {
         name,
         description,
@@ -285,13 +338,13 @@ mod tests {
             0x67, 1, b'R', 1, 0, // rule mask, name and switches
             3, 0, 1, 3, 0x81, 1, 3, 0, // target, minimum price, empty effects
         ];
-        assert_eq!(pack(share.clone(), 1, false).unwrap(), expected);
-        assert_eq!(unpack(&expected, 1, false).unwrap(), share);
+        assert_eq!(pack(share.clone(), 1, Layout::Plain).unwrap(), expected);
+        assert_eq!(unpack(&expected, 1, Layout::Plain).unwrap(), share);
         for cut in 0..expected.len() {
-            assert!(unpack(&expected[..cut], 1, false).is_err());
+            assert!(unpack(&expected[..cut], 1, Layout::Plain).is_err());
         }
-        assert!(unpack(&expected, 0, false).is_err());
-        assert!(unpack(&[&expected[..], &[0]].concat(), 1, false).is_err());
+        assert!(unpack(&expected, 0, Layout::Plain).is_err());
+        assert!(unpack(&[&expected[..], &[0]].concat(), 1, Layout::Plain).is_err());
     }
 
     #[test]
@@ -306,24 +359,107 @@ mod tests {
             6, 0xe6, 0x8f, 0x8f, 0xe8, 0xbf, 0xb0, // description
             0x0c, 3, 1, b'L', 0, // profile and rule count
         ];
-        assert_eq!(pack(share.clone(), 1, true).unwrap(), expected);
-        assert_eq!(unpack(&expected, 1, true).unwrap(), share);
+        assert_eq!(pack(share.clone(), 1, Layout::Described).unwrap(), expected);
+        assert_eq!(unpack(&expected, 1, Layout::Described).unwrap(), share);
         for cut in 0..expected.len() {
-            assert!(unpack(&expected[..cut], 1, true).is_err());
+            assert!(unpack(&expected[..cut], 1, Layout::Described).is_err());
         }
-        assert!(unpack(&[&expected[..], &[0]].concat(), 1, true).is_err());
+        assert!(unpack(&[&expected[..], &[0]].concat(), 1, Layout::Described).is_err());
         // Revision 1 reads another field where the description starts.
-        assert!(unpack(&expected, 1, false).is_err());
+        assert!(unpack(&expected, 1, Layout::Plain).is_err());
         let mut bare = share.clone();
         bare.description = String::new();
         assert_eq!(
-            pack(bare.clone(), 1, true).unwrap(),
+            pack(bare.clone(), 1, Layout::Described).unwrap(),
             [1, b'N', 0, 0x0c, 3, 1, b'L', 0]
         );
         assert_eq!(
-            unpack(&[1, b'N', 0, 0x0c, 3, 1, b'L', 0], 1, true).unwrap(),
+            unpack(&[1, b'N', 0, 0x0c, 3, 1, b'L', 0], 1, Layout::Described).unwrap(),
             bare
         );
+    }
+
+    #[test]
+    fn edits_wire_vector_writes_the_edits_after_the_rules() {
+        let conditions = b"BaseType == \"Gold\"";
+        let share = Share {
+            name: "N".into(),
+            description: String::new(),
+            profile: json!({"schemaVersion":3,"league":"L","rules":[],"overlays":[{
+                "baseName":"base.filter", "conditions":["BaseType == \"Gold\""],
+                "hidden":true, "enabled":true, "effects":{}
+            }]}),
+        };
+        let mut expected = vec![1, b'N', 0, 0x0c, 3, 1, b'L', 0]; // name, description, profile, rule count
+        expected.extend_from_slice(&[1, 1]); // edit switch on, edit count
+        expected.push(0x3b); // edit mask: baseName, conditions, hidden, enabled, effects
+        expected.extend_from_slice(&[
+            11, b'b', b'a', b's', b'e', b'.', b'f', b'i', b'l', b't', b'e', b'r',
+        ]);
+        expected.extend_from_slice(&[1, conditions.len() as u8]);
+        expected.extend_from_slice(conditions);
+        expected.extend_from_slice(&[1, 1, 0]); // hidden, enabled, empty effects
+        assert_eq!(pack(share.clone(), 1, Layout::Edits).unwrap(), expected);
+        // A switch that is not written reads as on.
+        let mut restored = share.clone();
+        restored.profile["editsEnabled"] = json!(true);
+        assert_eq!(unpack(&expected, 1, Layout::Edits).unwrap(), restored);
+        for cut in 0..expected.len() {
+            assert!(unpack(&expected[..cut], 1, Layout::Edits).is_err());
+        }
+        assert!(unpack(&[&expected[..], &[0]].concat(), 1, Layout::Edits).is_err());
+        // Earlier revisions end after the rules and cannot read the switch.
+        assert!(unpack(&expected, 1, Layout::Described).is_err());
+        // A scheme without edits still writes the switch and the count.
+        let mut bare = share.clone();
+        bare.profile["overlays"] = json!([]);
+        bare.profile["editsEnabled"] = json!(true);
+        assert_eq!(
+            unpack(&[1, b'N', 0, 0x0c, 3, 1, b'L', 0, 1, 0], 1, Layout::Edits).unwrap(),
+            bare
+        );
+        // A switched-off scheme writes a zero in front of the count. Only 0 and 1 are values.
+        let mut off = share.clone();
+        off.profile["editsEnabled"] = json!(false);
+        let mut expected_off = expected.clone();
+        expected_off[8] = 0;
+        assert_eq!(pack(off.clone(), 1, Layout::Edits).unwrap(), expected_off);
+        assert_eq!(unpack(&expected_off, 1, Layout::Edits).unwrap(), off);
+        expected_off[8] = 2;
+        assert!(unpack(&expected_off, 1, Layout::Edits).is_err());
+        let mut broken = share.clone();
+        broken.profile["editsEnabled"] = json!("no");
+        assert!(pack(broken, 1, Layout::Edits).is_err());
+        // Every edit field round-trips, and unknown fields are refused.
+        let full = Share {
+            name: "N".into(),
+            description: String::new(),
+            profile: json!({"schemaVersion":3,"league":"L","rules":[],"editsEnabled":true,"overlays":[{
+                "baseName":"base.filter", "conditions":["BaseType == \"Gold\"", "StackSize >= 5"],
+                "conditionLines":["BaseType == \"Gold\"", "AreaLevel >= 66"], "hidden":false, "enabled":false,
+                "effects":{"beam":"None", "icon":"0 Red Star", "font":{"fontSize":40,"textColor":"0 0 0"},
+                           "sound":{"type":"custom","fileName":"mine.mp3"}}
+            }]}),
+        };
+        let data = pack(full.clone(), 1, Layout::Edits).unwrap();
+        assert_eq!(unpack(&data, 1, Layout::Edits).unwrap(), full);
+        let mut unsupported = full;
+        unsupported.profile["overlays"][0]["id"] = json!("local-edit");
+        assert_eq!(
+            pack(unsupported, 1, Layout::Edits).unwrap_err(),
+            "当前分享码格式不支持方案字段「id」"
+        );
+        let mut too_many = Share {
+            name: "N".into(),
+            description: String::new(),
+            profile: json!({"schemaVersion":3,"league":"L","rules":[],"overlays":[]}),
+        };
+        too_many.profile["overlays"] = Value::Array(
+            (0..=schema::MAX_OVERLAYS)
+                .map(|_| json!({"baseName":"b"}))
+                .collect(),
+        );
+        assert!(pack(too_many, 1, Layout::Edits).is_err());
     }
 
     #[test]
@@ -353,11 +489,11 @@ mod tests {
             "originalLeague":"Original", "league":"", "strictness":6, "style":"customsounds", "locale":"tw",
             "server":"tencent", "rules":rules}),
         };
-        let data = pack(share.clone(), 100, false).unwrap();
-        assert_eq!(unpack(&data, 100, false).unwrap(), share);
+        let data = pack(share.clone(), 100, Layout::Plain).unwrap();
+        assert_eq!(unpack(&data, 100, Layout::Plain).unwrap(), share);
         let mut unsupported = share;
         unsupported.profile["rules"][0]["effects"]["newEffect"] = json!(true);
-        assert!(pack(unsupported, 100, false)
+        assert!(pack(unsupported, 100, Layout::Plain)
             .unwrap_err()
             .contains("newEffect"));
     }

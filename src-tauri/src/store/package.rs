@@ -1471,6 +1471,43 @@ mod tests {
     }
 
     #[test]
+    fn edits_travel_with_the_package_and_keep_their_ids() {
+        let mut sender = World::new();
+        let id = sender.add("改基础规则", profile(None, json!([])), BTreeMap::new());
+        let first = sender.export(&["改基础规则"], None);
+        let mut receiver = World::new();
+        let imported = receiver.apply(&first, PackageDecisions::default())[0].clone();
+        assert_eq!(receiver.scheme(&imported).profile["overlays"], json!([]));
+
+        // The author edits a rule of the base filter.
+        let edit = json!([{
+            "id": "edit-gold", "baseName": "fixture.filter", "conditions": ["BaseType == \"Gold\""],
+            "conditionLines": ["BaseType == \"Gold\"", "StackSize >= 5"], "hidden": true, "enabled": true,
+            "effects": {"beam": "None", "font": {"fontSize": 40}}
+        }]);
+        sender
+            .library
+            .schemes
+            .iter_mut()
+            .find(|scheme| scheme.id == id)
+            .unwrap()
+            .profile["overlays"] = edit.clone();
+        let second = sender.export(&["改基础规则"], None);
+        assert!(matches!(
+            receiver.plan(&second).schemes[0],
+            SchemeAction::Update { blocked: false, .. }
+        ));
+        let ids = receiver.apply(&second, PackageDecisions::default());
+        assert_eq!(ids, vec![imported.clone()]);
+        // The edit arrives with the ID it was written with.
+        assert_eq!(receiver.scheme(&imported).profile["overlays"], edit);
+        assert!(matches!(
+            receiver.plan(&second).schemes[0],
+            SchemeAction::Latest { .. }
+        ));
+    }
+
+    #[test]
     fn update_decisions_skip_copy_or_keep_the_local_filter() {
         let (mut sender, first, id) = published();
         let second = revised(&mut sender, &id);

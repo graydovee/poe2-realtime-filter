@@ -10,4 +10,6 @@ export const DEFAULT_PROFILE: FilterProfile = {
   locale: "cn",
   rules: JSON.parse(JSON.stringify(DEFAULT_RULES)),
   skippedItemIds: [],
+  overlays: [],
+  editsEnabled: true,
 };

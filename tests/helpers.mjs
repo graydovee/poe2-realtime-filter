@@ -30,7 +30,10 @@ const core = require(path.join(output, "lib/filter-engine.js"));
 export const engine = { ...core, generateFilter: (profile, snapshot, options) =>
   core.generateFilter(profile, readFileSync(path.join("vendor/neversink", core.baselineFileFor(profile)), "utf8"), snapshot, options)
 };
-export const { inspectBaseStyles: baseStyles, inspectBaseFilter } = require(path.join(output, "lib/baseline-effects.js"));
+export const { inspectBaseStyles: baseStyles, inspectBaseFilter, hiddenByOverlays } = require(path.join(output, "lib/baseline-effects.js"));
+export const blocks = require(path.join(output, "lib/filter-blocks.js"));
+export const overlays = require(path.join(output, "lib/base-overlays.js"));
+export const { normalizeProfile } = require(path.join(output, "lib/profile.js"));
 export const generateOnBase = core.generateFilter;
 export const { validateProfile } = require(path.join(output, "lib/profile-validation.js"));
 export const { searchCatalog } = require(path.join(output, "lib/catalog.js"));

@@ -257,7 +257,7 @@ fn packed_header_rejects_malformed_fields_and_lengths() {
 fn packed_header_rejects_unsupported_format_revision_or_compression() {
     for header in [
         [8, 3, 16, 1, 24, 1], // Unknown format.
-        [8, 2, 16, 3, 24, 1], // Unknown revision of the positional body.
+        [8, 2, 16, 4, 24, 1], // Unknown revision of the positional body.
         [8, 2, 16, 1, 24, 4], // Unknown compression.
     ] {
         // Unsupported values are rejected before CRC and before consulting the body.
@@ -430,7 +430,16 @@ fn packed_header_carries_the_catalog_version() {
 }
 
 
-// Fixed vectors of complete revision 2 share codes.
+// Fixed vectors of complete revision 2 share codes. Schemes without edits of base filter rules
+// are still written this way.
+const DESCRIBED_VERSION: BodyVersion = BodyVersion {
+    format: 2,
+    revision: 2,
+};
+const EDITED_VERSION: BodyVersion = BodyVersion {
+    format: 2,
+    revision: 3,
+};
 const DESCRIBED_RAW_SHARE: &str = "POE2F2.CAgCEAIYASAB8LY_mzgG5omT5a6dJOW8gOiNkuWIsOe7iOWxgO-8jOiHquWKqOi3n-maj-eJqeS7twwCCFN0YW5kYXJkABSGAgsBBQ";
 const DESCRIBED_BROTLI_SHARE: &str = "POE2F2.CAgCEAIYAiAB8LY_m-ADEDgG5omT5a6dJOW8gOiNkuWIsOe7iOWxgO-8jOiHquWKqOi3n-maj-eJqeS7twwCCFN0YW5kYXJkABSGAgsBBQM";
 const DESCRIBED_DEFLATE_SHARE: &str = "POE2F2.CAgCEAIYAyAB8LY_mwE_AMD_OAbmiZPlrp0k5byA6I2S5Yiw57uI5bGA77yM6Ieq5Yqo6Lef6ZqP54mp5Lu3DAIIU3RhbmRhcmQAFIYCCwEF";
@@ -466,11 +475,87 @@ fn described_revision_vectors_keep_wire_and_decoded_shares() {
     ] {
         let bytes = (positional::DESCRIBED_CODEC.pack)(share).unwrap();
         assert_eq!(
-            encode_shortest(&bytes, EXPORT_BODY.version, 1).unwrap(),
+            encode_shortest(&bytes, DESCRIBED_VERSION, 1).unwrap(),
             fixture
         );
         assert_eq!(encode(share).unwrap(), fixture);
     }
+}
+
+fn edited() -> Share {
+    let mut source = described(&plain(), "带修改");
+    source.profile["overlays"] = json!([{
+        "id": "local-edit", "baseName": "base.filter", "conditions": ["BaseType == \"Gold\"", "StackSize >= 5"],
+        "conditionLines": ["BaseType == \"Gold\"", "AreaLevel >= 66"], "hidden": true, "enabled": true,
+        "effects": {"beam": "None", "font": {"fontSize": 40}, "sound": {"type": "custom", "fileName": "mine.mp3"}}
+    }]);
+    source
+}
+
+// Fixed vector of a complete revision 3 share code.
+const EDITED_BROTLI_SHARE: &str = "POE2F2.CAgCEAMYAiAB8GlDq-IRAITjwI4t3JyvDXHR1M0fqzUEos37PPBJYwl0iaRhHEppUyMSIHqyPeSq2STNZoJIlbSqNW5jY7kVn0MiKL8guxhuvLf0f09yhIrEeFABCHPFR3ylIbsCZVumae-QYJ2v3dhFnFk6q43yGJr6AR8QaqRelwF6GIotlnveEvdECqQ";
+
+#[test]
+fn edits_travel_as_revision_3_and_schemes_without_them_stay_on_revision_2() {
+    let source = edited();
+    let mut expected = source.clone();
+    expected.profile["overlays"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("id");
+    expected.profile["editsEnabled"] = json!(true);
+    let code = encode(&source).unwrap();
+    assert_eq!(code, EDITED_BROTLI_SHARE);
+    let wire = decode_base64(code.split_once('.').unwrap().1, MAX_PAYLOAD).unwrap();
+    assert_eq!(frame::Frame::read(&wire).unwrap().version, EDITED_VERSION);
+    let decoded = decode(&code).unwrap();
+    assert_eq!(decoded.share, expected);
+    let bytes = (positional::EDITED_CODEC.pack)(&source).unwrap();
+    assert_eq!(packed_body(&code).unwrap(), (EDITED_VERSION, bytes.clone()));
+    assert_eq!(
+        code,
+        encode_shortest(
+            &bytes,
+            EDITED_VERSION,
+            positional::catalog_version().unwrap()
+        )
+        .unwrap()
+    );
+    // Edits are numbered on import, together with the rules.
+    let imported = decoded.into_import().unwrap();
+    let edits = imported.profile["overlays"].as_array().unwrap();
+    assert_eq!(edits[0]["id"].as_str().unwrap().len(), 8);
+    assert_eq!(
+        edits[0]["conditions"],
+        source.profile["overlays"][0]["conditions"]
+    );
+    // Revision 2 and 1 layouts stop after the rules and refuse the edit count.
+    assert!((positional::DESCRIBED_CODEC.unpack)(&bytes).is_err());
+    assert!((positional::CODEC.unpack)(&bytes).is_err());
+    // A scheme without edits is still written the way clients before the edits read it.
+    let bare = described(&plain(), "带修改");
+    assert_eq!(
+        packed_body(&encode(&bare).unwrap()).unwrap().0,
+        DESCRIBED_VERSION
+    );
+    let mut cleared = source;
+    cleared.profile["overlays"] = json!([]);
+    assert_eq!(
+        packed_body(&encode(&cleared).unwrap()).unwrap().0,
+        DESCRIBED_VERSION
+    );
+    // A switched-off scheme carries the switch even without edits, so it needs revision 3.
+    let mut switched_off = described(&plain(), "带修改");
+    switched_off.profile["overlays"] = json!([]);
+    switched_off.profile["editsEnabled"] = json!(false);
+    assert_eq!(
+        packed_body(&encode(&switched_off).unwrap()).unwrap().0,
+        EDITED_VERSION
+    );
+    assert_eq!(
+        decode(&encode(&switched_off).unwrap()).unwrap().share,
+        switched_off
+    );
 }
 
 #[cfg(test)]
@@ -503,7 +588,7 @@ const BENCHMARK_CANDIDATES: &[(&str, Encoder)] = &[
 
 #[cfg(test)]
 pub(crate) fn measure_body_sections(share: &Share) -> Result<(usize, usize)> {
-    positional::section_sizes(&pack_body(share)?)
+    positional::section_sizes(&pack_body(share)?.1)
 }
 
 /// Full share-code length and per-candidate encoding time for the same packed body.
@@ -512,19 +597,19 @@ pub(crate) fn measure_body_sections(share: &Share) -> Result<(usize, usize)> {
 pub(crate) fn measure_compression_candidates(
     share: &Share,
 ) -> Result<Vec<(&'static str, usize, std::time::Duration)>> {
-    let bytes = pack_body(share)?;
+    let (version, bytes) = pack_body(share)?;
     let checksum = crc32fast::hash(&bytes);
     BENCHMARK_CANDIDATES
         .iter()
         .map(|&(name, candidate)| {
             let start = std::time::Instant::now();
             let code = frame::encode(
-            &bytes,
-            EXPORT_BODY.version,
-            checksum,
-            candidate,
-            positional::catalog_version()?,
-        )?;
+                &bytes,
+                version,
+                checksum,
+                candidate,
+                positional::catalog_version()?,
+            )?;
             Ok((name, code.len(), start.elapsed()))
         })
         .collect()

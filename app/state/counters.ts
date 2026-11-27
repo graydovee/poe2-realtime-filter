@@ -4,6 +4,8 @@ export const counters = {
   request: 0,
   /** 基础过滤器样式读取。 */
   inspection: 0,
+  /** 基础过滤器规则表读取。 */
+  baseRules: 0,
   library: 0,
   catalog: 0,
   market: 0,

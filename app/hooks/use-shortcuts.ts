@@ -55,6 +55,13 @@ export function useAppShortcuts() {
         if (state.editorDialog || state.picker || state.previewOpen || state.schemeBusy) return;
         if (isEditableTarget(event.target)) return;
         if (!(event.target instanceof Element) || !event.target.closest("#module-rules")) return;
+        // 基础规则没有优先级可调，方向键只移动选中。
+        if (state.activeBase) {
+          if (mod) return;
+          event.preventDefault();
+          state.selectBaseRule(event.key === "ArrowDown" ? 1 : -1);
+          return;
+        }
         const { activeRuleId } = state;
         if (!activeRuleId) return;
         event.preventDefault();

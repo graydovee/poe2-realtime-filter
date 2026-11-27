@@ -76,7 +76,7 @@ ZIP，DEFLATE 压缩。单个方案导出时文件名是「方案名 方案包.z
 
 - `title`、`appVersion` 可选，只作说明。
 - `description` 是方案的描述，为空时省略。
-- `profile` 是经方案校验和迁移后的完整内容，保留规则 ID；`baseFilter` 换成名称提示 `baseFilterHint`。
+- `profile` 是经方案校验和迁移后的完整内容，保留规则和修改的 ID；`baseFilter` 换成名称提示 `baseFilterHint`。
 - 方案没有基础过滤器内容时省略 `base`，只留名称提示。
 - `origin` 只用于导入时匹配和显示，客户端只读取本机来源的路径。
 - `format` 不是 1 时提示升级客户端；其余字段严格解析。

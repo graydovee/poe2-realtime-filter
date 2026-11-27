@@ -170,6 +170,24 @@ test("自定义音效：方案里选过的文件别的规则可以直接选，�
   assert.equal(sound.safeSoundName("my alert (1).mp3"), "my_alert__1_.mp3");
 });
 
+test("对基础规则的修改里的自定义音效也在方案的音效库里，规则和别的修改可以直接选", () => {
+  const alert = { name: "alert.mp3", size: 10 };
+  const chime = { name: "chime.ogg", size: 30 };
+  const rules = [{ id: "r1", effects: { sound: { type: "custom", fileName: "alert.mp3" } } }];
+  const overlays = [
+    { id: "o1", effects: { sound: { type: "custom", fileName: "alert.mp3" } } },
+    { id: "o2", effects: { sound: { type: "custom", fileName: "chime.ogg" } } },
+    { id: "o3", effects: { sound: { type: "builtin", id: 2, volume: 300 } } },
+    { id: "o4", effects: { sound: { type: "custom", fileName: "missing.mp3" } } },
+  ];
+  // 规则和修改用同一个文件时只列一次；没有文件的修改不提供选项。
+  const options = sound.customSoundOptions(rules, { r1: alert, o1: alert, o2: chime }, overlays);
+  assert.deepEqual(options.map((option) => option.fileName), ["alert.mp3", "chime.ogg"]);
+  assert.equal(options[1].file, chime);
+  // 给修改新选的音效和方案里已有的同名但内容不同时，另起名字。
+  assert.equal(sound.customSoundFileName({ name: "chime.ogg", size: 40 }, options), "chime-2.ogg");
+});
+
 test("颜色转换：过滤器的 R G B (A) 与预览用的十六进制", () => {
   assert.equal(labels.rgba("255 0 0 255"), "rgba(255, 0, 0, 1)");
   assert.equal(labels.rgba("10 20 30 128"), "rgba(10, 20, 30, 0.5019607843137255)");

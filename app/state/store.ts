@@ -24,6 +24,9 @@ type UiSlice = {
   setInspectorWidth: (width: number) => void;
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
+  /** 规则列表里是否列出基础过滤器的规则，会记住。 */
+  showBaseRules: boolean;
+  setShowBaseRules: (open: boolean) => void;
 };
 
 /** 窗口不窄于这个宽度时，检查器停靠在右侧；否则从侧边滑出。 */
@@ -41,6 +44,8 @@ const createUiSlice: StateCreator<AppState, [], [], UiSlice> = (set, get) => ({
   setInspectorWidth: (inspectorWidth) => set({ inspectorWidth }),
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  showBaseRules: false,
+  setShowBaseRules: (showBaseRules) => set({ showBaseRules }),
 });
 
 export type AppState = UiSlice & EditorSlice & ManagerSlice;
@@ -57,7 +62,11 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => localStorage),
       // 首屏服务端渲染与本地恢复可能不一致，挂载后再恢复。
       skipHydration: true,
-      partialize: (state) => ({ inspectorOpen: state.inspectorOpen, inspectorWidth: state.inspectorWidth }),
+      partialize: (state) => ({
+        inspectorOpen: state.inspectorOpen,
+        inspectorWidth: state.inspectorWidth,
+        showBaseRules: state.showBaseRules,
+      }),
     },
   ),
 );

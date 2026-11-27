@@ -551,7 +551,7 @@ fn check_count(count: usize, cap: usize) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{pack_with, unpack_with};
+    use super::super::{pack_with, unpack_with, Layout};
     use super::*;
     use crate::share_code::Share;
     use serde_json::{json, Value};
@@ -662,8 +662,8 @@ mod tests {
             description: String::new(),
             profile: json!({"rules":[],"skippedItemIds":["test-0","test-1","test-2"]}),
         };
-        assert_eq!(pack_with(&share, &catalog, false).unwrap(), BYTES);
-        assert_eq!(unpack_with(BYTES, &catalog, false).unwrap(), share);
+        assert_eq!(pack_with(&share, &catalog, Layout::Plain).unwrap(), BYTES);
+        assert_eq!(unpack_with(BYTES, &catalog, Layout::Plain).unwrap(), share);
     }
 
     #[test]
@@ -771,7 +771,7 @@ mod tests {
                 "skippedItemIds":[]}),
         };
         share.profile["rules"][0]["baselineEffectItemId"] = json!("test-0");
-        let data = pack_with(&share, &catalog, false).unwrap();
+        let data = pack_with(&share, &catalog, Layout::Plain).unwrap();
         let mut lists = Reader(&data);
         lists.segment().unwrap();
         assert_eq!(lists.uint().unwrap(), 0);
@@ -787,7 +787,7 @@ mod tests {
         let bound = share.profile["rules"][0].as_object_mut().unwrap();
         bound.remove("effects");
         bound.remove("effectPresetId");
-        assert_eq!(unpack_with(&data, &catalog, false).unwrap(), share);
+        assert_eq!(unpack_with(&data, &catalog, Layout::Plain).unwrap(), share);
     }
 
     #[test]
@@ -878,11 +878,11 @@ mod tests {
             description: String::new(),
             profile: json!({"rules":[],"skippedItemIds":[]}),
         };
-        let mut body = pack_with(&share, &catalog, false).unwrap();
+        let mut body = pack_with(&share, &catalog, Layout::Plain).unwrap();
         body.push(0);
-        assert!(unpack_with(&body, &catalog, false).is_err());
+        assert!(unpack_with(&body, &catalog, Layout::Plain).is_err());
         share.profile["skippedItemIds"] = json!(["test-99"]);
-        assert!(pack_with(&share, &catalog, false)
+        assert!(pack_with(&share, &catalog, Layout::Plain)
             .unwrap_err()
             .contains("test-99"));
     }

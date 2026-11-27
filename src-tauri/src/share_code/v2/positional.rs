@@ -1,6 +1,7 @@
-//! Format 2, revisions 1 and 2. A length-prefixed metadata record, then the skip list and one
-//! item list per rule. Revision 2 writes the scheme description after the name. Keep these
-//! layouts readable when later versions are added.
+//! Format 2, revisions 1, 2 and 3. A length-prefixed metadata record, then the skip list and one
+//! item list per rule. Revision 2 writes the scheme description after the name. Revision 3 writes
+//! the edits of base filter rules after the rules. Keep these layouts readable when later versions
+//! are added.
 
 mod items;
 mod metadata;
@@ -12,6 +13,7 @@ use crate::{
     share_code::{Share, MAX_JSON},
 };
 use items::{catalog, read_list, write_list, Catalog};
+use metadata::Layout;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use wire::{invalid, put_uint, Reader};
@@ -42,27 +44,54 @@ pub(super) const DESCRIBED_CODEC: BodyCodec = BodyCodec {
     pack: pack_described,
     unpack: unpack_described,
 };
+pub(super) const EDITED_CODEC: BodyCodec = BodyCodec {
+    version: BodyVersion {
+        format: 2,
+        revision: 3,
+    },
+    pack: pack_edited,
+    unpack: unpack_edited,
+};
 const MAX_RULES: usize = 100;
 const MAX_SELECTED: usize = 2000;
 const MAX_SKIPPED: usize = 5000;
 
 fn pack(share: &Share) -> Result<Vec<u8>> {
-    pack_with(share, catalog()?, false)
+    pack_with(share, catalog()?, Layout::Plain)
 }
 
 fn unpack(bytes: &[u8]) -> Result<Share> {
-    unpack_with(bytes, catalog()?, false)
+    unpack_with(bytes, catalog()?, Layout::Plain)
 }
 
 fn pack_described(share: &Share) -> Result<Vec<u8>> {
-    pack_with(share, catalog()?, true)
+    pack_with(share, catalog()?, Layout::Described)
 }
 
 fn unpack_described(bytes: &[u8]) -> Result<Share> {
-    unpack_with(bytes, catalog()?, true)
+    unpack_with(bytes, catalog()?, Layout::Described)
 }
 
-fn pack_with(share: &Share, catalog: &Catalog, described: bool) -> Result<Vec<u8>> {
+fn pack_edited(share: &Share) -> Result<Vec<u8>> {
+    pack_with(share, catalog()?, Layout::Edits)
+}
+
+fn unpack_edited(bytes: &[u8]) -> Result<Share> {
+    unpack_with(bytes, catalog()?, Layout::Edits)
+}
+
+/// A stored profile can carry null for empty font and sound settings.
+fn drop_empty_effects(fields: &mut Map<String, Value>) {
+    if let Some(effects) = fields.get_mut("effects").and_then(Value::as_object_mut) {
+        for key in ["font", "sound"] {
+            if effects.get(key).is_some_and(Value::is_null) {
+                effects.remove(key);
+            }
+        }
+    }
+}
+
+fn pack_with(share: &Share, catalog: &Catalog, layout: Layout) -> Result<Vec<u8>> {
     let mut metadata = share.clone();
     for rule in rules_mut(&mut metadata.profile)? {
         let fields = rule.as_object_mut().ok_or_else(invalid)?;
@@ -71,12 +100,17 @@ fn pack_with(share: &Share, catalog: &Catalog, described: bool) -> Result<Vec<u8
         if fields.contains_key("baselineEffectItemId") {
             fields.remove("effects");
             fields.remove("effectPresetId");
-        } else if let Some(effects) = fields.get_mut("effects").and_then(Value::as_object_mut) {
-            // A stored profile can carry null for empty font and sound settings.
-            for key in ["font", "sound"] {
-                if effects.get(key).is_some_and(Value::is_null) {
-                    effects.remove(key);
-                }
+        } else {
+            drop_empty_effects(fields);
+        }
+    }
+    if layout == Layout::Edits {
+        // Edits get their IDs on import, like rules.
+        if let Some(edits) = metadata.profile.get_mut("overlays").and_then(Value::as_array_mut) {
+            for edit in edits {
+                let fields = edit.as_object_mut().ok_or_else(invalid)?;
+                fields.remove("id");
+                drop_empty_effects(fields);
             }
         }
     }
@@ -98,7 +132,7 @@ fn pack_with(share: &Share, catalog: &Catalog, described: bool) -> Result<Vec<u8
         write_list(&mut lists, slots, &mut prior, index, catalog)?;
         Ok(())
     })?;
-    let metadata = metadata::pack(metadata, MAX_RULES, described)?;
+    let metadata = metadata::pack(metadata, MAX_RULES, layout)?;
     if metadata.len() + lists.len() > MAX_JSON {
         return Err(invalid());
     }
@@ -112,12 +146,12 @@ fn pack_with(share: &Share, catalog: &Catalog, described: bool) -> Result<Vec<u8
     Ok(out)
 }
 
-fn unpack_with(bytes: &[u8], catalog: &Catalog, described: bool) -> Result<Share> {
+fn unpack_with(bytes: &[u8], catalog: &Catalog, layout: Layout) -> Result<Share> {
     if bytes.len() > MAX_JSON {
         return Err(invalid());
     }
     let mut reader = Reader(bytes);
-    let mut share = metadata::unpack(reader.segment()?, MAX_RULES, described)?;
+    let mut share = metadata::unpack(reader.segment()?, MAX_RULES, layout)?;
     for rule in rules_mut(&mut share.profile)? {
         let fields = rule.as_object().ok_or_else(invalid)?;
         if fields.contains_key("baselineEffectItemId")

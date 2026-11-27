@@ -51,7 +51,8 @@ pub struct DecodedShare {
 }
 
 impl DecodedShare {
-    /// Only confirmed imports allocate and persist rule IDs. Share inspection remains read-only.
+    /// Only confirmed imports allocate and persist rule and edit IDs. Share inspection remains
+    /// read-only.
     pub fn into_import(mut self) -> Result<Share> {
         if self.needs_rule_ids {
             let rules = self
@@ -63,6 +64,17 @@ impl DecodedShare {
             let mut used = HashSet::new();
             for rule in rules {
                 let fields = rule.as_object_mut().ok_or("分享码中的规则无效")?;
+                fields.insert("id".into(), Value::String(new_rule_id(&mut used)?));
+            }
+            let edits = self
+                .share
+                .profile
+                .get_mut("overlays")
+                .and_then(Value::as_array_mut)
+                .into_iter()
+                .flatten();
+            for edit in edits {
+                let fields = edit.as_object_mut().ok_or("分享码中的修改无效")?;
                 fields.insert("id".into(), Value::String(new_rule_id(&mut used)?));
             }
             check_json_size(&self.share, INFLATED_TOO_LARGE)?;

@@ -1,9 +1,10 @@
 import { canFollowBaselineItem } from "./baseline-effects";
+import { blockKey, conditionLineIssue, MAX_CONDITIONS, MAX_CONDITION_LENGTH, MAX_OVERLAYS } from "./base-overlays";
 import { FILTER_ITEMS_BY_ID, STYLE_LABELS } from "./data";
 import { dropConditionsIssue } from "./drop-conditions";
 import { mapIconShapes } from "./effect-labels";
 import { normalizeProfile } from "./profile";
-import type { BuiltinSound, FilterProfile, FilterRule, PricePoint } from "./types";
+import type { BaseOverlay, BuiltinSound, FilterProfile, FilterRule, PricePoint, RuleEffects } from "./types";
 
 const safeName=(value:string)=>value.replace(/[^a-zA-Z0-9._-]/g,'_');
 const beamPattern=/^(Red|Orange|Yellow|Green|Blue|Cyan|Purple|Pink|White|Brown|Grey)( Temp)?$/;
@@ -44,8 +45,13 @@ function validateRule(rule:FilterRule,ids:Set<string>){
  if(rule.enabled&&!useItems&&!usePrice)throw new Error('规则至少要选择物品或价格区间');
  const dropIssue = dropConditionsIssue(rule);
  if (dropIssue) throw new Error(`「${rule.name}」${dropIssue}`);
- const effects=rule.effects??{};
- if(effects.beam!==undefined&&!beamPattern.test(effects.beam))throw new Error('无效光柱');
+ validateEffects(rule.effects??{});
+}
+
+/** 特效和音效的取值范围。修改可以把光柱设成 `None`，把基础规则原本的光柱去掉。 */
+function validateEffects(effects:RuleEffects|undefined,allowNoBeam=false){
+ if(!effects)return;
+ if(effects.beam!==undefined&&!(allowNoBeam&&effects.beam==='None')&&!beamPattern.test(effects.beam))throw new Error('无效光柱');
  if(effects.icon!==undefined&&!iconPattern.test(effects.icon))throw new Error('无效地图图标');
  const font=effects.font;
  if(font){
@@ -59,6 +65,29 @@ function validateRule(rule:FilterRule,ids:Set<string>){
   if(sound.fallback!==undefined&&(!sound.optional||!sound.fallback||!validBuiltinSound(sound.fallback)))throw new Error('无效的备用音效');
   if(sound.optional!==undefined&&typeof sound.optional!=='boolean'||sound.volume!==undefined&&!number(sound.volume,0,300))throw new Error('无效音效');
  }else if(sound&&(sound.type==='builtin'?!validBuiltinSound(sound):!['custom','neversink'].includes(sound.type)||typeof sound.fileName!=='string'||safeName(sound.fileName)!==sound.fileName||!/^.+\.(mp3|wav|ogg)$/i.test(sound.fileName)))throw new Error('无效音效');
+}
+
+/** 一处对基础规则的修改。`ids` 和规则共用；`keys` 保证同一条基础规则只有一处修改。 */
+function validateOverlay(overlay:BaseOverlay,ids:Set<string>,keys:Set<string>){
+ if(!overlay||typeof overlay.id!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(overlay.id)||ids.has(overlay.id))throw new Error('无效修改');
+ ids.add(overlay.id);
+ if(typeof overlay.baseName!=='string'||!overlay.baseName.length||overlay.baseName.length>260||/[\x00-\x1f]/.test(overlay.baseName))throw new Error('无效的修改来源');
+ if(!Array.isArray(overlay.conditions)||!overlay.conditions.length||overlay.conditions.length>MAX_CONDITIONS||overlay.conditions.some(line=>typeof line!=='string'||!line.trim()||line.length>MAX_CONDITION_LENGTH||/[\r\n]/.test(line)))throw new Error('修改对应的规则条件无效');
+ const key=blockKey(overlay.conditions);
+ if(keys.has(key))throw new Error('同一条基础规则只能有一处修改');
+ keys.add(key);
+ if(overlay.hidden!==undefined&&typeof overlay.hidden!=='boolean')throw new Error('无效修改');
+ if(typeof overlay.enabled!=='boolean')throw new Error('无效修改');
+ if(overlay.conditionLines!==undefined){
+  if(!Array.isArray(overlay.conditionLines)||overlay.conditionLines.length>MAX_CONDITIONS)throw new Error('修改的条件无效');
+  for(const line of overlay.conditionLines){
+   if(typeof line!=='string')throw new Error('修改的条件无效');
+   const issue=conditionLineIssue(line);
+   if(issue)throw new Error(`修改的条件无效：${issue}`);
+  }
+ }
+ if(!overlay.effects||typeof overlay.effects!=='object')throw new Error('无效修改');
+ validateEffects(overlay.effects,true);
 }
 
 export function validateProfile(input:unknown):FilterProfile {
@@ -79,6 +108,10 @@ export function validateProfile(input:unknown):FilterProfile {
  if(!Array.isArray(p.rules)||p.rules.length>100)throw new Error('自定义规则过多');
  const ids=new Set<string>();
  for(const rule of p.rules)validateRule(rule,ids);
+ if(!Array.isArray(p.overlays)||p.overlays.length>MAX_OVERLAYS)throw new Error('对基础规则的修改过多');
+ if(typeof p.editsEnabled!=='boolean')throw new Error('无效的基础规则修改设置');
+ const keys=new Set<string>();
+ for(const overlay of p.overlays)validateOverlay(overlay,ids,keys);
  if(!Array.isArray(p.skippedItemIds)||p.skippedItemIds.length>5000||p.skippedItemIds.some(id=>typeof id!=='string'||!FILTER_ITEMS_BY_ID.has(id)))throw new Error('跳过物品无效');
  return JSON.parse(JSON.stringify(p));
 }

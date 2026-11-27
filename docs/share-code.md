@@ -3,13 +3,13 @@
 | 文本前缀 | 读取端 | 写入端 |
 | --- | --- | --- |
 | `POE2F1` | 两段式 JSON，以及带 JSON 头的 `br/p1`、`br/p2`、`br/p3`、`poe2/p1`、`poe2/p2` | 只读取。 |
-| `POE2F2` | 二进制帧，正文 `format=2`、`revision=1` 或 `revision=2`，支持 raw、Brotli 和 raw DEFLATE。协议头的物品目录版本省略或等于当前版本。 | 写 `format=2`、`revision=2` 和当前的物品目录版本，在 raw 和 Brotli 中选择完整码长较短的一种。 |
+| `POE2F2` | 二进制帧，正文 `format=2`、`revision=1`、`revision=2` 或 `revision=3`，支持 raw、Brotli 和 raw DEFLATE。协议头的物品目录版本省略或等于当前版本。 | 写 `format=2` 和当前的物品目录版本，在 raw 和 Brotli 中选择完整码长较短的一种。方案没有对基础规则的修改、总开关也打开（或没写）时写 `revision=2`，其余写 `revision=3`。 |
 
 前缀区分外层帧。F1 的 `alg` 和 `p`、F2 的 `format` 和 `revision` 分别区分各自的正文布局。方案内容中的 `profile.schemaVersion` 由应用校验，独立于分享码版本。各文本段以 `.` 分隔，二进制段使用无填充的 Base64URL。解码时仅裁去整串的首尾空白。
 
 ## 应用接口
 
-Rust 入口为 `share_code::encode(&Share) -> Result<String>` 和 `share_code::decode(&str) -> Result<DecodedShare>`。`Share` 包含字符串 `name`、字符串 `description` 和 JSON 值 `profile`。`decode` 解析和校验协议结构，调用方可读取 `DecodedShare.share` 检查内容，再用 `into_import()` 准备确认导入。F1 使用载荷里的规则 ID。F2 不带规则 ID，在确认导入时按规则顺序为每条规则分配方案内唯一的 8 位随机字母数字 ID。参见 [Rust 入口](../src-tauri/src/share_code.rs)。
+Rust 入口为 `share_code::encode(&Share) -> Result<String>` 和 `share_code::decode(&str) -> Result<DecodedShare>`。`Share` 包含字符串 `name`、字符串 `description` 和 JSON 值 `profile`。`decode` 解析和校验协议结构，调用方可读取 `DecodedShare.share` 检查内容，再用 `into_import()` 准备确认导入。F1 使用载荷里的规则 ID。F2 不带规则和修改的 ID，在确认导入时按顺序为每条规则和每处修改分配方案内唯一的 8 位随机字母数字 ID。参见 [Rust 入口](../src-tauri/src/share_code.rs)。
 
 | 桌面命令 | 行为 |
 | --- | --- |
@@ -17,9 +17,9 @@ Rust 入口为 `share_code::encode(&Share) -> Result<String>` 和 `share_code::d
 | `inspect_share(code, server)` | 返回 `server`、`name`、`description`、`league`、`hasServer` 和目标服务器的赛季目录 `catalog`。码内没有服务器字段时使用调用方传入的服务器。此调用只读取分享信息。 |
 | `scheme_import(code, server, league?, name?)` | 校验服务器与码内值一致（如有），按需校验并替换目标赛季，以可选名称覆写原名。经方案校验后连同描述保存为新方案，返回 `{ id, missing }`，其中 `missing` 为缺少的音效。每次导入都创建新方案。 |
 
-分享内容包括方案名称、描述、方案设置、服务器、赛季 ID（`league` 和来源 `originalLeague`）、规则、跳过物品、基础过滤器名称提示和音效引用。导入会丢弃载荷里的 `baseFilter` 路径，按名称在游戏目录中查找唯一匹配项；没有时再查基础过滤器表里方案包导入的副本。缺失或多项同名时保留提示，供接收方重新选择。
+分享内容包括方案名称、描述、方案设置、服务器、赛季 ID（`league` 和来源 `originalLeague`）、规则、对基础规则的修改、跳过物品、基础过滤器名称提示和音效引用。导入会丢弃载荷里的 `baseFilter` 路径，按名称在游戏目录中查找唯一匹配项；没有时再查基础过滤器表里方案包导入的副本。缺失或多项同名时保留提示，供接收方重新选择。
 
-分享码带规则、方案设置、名称和描述，每次导入都创建新方案。要连同基础过滤器和音效一起分享，使用[方案包](scheme-package.md)：它带方案 ID，同一个包再次导入时按 ID 更新。参见 [桌面命令](../src-tauri/src/main.rs)、[方案存储](../src-tauri/src/store.rs)和[方案校验](../lib/profile-validation.ts)。
+分享码带规则、对基础规则的修改、方案设置、名称和描述，每次导入都创建新方案。要连同基础过滤器和音效一起分享，使用[方案包](scheme-package.md)：它带方案 ID，同一个包再次导入时按 ID 更新。参见 [桌面命令](../src-tauri/src/main.rs)、[方案存储](../src-tauri/src/store.rs)和[方案校验](../lib/profile-validation.ts)。
 
 ## POE2F1
 
@@ -67,7 +67,7 @@ POE2F2.<base64url(uvarint(头字节数) | ShareHeader | CRC32_LE | payload)>
 | 字段号 | 名称 | 支持的值 |
 | --- | --- | --- |
 | `1` | `format` | `2`，按位置编码元数据和物品列表。 |
-| `2` | `revision` | `1` 或 `2`，各对应下面的正文布局。 |
+| `2` | `revision` | `1`、`2` 或 `3`，各对应下面的正文布局。 |
 | `3` | `compression` | `1` raw（未压缩），`2` Brotli，`3` raw DEFLATE（RFC 1951）。 |
 | `4` | `catalog_version` | 物品目录版本，非零的正整数。可以省略，省略表示 `1`。 |
 
@@ -100,6 +100,16 @@ uvarint(元数据字节数) | 元数据 | 跳过物品 | 第 1 条规则物品�
 ```
 
 方案名称之后多一个描述字符串，没有描述时写空串。其余与修订 `1` 相同。
+
+### 正文格式 `2`，修订 `3`
+
+```text
+元数据 = 方案名称字符串 | 描述字符串 | 方案设置记录 | uvarint(规则数) | 各规则记录 | 修改开关 | uvarint(修改数) | 各修改记录
+```
+
+规则之后是方案对基础规则的修改：先 1 字节的总开关（`1` 启用、`0` 关闭），再是修改数，没有修改时修改数为 `0`。修改记录的字段依次为 `baseName`、`conditions`（字符串数组，最多 40 行）、`conditionLines`（同上）、`hidden`、`enabled`、`effects`。修改记录不带 ID，确认导入时和规则一起分配。其余与修订 `2` 相同。
+
+写入端按方案选修订：没有修改、总开关打开的方案写修订 `2`，旧客户端照常读取；有修改，或者总开关关闭的方案写修订 `3`，不支持修订 `3` 的客户端读到它提示升级。
 
 ### 物品列表和目录地址
 
@@ -139,7 +149,7 @@ F2 读取桌面引擎 `shareCatalog` 投影。`data/item-catalog.json` 的 `shar
 | 协议头 | F1 三段式 JSON 头和 F2 二进制头均为 128 字节。 |
 | 帧或封装载荷 | F1 三段式的解码载荷（含 CRC）、F2 的整个解码帧均为 `1 MiB + 4,096` 字节。Base64URL 字符串解码前也检查长度。 |
 | 正文与展开 | F1 两段式 JSON 与 F1/F2 的未压缩正文均为 `1 MiB`。F1 `poe2`、F2 还限制展开后的方案 JSON，F2 确认导入生成规则 ID 后再次检查。 |
-| 规则和物品 | 每方案最多 100 条规则，每条规则最多 2,000 件选中物品，跳过物品最多 5,000 件。F1 `poe2` 和 F2 在解包时检查列表展开，包括引用。普通 JSON 的规则与物品上限在方案校验时检查。 |
+| 规则和物品 | 每方案最多 100 条规则，每条规则最多 2,000 件选中物品，跳过物品最多 5,000 件。修订 `3` 每方案最多 500 处修改，每处最多 40 行条件。F1 `poe2` 和 F2 在解包时检查列表展开，包括引用。普通 JSON 的规则与物品上限在方案校验时检查。 |
 
 - 未知前缀报告「不支持的分享码版本」。F1 的未知 `alg/p` 或 F2 的未知 `format/revision/compression` 提示升级。无效编码和损坏的头分别报告「分享码不是有效的 Base64URL」和「分享码协议头无效」。
 - Base64URL 解码前后超限报告「分享码过大」。F1 三段式或 F2 的未压缩正文超限报告「分享码解压后过大」。CRC 字段截断、压缩流损坏、CRC 不符分别报告「分享码压缩数据不完整」「分享码压缩数据损坏」「分享码校验失败」。
@@ -151,10 +161,10 @@ F2 读取桌面引擎 `shareCatalog` 投影。`data/item-catalog.json` 的 `shar
 | --- | --- |
 | [share_code.rs](../src-tauri/src/share_code.rs) | `ShareDecoder` 和 `ShareEncoder` 分开。`DECODERS` 按文本前缀选读端，`EXPORT_CODEC` 选写入端。 |
 | [v1.rs](../src-tauri/src/share_code/v1.rs) | F1 读取。目录打包正文和固定目录在 `v1/`。 |
-| [v2.rs](../src-tauri/src/share_code/v2.rs) | `BODY_CODECS` 按 `(format, revision)` 选正文读端，`EXPORT_BODY` 选正文写入端。二进制帧由 `v2/frame.rs` 处理，`v2/positional.rs` 与其子模块定义正文。 |
+| [v2.rs](../src-tauri/src/share_code/v2.rs) | `BODY_CODECS` 按 `(format, revision)` 选正文读端，`export_body` 按方案有没有对基础规则的修改选正文写入端。二进制帧由 `v2/frame.rs` 处理，`v2/positional.rs` 与其子模块定义正文。 |
 | [compression.rs](../src-tauri/src/share_code/compression.rs) | 公用的 CRC 与压缩处理。 |
 
-1. 沿用 F2 帧时，为布局变更分配新正文 `revision`，新的序列化家族使用新 `format`。把新正文读端登记在 `BODY_CODECS`，已发布的条目、字段位图、枚举编号和目录语义保持不变。可跳过的头扩展使用新 protobuf 字段号。新增压缩算法时同步更新 `.proto` 和压缩层。
+1. 沿用 F2 帧时，为布局变更分配新正文 `revision`，新的序列化家族使用新 `format`。把新正文读端登记在 `BODY_CODECS`，已发布的条目、字段位图、枚举编号和目录语义保持不变。写入端用能承载这个方案的最低修订。可跳过的头扩展使用新 protobuf 字段号。新增压缩算法时同步更新 `.proto` 和压缩层。
 2. 外层帧有不兼容变更时，分配新前缀，实现 `ShareDecoder` 并加入 `DECODERS`。需要对外生成的新版本同时实现写端。发布时按变更范围切换 `EXPORT_BODY` 或 `EXPORT_CODEC`，读取注册表包含全部已发布版本。
 3. 为新版本增加固定字节向量、往返、导入和错误边界用例。用例覆盖 F1 的全部读法、F2 的三种压缩帧和目录增量。更新本文及相关 schema。参见 [F1 夹具](../src-tauri/src/share_code/v1/tests.rs)、[F2 夹具](../src-tauri/src/share_code/v2/tests.rs)和[目录兼容测试](../tests/share-code.test.mjs)。
 4. 物品目录的旧地址无法继续沿用时，把 `catalogVersion` 加一，并按第 1 步给写入端分配新的正文 `revision`，见「物品目录版本」。

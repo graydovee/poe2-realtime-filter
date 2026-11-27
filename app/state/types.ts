@@ -3,6 +3,9 @@ import type { GameServer, LeagueCatalog, MarketSnapshot } from "../../lib/types"
 
 export type View = "manager" | "editor";
 
+/** 编辑区当前选中的基础过滤器一侧的条目：一条基础规则（它在基础过滤器里的序号），或一处失效的修改。 */
+export type BaseSelection = { kind: "rule"; index: number } | { kind: "edit"; id: string };
+
 /** 物品选择器正在编辑的条件、跳过物品或特效来源。 */
 export type PickerTarget = "rule" | "skipped" | { kind: "effect-source"; ruleId: string; itemIds?: string[] };
 

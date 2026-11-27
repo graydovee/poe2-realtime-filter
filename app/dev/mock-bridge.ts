@@ -3,13 +3,16 @@
  * 只在开发构建且地址带 ?mock=1 时接入（见 lib/desktop.ts）：界面逻辑走真实的 lib/，
  * Tauri 命令返回内存里的演示数据。生产构建不会包含这个文件。
  */
+import { inspectBaseRules } from "../../lib/base-overlays";
 import { inspectBaseFilter } from "../../lib/baseline-effects";
+import { groupName } from "../../lib/catalog";
 import type { Library } from "../../lib/desktop";
-import { DEFAULT_RULES } from "../../lib/data";
+import { DEFAULT_RULES, ITEM_CATALOG } from "../../lib/data";
 import { generateFilter } from "../../lib/filter-engine";
 import { DOWNLOAD_CANCELLED, reportDownloadProgress } from "../state/downloads";
 import type {
   BaseFilter,
+  BaseOverlay,
   Currency,
   FilterProfile,
   FilterRule,
@@ -77,6 +80,15 @@ const STALE_BASE_TEXT = [
   "",
 ].join("\n");
 
+/** 一份 450 条规则的基础过滤器，用来检查规则列表的滚动和搜索。 */
+const LARGE_BASE: BaseFilter = {
+  kind: "downloaded",
+  source: "neversink",
+  version: "demo",
+  entry: "demo/long-list.filter",
+  name: "NeverSink's filter 2 - 1-REGULAR（长列表演示）",
+};
+
 const BASES: BaseFilter[] = [
   BASE,
   {
@@ -86,6 +98,7 @@ const BASES: BaseFilter[] = [
     entry: "NeverSink's filter 2 - 1-REGULAR.filter",
     name: "NeverSink's filter 2 - 1-REGULAR",
   },
+  LARGE_BASE,
   {
     kind: "subscribed",
     source: "online",
@@ -194,10 +207,21 @@ function profile(league: string, base?: BaseFilter, extra: Partial<FilterProfile
     locale: "cn",
     rules: [...clone(DEFAULT_RULES), ...clone(CUSTOM_RULES)],
     skippedItemIds: ["exalted-orb", "chaos-orb"],
+    overlays: [],
+    editsEnabled: true,
     ...(base ? { baseFilter: base } : {}),
     ...extra,
   };
 }
+
+/** 演示用的几处修改，条件行和 mockBaseline 里对应规则写的一样：有效、改过条件、已关闭、换了基础过滤器而失效、规则没了而失效。 */
+const DEMO_EDITS: BaseOverlay[] = [
+  { id: "edit-divine", baseName: BASE.name, conditions: ['BaseType == "Divine Orb"'], enabled: true, effects: { beam: "Yellow", font: { fontSize: 50, textColor: "255 240 200 255" } } },
+  { id: "edit-conditions", baseName: BASE.name, conditions: ['BaseType == "Exalted Orb" "Chaos Orb"'], enabled: true, conditionLines: ['BaseType == "Exalted Orb" "Chaos Orb"', "AreaLevel >= 60"], effects: {} },
+  { id: "edit-off", baseName: BASE.name, conditions: ['BaseType == "Gold"', "StackSize >= 2000"], enabled: false, hidden: true, effects: {} },
+  { id: "edit-other-base", baseName: "NeverSink's filter 2 - 1-REGULAR", conditions: ['BaseType == "Vaal Orb"', "ItemLevel >= 60"], enabled: true, effects: { beam: "Red" } },
+  { id: "edit-removed", baseName: BASE.name, conditions: ['BaseType == "Mirror Shard"'], enabled: true, effects: { font: { fontSize: 45 } } },
+];
 
 let library: Library = {
   server: "international",
@@ -256,13 +280,40 @@ let library: Library = {
       installed: null,
       status: "",
     },
+    {
+      id: "scheme-6",
+      name: "基础规则修改演示",
+      description: "对基础过滤器里的规则做了几处修改：有效、改过条件、已关闭、失效的都有。",
+      profile: profile("Forbidden Rites", BASE, { overlays: clone(DEMO_EDITS) }),
+      autoRefresh: false,
+      installed: null,
+      status: "",
+    },
+    {
+      id: "scheme-8",
+      name: "基础规则修改已关闭演示",
+      description: "有 5 处修改，但标题栏的总开关是关着的：修改都不生效，批量操作里也没有复制、粘贴和还原。",
+      profile: profile("Runes of Aldur", BASE, { overlays: clone(DEMO_EDITS), editsEnabled: false }),
+      autoRefresh: false,
+      installed: null,
+      status: "",
+    },
+    {
+      id: "scheme-7",
+      name: "长列表演示",
+      description: "基础过滤器里有 450 条规则。",
+      profile: profile("Forbidden Rites", LARGE_BASE, { rules: clone(DEFAULT_RULES) }),
+      autoRefresh: false,
+      installed: null,
+      status: "",
+    },
   ],
 };
 
 /** 描述和后端一样存成一行。 */
 const oneLine = (text: unknown) => String(text).trim().split(/\s+/).join(" ");
 
-let nextId = 6;
+let nextId = 9;
 /** 最近一次解析的分享码里的描述，导入时带给新方案。 */
 let sharedDescription = "";
 /** 演示里的下载是否被取消。 */
@@ -270,39 +321,107 @@ let downloadStopped = false;
 
 const schemeById = (id: unknown) => library.schemes.find((entry) => entry.id === id);
 
-/** 画廊和生成预览读取同一份演示用的基础过滤器，涵盖单一来源、多个来源和无法绑定的预设。 */
+let longList: string | undefined;
+
+/** 450 条规则、30 个分节的基础过滤器，物品取自目录，用来检查规则列表的滚动和搜索。 */
+function longListBaseline() {
+  if (longList) return longList;
+  const items = ITEM_CATALOG.filter((item) => item.matcher.baseType && !item.id.includes(":"));
+  const lines: string[] = ["# NeverSink's Indepth Loot Filter - long list demo", ""];
+  const banner = "#===================================================================================================";
+  let section = -1;
+  for (let index = 0; index < 450; index += 1) {
+    const item = items[index % items.length];
+    const tier = index % 15;
+    if (section !== Math.floor(index / 15)) {
+      section = Math.floor(index / 15);
+      lines.push(banner, `# [[${String(section * 100).padStart(4, "0")}]] ${groupName(item.categoryPath, "cn")} · 第 ${section + 1} 档`, banner);
+    }
+    lines.push(
+      `Show # $type->demo $tier->t${tier + 1}`,
+      `\tBaseType == "${item.matcher.baseType}"`,
+      `\tItemLevel >= ${10 + tier * 5}`,
+      `\tSetFontSize ${30 + tier}`,
+      tier % 3 === 0 ? "\tPlayEffect Blue Temp" : "\tSetBorderColor 120 120 255 255",
+      "",
+    );
+  }
+  lines.push("Show", "\tSetFontSize 32");
+  longList = lines.join("\n");
+  return longList;
+}
+
+/** 画廊、规则表和生成预览读取同一份演示用的基础过滤器，涵盖单一来源、多个来源和无法绑定的预设。 */
 function mockBaseline(base: BaseFilter) {
   if (base.kind === "local") return STALE_BASE_TEXT;
+  if (base.name === LARGE_BASE.name) return longListBaseline();
   const regular = base.kind === "downloaded" && base.entry.endsWith("1-REGULAR.filter");
+  const banner = "#===================================================================================================";
   return [
-    "Show",
+    "# NeverSink's Indepth Loot Filter - for Path of Exile 2 (demo)",
+    "",
+    banner,
+    "# [[2600]] Currency - Regular Currency Tiering",
+    banner,
+    "",
+    "Show # $type->currency $tier->t1",
     '\tBaseType == "Divine Orb"',
     "\tSetFontSize 45",
     regular ? "\tPlayEffect Purple" : "\tPlayEffect Red",
     regular ? "\tMinimapIcon 1 Purple Star" : "\tMinimapIcon 0 Red Star",
     "\tPlayAlertSound 6 300",
     "",
-    "Show",
+    "Show # $type->currency $tier->t2",
     '\tBaseType == "Orb of Annulment"',
     regular ? "\tSetFontSize 38" : "\tSetFontSize 42",
     "\tSetBorderColor 0 240 190 255",
     "\tPlayEffect Green",
     "",
-    "Show",
+    "Show # $type->currency $tier->t3",
     '\tBaseType == "Exalted Orb" "Chaos Orb"',
     regular ? "\tSetFontSize 40" : "\tSetFontSize 44",
     "\tPlayEffect Blue",
     "\tMinimapIcon 1 Blue Diamond",
     "\tPlayAlertSound 3 300",
     "",
-    "Show",
+    "Show # $type->currency $tier->vaal",
     '\tBaseType == "Vaal Orb"',
     "\tItemLevel >= 60",
     "\tSetFontSize 34",
     "\tSetBorderColor 255 140 0 255",
     "",
-    "Show",
+    banner,
+    "# [[0100]] Gold",
+    banner,
     "",
+    "Show # $type->gold $tier->large",
+    '\tBaseType == "Gold"',
+    "\tStackSize >= 2000",
+    "\tSetFontSize 40",
+    "\tPlayEffect Orange",
+    "\tMinimapIcon 1 Yellow Cross",
+    "",
+    "Hide # $type->gold $tier->small",
+    '\tBaseType == "Gold"',
+    "\tSetFontSize 30",
+    "",
+    banner,
+    "# [[2300]] Waystones",
+    banner,
+    "",
+    "Show # $type->waystone $tier->high",
+    '\tClass == "Waystones"',
+    "\tWaystoneTier >= 14",
+    "\tSetFontSize 42",
+    "\tPlayEffect Blue Temp",
+    "",
+    "Show # $type->waystone $tier->rest",
+    '\tClass == "Waystones"',
+    "\tSetFontSize 34",
+    "\tSetBorderColor 120 120 255 255",
+    "",
+    "Show",
+    "\tSetFontSize 32",
   ].join("\n");
 }
 
@@ -318,6 +437,8 @@ const handlers: Record<string, Handler> = {
   local_market: ({ league, server }) => market(String(league), server as GameServer | undefined),
   refresh_market: async () => delay(900),
   base_styles: ({ base }) => inspectBaseFilter(mockBaseline(base as BaseFilter), {}),
+  base_rules: ({ base, profile }) =>
+    inspectBaseRules(mockBaseline(base as BaseFilter), {}, (base as BaseFilter).name, (profile as FilterProfile).overlays ?? []),
   preview: ({ profile: value }) => {
     const profile = value as FilterProfile;
     const baseline = profile.baseFilter ? mockBaseline(profile.baseFilter) : null;

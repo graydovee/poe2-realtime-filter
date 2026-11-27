@@ -97,6 +97,31 @@ const EFFECTS: &[Field] = &[
     field("sound", Kind::Sound),
 ];
 
+const MAX_CONDITIONS: usize = 40;
+pub(super) const MAX_OVERLAYS: usize = 500;
+
+// Revision 3 writes these after the rules. An edit has no ID on the wire; it gets one on import.
+pub(super) const OVERLAY: &[Field] = &[
+    field("baseName", Kind::Text),
+    field(
+        "conditions",
+        Kind::Array {
+            item: &Kind::Text,
+            max: MAX_CONDITIONS,
+        },
+    ),
+    field(
+        "conditionLines",
+        Kind::Array {
+            item: &Kind::Text,
+            max: MAX_CONDITIONS,
+        },
+    ),
+    field("hidden", Kind::Bool),
+    field("enabled", Kind::Bool),
+    field("effects", Kind::Object(EFFECTS)),
+];
+
 const FONT: &[Field] = &[
     field("fontSize", Kind::UInt),
     field("textColor", Kind::Text),

@@ -148,6 +148,23 @@ export type FilterRule = {
   effects: RuleEffects;
 };
 
+/**
+ * 对一条基础规则的修改：只写改过的项，生成时原地替换那条规则的对应部分。
+ * 修改记着建立时的基础过滤器名和那条规则原有的条件行，靠它们在当前基础过滤器里找到对应的规则。
+ */
+export type BaseOverlay = {
+  id: string;
+  baseName: string;
+  /** 那条基础规则规范化后的原有条件行。匹配只看它，改过的条件不影响这条修改对应哪条规则。 */
+  conditions: string[];
+  /** 改过的条件行，整组替换原有的条件。 */
+  conditionLines?: string[];
+  /** 设了就把这条规则改成显示（false）或隐藏（true）。 */
+  hidden?: boolean;
+  enabled: boolean;
+  effects: RuleEffects;
+};
+
 /** 基础过滤器的来源。`imported` 是方案包带进来、存在安装目录里的副本，按基础过滤器表里的 ID 引用。 */
 export type BaseFilter =
   | { kind: "local"; path: string; name: string }
@@ -167,6 +184,10 @@ export type FilterProfile = {
   locale: Locale;
   rules: FilterRule[];
   skippedItemIds: string[];
+  /** 对基础规则的修改。 */
+  overlays: BaseOverlay[];
+  /** 基础规则修改的总开关。关闭时全部修改不生效，编辑器里基础规则只读。 */
+  editsEnabled: boolean;
 };
 
 /** 一套完整特效：光柱 + 地图图标 + 字体 + 音效。 */
@@ -199,6 +220,8 @@ export type SafetyReport = {
 
 export type GeneratedBundle = {
   filterFile: string;
+  /** 末尾的基础过滤器正文，已经应用了生效的修改。没有基础过滤器时是空串。 */
+  baseText: string;
   baselineFile: string;
   fileName: string;
   soundFiles: string[];

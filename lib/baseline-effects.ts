@@ -1,10 +1,10 @@
 import { CLASS_OF_ITEM, DEFAULT_EFFECT_ITEMS, FILTER_ITEMS_BY_ID } from "./data";
+import { ACTION_GROUPS, tokenize, type BlockAction } from "./filter-blocks";
 import type { EffectPreset, ItemDefinition, RuleEffects } from "./types";
 
 export { DEFAULT_EFFECT_ITEMS } from "./data";
 
-type ActionGroup = "beam" | "icon" | "fontSize" | "textColor" | "borderColor" | "backgroundColor" | "builtinSound" | "customSound" | "dropSound" | "dropSoundIfAlert";
-type Action = { key: ActionGroup; command: string; value: string };
+type Action = BlockAction;
 type Probe = { baseType: string; className?: string; gemLevel?: number; rarity?: number; nonUnique?: boolean; currency: boolean };
 type Condition = (item: Probe) => boolean | undefined;
 type Block = { index: number; show: boolean; continue: boolean; baseTypes?: Set<string>; conditions: Condition[]; actions: Action[] };
@@ -14,18 +14,6 @@ export type InheritedStyle = { effects: RuleEffects; actions: string[]; warning?
 /** 样式按参考物品的目录 ID 查找，和应用特效的规则 ID 无关。 */
 export type BaseInspection = { styles: Record<string, InheritedStyle>; presets: EffectPreset[] };
 type AudioReferences = Record<string, string>;
-
-const actionGroups: Record<string, ActionGroup> = {
-  PlayEffect: "beam", MinimapIcon: "icon", SetFontSize: "fontSize", SetTextColor: "textColor",
-  SetBorderColor: "borderColor", SetBackgroundColor: "backgroundColor", PlayAlertSound: "builtinSound",
-  PlayAlertSoundPositional: "builtinSound", CustomAlertSound: "customSound", CustomAlertSoundOptional: "customSound",
-  DisableDropSound: "dropSound", EnableDropSound: "dropSound", DisableDropSoundIfAlertSound: "dropSoundIfAlert",
-  EnableDropSoundIfAlertSound: "dropSoundIfAlert",
-};
-
-function tokenize(line: string): string[] {
-  return (line.match(/"[^"]*"|#[^\r\n]*|[^\s"#]+/g) ?? []).filter((word) => !word.startsWith("#"));
-}
 
 function readBlocks(text: string): Block[] {
   const blocks: Block[] = [];
@@ -38,8 +26,8 @@ function readBlocks(text: string): Block[] {
       blocks.push(current);
     } else if (current) {
       if (command === "Continue") current.continue = true;
-      else if (Object.prototype.hasOwnProperty.call(actionGroups, command)) {
-        current.actions.push({ key: actionGroups[command], command, value: args.join(" ") });
+      else if (Object.prototype.hasOwnProperty.call(ACTION_GROUPS, command)) {
+        current.actions.push({ key: ACTION_GROUPS[command], command, value: args.join(" ") });
       } else if (command === "BaseType" && args[0] === "==" && args.length > 1 && !current.baseTypes) {
         current.baseTypes = new Set(args.slice(1).map(filterName));
       } else current.conditions.push(compileCondition(command, args));
@@ -142,7 +130,7 @@ function catalogProbe(item: ItemDefinition): Probe {
   };
 }
 
-function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects {
+export function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects {
   const latest = new Map(actions.map((action) => [action.key, action]));
   // Build in a fixed order so equivalent effects have the same preset key.
   actions = [...latest.values()].sort((left, right) => left.key.localeCompare(right.key));
@@ -171,9 +159,10 @@ function displayEffects(actions: Action[], audio: AudioReferences): RuleEffects 
   return effects;
 }
 
-/** Treat an unresolved condition as branching. Inherit only when both outcomes agree. */
-function styleFor(blocks: BlockIndex, item: Probe, audio: AudioReferences): InheritedStyle | undefined {
-  type State = { actions: Action[]; show: boolean };
+type State = { actions: Action[]; show: boolean; block?: number };
+
+/** Treat an unresolved condition as branching. The outcome counts only when both outcomes agree. */
+function finalState(blocks: BlockIndex, item: Probe): State | undefined {
   let active: State[] = [{ actions: [], show: false }];
   let result: State | undefined;
   const signature = (state: State) => JSON.stringify([state.show, state.actions.map(({ command, value }) => [command, value]).sort()]);
@@ -202,7 +191,7 @@ function styleFor(blocks: BlockIndex, item: Probe, audio: AudioReferences): Inhe
       if (uncertain) next.set(signature(state), state);
       const actions = new Map(state.actions.map((action) => [action.key, action]));
       for (const action of block.actions) actions.set(action.key, action);
-      const matched = { show: block.show, actions: [...actions.values()] };
+      const matched: State = { show: block.show, actions: [...actions.values()], block: block.index };
       if (block.continue) next.set(signature(matched), matched);
       else if (!finish(matched)) return undefined;
     }
@@ -210,11 +199,29 @@ function styleFor(blocks: BlockIndex, item: Probe, audio: AudioReferences): Inhe
     active = [...next.values()];
   }
   for (const state of active) if (!finish(state)) return undefined;
+  return result;
+}
+
+function styleFor(blocks: BlockIndex, item: Probe, audio: AudioReferences): InheritedStyle | undefined {
+  const result = finalState(blocks, item);
   if (!result?.show) return undefined;
   return {
     effects: displayEffects(result.actions, audio),
     actions: result.actions.map(({ command, value }) => "\t" + command + (value ? " " + value : "")),
   };
+}
+
+/** 在应用了修改的基础过滤器里，找出最终落进这些规则、因此被隐藏的物品。结果不确定的物品不算。 */
+export function hiddenByOverlays(text: string, hiddenBlocks: Set<number>, itemIds: Iterable<string>): ItemDefinition[] {
+  const index = indexBlocks(readBlocks(text));
+  const hidden: ItemDefinition[] = [];
+  for (const itemId of itemIds) {
+    const item = FILTER_ITEMS_BY_ID.get(itemId);
+    if (!canFollowBaselineItem(item)) continue;
+    const final = finalState(index, catalogProbe(item));
+    if (final && !final.show && final.block !== undefined && hiddenBlocks.has(final.block)) hidden.push(item);
+  }
+  return hidden;
 }
 
 function itemStyles(blocks: Block[], audio: AudioReferences, itemIds: Iterable<string>): BaseInspection["styles"] {

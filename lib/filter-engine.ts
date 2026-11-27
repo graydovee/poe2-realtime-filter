@@ -1,14 +1,16 @@
-import { inspectBaseStyles } from "./baseline-effects";
+import { hiddenByOverlays, inspectBaseStyles } from "./baseline-effects";
+import { applyOverlays, overlayWarnings, resolveOverlays, type OverlayState } from "./base-overlays";
 import { CLASS_MATCHES, CLASS_MATCH_BY_ID, CLASS_OF_ITEM, FALLBACK_SNAPSHOT, FILTER_ITEMS_BY_ID, ITEM_CATALOG, marketItemId, type ClassMatch } from "./data";
 import { DROP_KEYS, dropInterval, dropLines, rarityInterval, type Interval } from "./drop-conditions";
+import { parseFilterBlocks, soundLine } from "./filter-blocks";
 import { toExalted } from "./pricing";
 import type {
+  BaseOverlay,
   FilterProfile,
   FilterRule,
   GeneratedBundle,
   ItemDefinition,
   MarketSnapshot,
-  PresetSound,
   PriceRange,
   SafetyReport,
   Strictness,
@@ -57,22 +59,6 @@ export function matcherLines(item: ItemDefinition, withRarity = true): string[] 
   if (withRarity && item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
   if (withRarity && item.matcher.nonUnique) lines.push("\tRarity < Unique");
   return lines;
-}
-
-function soundLine(sound: PresetSound, distinguishCustom: boolean): string {
-  if (sound.type === "builtin") {
-    const command = sound.positional ? "PlayAlertSoundPositional" : "PlayAlertSound";
-    return `\t${command} ${sound.id} ${sound.volume}`;
-  }
-  if (sound.type === "baseline") {
-    const command = sound.optional ? "CustomAlertSoundOptional" : "CustomAlertSound";
-    const name = (distinguishCustom ? "@poe2rf-baseline/" : "") + sound.fileName;
-    const references = name.split(";").map((file, index) => index > 0 && distinguishCustom ? "@poe2rf-baseline/" + file : file).join(";");
-    const alert = `\t${command} ${quote(references)}${sound.volume === undefined ? "" : ` ${sound.volume}`}`;
-    return sound.fallback ? `${soundLine(sound.fallback, distinguishCustom)}\n${alert}` : alert;
-  }
-  const name = (distinguishCustom && sound.type === "custom" ? "@poe2rf-custom/" : "") + sound.fileName;
-  return `\tCustomAlertSound ${quote(name)} 300`;
 }
 
 /** 只输出规则里真正填写的动作；留空 = 交给基础过滤器。 */
@@ -261,6 +247,7 @@ function validateSafety(
   coveredRules: SafetyReport["coveredRules"],
   divineToExalted: number | undefined,
   baselineIssues: string[],
+  editedHidden: Array<{ item: ItemDefinition; exaltedValue?: number }>,
 ): SafetyReport {
   const baseTypes = new Set<string>();
   const classes = new Set<string>();
@@ -269,7 +256,7 @@ function validateSafety(
       (line[1] === "BaseType" ? baseTypes : classes).add(value[1]);
     }
   }
-  const hiddenHighValueItems = hidden
+  const hiddenHighValueItems = [...hidden, ...editedHidden]
     .filter((entry) => (entry.exaltedValue ?? 0) >= (divineToExalted ?? Number.POSITIVE_INFINITY))
     .map((entry) => entry.item.name);
   const exclusionViolations = hidden.filter((entry) => skipped.has(entry.item.id)).map((entry) => entry.item.name);
@@ -393,23 +380,67 @@ export function generateFilter(profile: FilterProfile, baseline: string | null, 
     }
   }
 
+  // 生效的修改原地写进基础过滤器：每条修改对应条件相同的那几条规则。总开关关闭时全部修改按关闭处理。
+  const editsOn = profile.editsEnabled !== false;
+  const overlays = (profile.overlays ?? []).map((overlay) => editsOn ? overlay : { ...overlay, enabled: false });
+  const baseName = profile.baseFilter?.name;
+  const parsed = baseline !== null && overlays.length ? parseFilterBlocks(baseline) : undefined;
+  const states = overlays.length ? resolveOverlays(overlays, baseName, parsed?.blocks ?? []) : new Map<string, OverlayState>();
+  const byBlock = new Map<number, BaseOverlay>();
+  const hiddenBlocks = new Set<number>();
+  let appliedOverlays = 0;
+  let disabledOverlays = 0;
+  let invalidOverlays = 0;
+  for (const overlay of overlays) {
+    if (!overlay.enabled) {
+      disabledOverlays += 1;
+      continue;
+    }
+    const state = states.get(overlay.id);
+    if (state?.state !== "ok") {
+      invalidOverlays += 1;
+      continue;
+    }
+    appliedOverlays += 1;
+    for (const index of state.blocks) {
+      byBlock.set(index, overlay);
+      // 修改把这条规则改成隐藏，或者改了它的条件而它本来就隐藏时，它可能新隐藏掉高价值物品。
+      if ((overlay.hidden ?? !parsed!.blocks[index].show) && (overlay.hidden || overlay.conditionLines !== undefined)) hiddenBlocks.add(index);
+    }
+  }
+  const baseText = parsed && byBlock.size ? applyOverlays(parsed, byBlock) : baseline;
+  warnings.push(...overlayWarnings(overlays, states, baseName));
+  // 改成隐藏的规则会命中高价值物品时，按隐藏了这些物品处理。在替换后的文本上模拟，改过条件的修改也算得准。
+  const editedHidden: Array<{ item: ItemDefinition; exaltedValue?: number }> = [];
+  if (baseline !== null && hiddenBlocks.size && snapshot.rates) {
+    const floor = snapshot.rates.divineToExalted;
+    editedHidden.push(...hiddenByOverlays(baseText ?? "", hiddenBlocks,
+      ITEM_CATALOG.filter((item) => item.priceable && (exaltedValues.get(marketItemId(item)) ?? 0) >= floor).map((item) => item.id))
+      .map((item) => ({ item, exaltedValue: exaltedValues.get(marketItemId(item)) })));
+  }
+
   const header = [
     "# poe2-filter generated overlay",
     standalone ? "# Mode: custom rules" : "# Mode: overlay",
     ...(/^[ -~]+$/.test(league) ? ["# League: " + league] : []),
     ...(!standalone && !options.baselineName ? ["# Strictness: " + profile.strictness] : []),
     "# Rules: " + rules.length + " enabled / " + skipped.size + " skipped items",
+    ...(overlays.length
+      ? ["# Base rule edits: " + appliedOverlays + " applied" + (disabledOverlays ? `, ${disabledOverlays} disabled` : "")
+        + (invalidOverlays ? `, ${invalidOverlays} invalid` : "")]
+      : []),
     "# Market: " + snapshot.source + (options.includeMarketTimestamp === false ? "" : " @ " + snapshot.capturedAt),
     standalone ? "# Unmatched items: game defaults" : "# Safety: Unspecified actions are handled by the base filter.",
     "",
   ].join("\n");
-  const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + (baseline ?? "Show\n");
+  const filterFile = header + "\n" + (overrides.length ? overrides.join("\n\n") + "\n\n" : "") + (baseText ?? "Show\n");
   for (const match of filterFile.matchAll(/^\s*CustomAlertSound(?:Optional)?\s+"([^"\n]+)"/gm)) soundFiles.add(match[1]);
   // 基础过滤器可能和当前游戏版本不兼容。在拼好的最终文本上查，报出的行号才和游戏报的行号一致。
   const baselineIssues = baseline === null ? [] : renamedClassIssues(filterFile);
-  const safetyReport = validateSafety(baselineFile, baseline ?? "", hidden, skipped, warnings, coveredRules, snapshot.rates?.divineToExalted, baselineIssues);
+  const safetyReport = validateSafety(baselineFile, baseText ?? "", hidden, skipped, warnings, coveredRules, snapshot.rates?.divineToExalted, baselineIssues, editedHidden);
   return {
     filterFile,
+    baseText: baseText ?? "",
     baselineFile,
     fileName: "poe2-filter-" + league.toLowerCase().replace(/[^a-z0-9]+/g, "-") + (options.baselineName || standalone ? "" : "-" + BASELINE_NAMES[profile.strictness].toLowerCase()) + ".filter",
     soundFiles: [...soundFiles],

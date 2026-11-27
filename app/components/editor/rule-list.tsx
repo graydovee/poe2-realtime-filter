@@ -25,6 +25,7 @@ import type { FilterRule } from "../../../lib/types";
 import { useAppStore } from "../../state/store";
 import { Button, IconButton } from "../ui/button";
 import { Tooltip } from "../ui/tooltip";
+import { BaseRuleList } from "./base-rule-list";
 import { ruleSummary } from "./rule-summary";
 
 const indexLabel = (rules: FilterRule[], id: string | number) => {
@@ -95,7 +96,9 @@ export function RuleList() {
   const setActiveRuleId = useAppStore((state) => state.setActiveRuleId);
   const moveRule = useAppStore((state) => state.moveRule);
   const addRule = useAppStore((state) => state.addRule);
-  const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
+  const baseSelected = useAppStore((state) => state.activeBase !== null);
+  const showBaseRules = useAppStore((state) => state.showBaseRules);
+  const active = baseSelected ? undefined : rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
   const index = active ? rules.indexOf(active) : -1;
 
   const sensors = useSensors(
@@ -164,6 +167,7 @@ export function RuleList() {
           新增规则
         </Button>
       </div>
+      {showBaseRules && <BaseRuleList />}
     </div>
   );
 }
@@ -174,7 +178,8 @@ export function RuleStrip() {
   const activeRuleId = useAppStore((state) => state.activeRuleId);
   const setActiveRuleId = useAppStore((state) => state.setActiveRuleId);
   const addRule = useAppStore((state) => state.addRule);
-  const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
+  const baseSelected = useAppStore((state) => state.activeBase !== null);
+  const active = baseSelected ? undefined : rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="规则列表">
       {rules.map((rule, index) => (

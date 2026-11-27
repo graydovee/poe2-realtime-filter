@@ -423,10 +423,11 @@ fn expand_filter(
 const BASE_SOUND_PREFIX: &str = "@poe2rf-baseline/";
 const CUSTOM_SOUND_PREFIX: &str = "@poe2rf-custom/";
 
+/// 方案里引用的自定义音效文件名，规则和修改都算。
 fn sound_names(profile: &Value) -> BTreeSet<String> {
-    profile["rules"]
-        .as_array()
+    ["rules", "overlays"]
         .into_iter()
+        .filter_map(|list| profile[list].as_array())
         .flatten()
         .filter_map(|rule| {
             let sound = &rule["effects"]["sound"];
@@ -951,7 +952,7 @@ impl Store {
             self.install(&mut updated, market, None)?;
         } else {
             let baseline = self.load_baseline(base)?;
-            self.prepare_sounds(&baseline.text, Some(&baseline), Some(&updated))?;
+            self.prepare_sounds(&baseline.text, &baseline.text, Some(&baseline), Some(&updated))?;
         }
         updated.status = if install {
             format!("基础过滤器已更新至 {version} · {}", updated.status)
@@ -1061,15 +1062,30 @@ impl Store {
         }
     }
 
-    pub fn base_styles(&self, base: BaseFilter) -> Result<Value> {
-        let baseline = self.load_baseline(&base)?;
-        let audio: BTreeMap<_, _> = Self::base_sound_references(&baseline)
+    /// 基础过滤器里的音效文件：可移植的名字 → 过滤器里写的引用。
+    fn baseline_audio(baseline: &Baseline) -> BTreeMap<String, String> {
+        Self::base_sound_references(baseline)
             .into_iter()
             .filter_map(|(name, raw)| Some((raw?, name)))
-            .collect();
+            .collect()
+    }
+
+    pub fn base_styles(&self, base: BaseFilter) -> Result<Value> {
+        let baseline = self.load_baseline(&base)?;
+        let audio = Self::baseline_audio(&baseline);
         engine::call(
             "baseStyles",
             json!({ "text": baseline.text, "audio": audio }),
+        )
+    }
+
+    /// 基础过滤器里的每一条规则，连同方案里每处修改在它上面的状态。
+    pub fn base_rules(&self, base: BaseFilter, overlays: &Value) -> Result<Value> {
+        let baseline = self.load_baseline(&base)?;
+        let audio = Self::baseline_audio(&baseline);
+        engine::call(
+            "baseRules",
+            json!({ "text": baseline.text, "audio": audio, "baseName": base.name(), "overlays": overlays }),
         )
     }
 
@@ -1146,19 +1162,22 @@ impl Store {
         let baseline = self.baseline(&profile)?;
         let mut result = self.generate(&profile, baseline.as_ref(), market)?;
         let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
-        let (text, _) = self.prepare_sounds(text, baseline.as_ref(), None)?;
+        let base_text = result["baseText"].as_str().ok_or("过滤器正文缺失")?;
+        let (text, _) = self.prepare_sounds(text, base_text, baseline.as_ref(), None)?;
         result["filterFile"] = json!(text);
         Ok(result)
     }
 
+    /// 把生成结果里的音效指令换成按内容散列命名的文件。`base_text` 是结果末尾的基础过滤器正文，
+    /// 规则和修改的自定义音效、引用的基础过滤器音效都带着客户端自己的前缀，按前缀分辨它们。
     fn prepare_sounds(
         &self,
         text: &str,
+        base_text: &str,
         baseline: Option<&Baseline>,
         scheme: Option<&Scheme>,
     ) -> Result<(String, BTreeMap<String, Vec<u8>>)> {
-        let base_text = baseline.map_or("", |base| base.text.as_str());
-        let overlay = text
+        let custom_rules = text
             .strip_suffix(base_text)
             .ok_or("生成结果缺少基础过滤器正文")?;
         let game = match scheme.and_then(|scheme| scheme.installed.as_ref()) {
@@ -1170,7 +1189,7 @@ impl Store {
         let mut assets = BTreeMap::new();
         let mut total = 0;
         let mut output = String::with_capacity(text.len());
-        for (part, is_overlay) in [(overlay, true), (base_text, false)] {
+        for part in [custom_rules, base_text] {
             for line in part.split_inclusive('\n') {
                 let trimmed = line.trim_end_matches(['\r', '\n']);
                 let end = &line[trimmed.len()..];
@@ -1197,18 +1216,13 @@ impl Store {
                 let optional = &captures[2] == "CustomAlertSoundOptional";
                 let mut targets = Vec::new();
                 for name in name.split(';') {
-                    let custom = is_overlay && name.starts_with(CUSTOM_SOUND_PREFIX);
+                    let custom = name.starts_with(CUSTOM_SOUND_PREFIX);
                     let name = if custom {
                         &name[CUSTOM_SOUND_PREFIX.len()..]
                     } else {
                         name
                     };
-                    let key = (
-                        name,
-                        custom,
-                        optional,
-                        is_overlay && name.starts_with(BASE_SOUND_PREFIX),
-                    );
+                    let key = (name, custom, optional, name.starts_with(BASE_SOUND_PREFIX));
                     if !names.contains_key(&key) {
                         let target = if custom && scheme.is_none() {
                             Some(name.to_owned()) // Draft uploads are checked when saving and installing.
@@ -1225,9 +1239,8 @@ impl Store {
                                         )
                                     })
                                     .and_then(|base| {
-                                        let reference = if let Some(portable) = name
-                                            .strip_prefix(BASE_SOUND_PREFIX)
-                                            .filter(|_| is_overlay)
+                                        let reference = if let Some(portable) =
+                                            name.strip_prefix(BASE_SOUND_PREFIX)
                                         {
                                             let map = references.get_or_insert_with(|| {
                                                 Self::base_sound_references(base)
@@ -1311,7 +1324,8 @@ impl Store {
             return Err("规则未通过安全检查，请先查看预览报告".into());
         }
         let text = result["filterFile"].as_str().ok_or("过滤器正文缺失")?;
-        self.prepare_sounds(text, baseline.as_ref(), Some(scheme))
+        let base_text = result["baseText"].as_str().ok_or("过滤器正文缺失")?;
+        self.prepare_sounds(text, base_text, baseline.as_ref(), Some(scheme))
     }
 
     fn filter_path(directory: &Path, name: &str) -> Result<PathBuf> {
@@ -2636,6 +2650,164 @@ mod tests {
             .unwrap_err()
             .contains("重新选择"));
         assert_eq!(fs::read_to_string(&installed).unwrap(), refreshed);
+    }
+
+    #[test]
+    fn custom_sound_names_come_from_rules_and_edits() {
+        let profile = json!({
+            "rules": [
+                {"effects": {"sound": {"type": "custom", "fileName": "a.ogg"}}},
+                {"effects": {"sound": {"type": "builtin", "id": 1, "volume": 100}}}
+            ],
+            "overlays": [{"effects": {"sound": {"type": "custom", "fileName": "b.ogg"}}}]
+        });
+        assert_eq!(
+            sound_names(&profile),
+            BTreeSet::from(["a.ogg".to_string(), "b.ogg".to_string()])
+        );
+    }
+
+    /// 一份带两种音效引用的基础过滤器，和一处改了显示、字号、音效的修改。
+    fn edited(store: &Store) -> (Value, BaseFilter) {
+        let source = store.root.join("fixture.filter");
+        fs::create_dir_all(&store.root).unwrap();
+        fs::write(
+            &source,
+            "Show # gold\n\tBaseType == \"Gold\"\n\tSetFontSize 30\n\tCustomAlertSound \"a b.ogg\" 200\n\nHide\n\tBaseType == \"Chaos Orb\"\n\tCustomAlertSound \"c d.ogg\"\n",
+        )
+        .unwrap();
+        fs::write(store.root.join("a b.ogg"), b"filter sound").unwrap();
+        fs::write(store.root.join("c d.ogg"), b"hidden sound").unwrap();
+        let base = BaseFilter::from_file(&source).unwrap();
+        let mut input = json!({"schemaVersion":2,"locale":"cn","league":"Standard","baseFilter":base,"rules":[],"skippedItemIds":[]});
+        input["overlays"] = json!([
+            {
+                "id": "edit-gold", "baseName": input["baseFilter"]["name"], "conditions": ["BaseType == \"Gold\""],
+                "hidden": true, "enabled": true,
+                "effects": {"font": {"fontSize": 40}, "sound": {"type": "custom", "fileName": "trade.ogg"}}
+            },
+            {"id": "edit-stale", "baseName": input["baseFilter"]["name"], "conditions": ["BaseType == \"Regal Orb\""], "enabled": true, "effects": {}}
+        ]);
+        let base = serde_json::from_value(input["baseFilter"].clone()).unwrap();
+        (input, base)
+    }
+
+    #[test]
+    fn edits_are_written_into_base_rules_with_their_sounds() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let (input, _) = edited(&store);
+        let contents = b"edit sound";
+        let uploaded = BTreeMap::from([(
+            "trade.ogg".into(),
+            base64::engine::general_purpose::STANDARD.encode(contents),
+        )]);
+        let id = store
+            .add(&mut library, "修改基础规则", "", input, uploaded)
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let rules = store
+            .base_rules(
+                serde_json::from_value(scheme.profile["baseFilter"].clone()).unwrap(),
+                &scheme.profile["overlays"],
+            )
+            .unwrap();
+        assert_eq!(rules["rules"].as_array().unwrap().len(), 2);
+        assert_eq!(rules["rules"][0]["hidden"], false);
+        assert_eq!(rules["overlays"]["edit-gold"], json!({ "state": "ok", "blocks": [0] }));
+        assert_eq!(rules["overlays"]["edit-stale"]["state"], "invalid");
+        assert!(rules["overlays"]["edit-stale"]["reason"]
+            .as_str()
+            .unwrap()
+            .contains("找不到条件相同的规则"));
+
+        let preview = store.preview(scheme.profile.clone(), None).unwrap();
+        let preview = preview["filterFile"].as_str().unwrap();
+        assert!(preview.contains("Hide # gold\n\tBaseType == \"Gold\"\n\tSetFontSize 40\n\tCustomAlertSound \"trade.ogg\" 300\n"));
+        // 失效的修改不改原文；基础过滤器自己的音效照常处理。
+        assert!(preview.contains("\n\nHide\n\tBaseType == \"Chaos Orb\"\n\tCustomAlertSound \"poe2rf-"));
+        assert!(!preview.contains("a b.ogg"));
+
+        store.install(Store::get_mut(&mut library, &id).unwrap(), None, None).unwrap();
+        let installed = fs::read_to_string(store.default_game.join("修改基础规则.filter")).unwrap();
+        assert!(installed.contains(&format!("CustomAlertSound \"poe2rf-{}.ogg\" 300", digest(contents))));
+        assert!(installed.contains(&format!("CustomAlertSound \"poe2rf-{}.ogg\"", digest(b"hidden sound"))));
+        assert!(!installed.contains("trade.ogg"));
+    }
+
+    #[test]
+    fn base_rules_without_edits_are_unchanged() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let (mut input, base) = edited(&store);
+        input["overlays"] = json!([]);
+        let id = store
+            .add(&mut library, "原样", "", input.clone(), BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let preview = store.preview(scheme.profile.clone(), None).unwrap();
+        let text = preview["filterFile"].as_str().unwrap();
+        let original = fs::read_to_string(store.root.join("fixture.filter")).unwrap();
+        assert!(text.ends_with(&original.replace("a b.ogg", &format!("poe2rf-{}.ogg", digest(b"filter sound"))).replace("c d.ogg", &format!("poe2rf-{}.ogg", digest(b"hidden sound")))));
+        let rules = store.base_rules(base.clone(), &json!([])).unwrap();
+        assert!(rules["overlays"].as_object().unwrap().is_empty());
+        assert_eq!(rules["rules"][1]["hidden"], true);
+    }
+
+    #[test]
+    fn edits_travel_with_share_codes_and_get_new_ids_on_import() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let (input, _) = edited(&store);
+        let id = store
+            .add(&mut library, "分享修改", "", input, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let code = Store::share(scheme).unwrap();
+        // 这台机器的游戏目录里没有这个名字的基础过滤器，导入后留下名称提示。
+        let imported = store
+            .import(&mut library, &code, Some("导入的修改".into()))
+            .unwrap();
+        let copy = Store::get(&library, &imported).unwrap();
+        let edits = copy.profile["overlays"].as_array().unwrap();
+        assert_eq!(edits.len(), 2);
+        assert_ne!(edits[0]["id"], "edit-gold");
+        assert_eq!(edits[0]["id"].as_str().unwrap().len(), 8);
+        assert_eq!(edits[0]["conditions"], json!(["BaseType == \"Gold\""]));
+        assert_eq!(edits[0]["effects"]["sound"]["fileName"], "trade.ogg");
+        assert_eq!(copy.profile["baseFilter"], Value::Null);
+        assert_eq!(copy.profile["baseFilterHint"], "fixture.filter");
+        assert_eq!(store.missing(copy), vec!["trade.ogg"]);
+    }
+
+    #[test]
+    fn a_switched_off_scheme_leaves_its_base_rules_alone() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let (mut input, _) = edited(&store);
+        input["editsEnabled"] = json!(false);
+        let id = store
+            .add(&mut library, "关闭修改", "", input, BTreeMap::new())
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let preview = store.preview(scheme.profile.clone(), None).unwrap();
+        let text = preview["filterFile"].as_str().unwrap();
+        assert!(text.contains("Show # gold\n\tBaseType == \"Gold\"\n\tSetFontSize 30\n"));
+        assert!(text.contains("# Base rule edits: 0 applied, 2 disabled"));
+        // The switch leaves each edit's own state alone.
+        assert_eq!(scheme.profile["overlays"][0]["enabled"], json!(true));
+        let code = Store::share(scheme).unwrap();
+        let imported = store
+            .import(&mut library, &code, Some("导入的关闭".into()))
+            .unwrap();
+        let copy = Store::get(&library, &imported).unwrap();
+        assert_eq!(copy.profile["editsEnabled"], json!(false));
+        assert_eq!(copy.profile["overlays"].as_array().unwrap().len(), 2);
+        assert_eq!(copy.profile["overlays"][0]["enabled"], json!(true));
     }
 
     #[test]

@@ -2,19 +2,31 @@ import type { StateCreator } from "zustand";
 import { toast } from "sonner";
 
 import type { BaseInspection } from "../../lib/baseline-effects";
+import { blockKey, type BaseRules } from "../../lib/base-overlays";
 import { explain, fileToBase64, local, readSound, type LocalScheme } from "../../lib/desktop";
 import { DEFAULT_PROFILE } from "../../lib/default-profile";
 import { FALLBACK_SNAPSHOT, legacyEffectItemId } from "../../lib/data";
 import { normalizeProfile } from "../../lib/profile";
 import { newRuleId } from "../../lib/rule-id";
 import { customSoundFileName, customSoundOptions } from "../../lib/sound-library";
-import type { BaseFilter, FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot, RuleEffects } from "../../lib/types";
+import type { BaseFilter, BaseOverlay, FilterProfile, FilterRule, GameServer, LeagueCatalog, MarketSnapshot, PresetSound, RuleEffects } from "../../lib/types";
 import { counters } from "./counters";
 import type { AppState } from "./store";
-import type { EditorDialog, Generated, ItemPickerToggle, PickerTarget } from "./types";
+import type { BaseSelection, EditorDialog, Generated, ItemPickerToggle, PickerTarget } from "./types";
 
 type RemovedRule = { rule: FilterRule; index: number; sound?: File };
+type RemovedOverlay = { overlay: BaseOverlay; index: number; sound?: File };
+/** 还原基础规则时去掉的修改，连同它们的自定义音效，供「撤销」恢复。 */
+type RestoredOverlays = { overlays: BaseOverlay[]; sounds: Record<string, File> };
 type RuleAppearance = { itemId: string } | { effects: RuleEffects; presetId?: string; file?: File };
+/** 改一条基础规则时能改的部分。 */
+export type OverlayPatch = Partial<Pick<BaseOverlay, "hidden" | "conditionLines" | "effects">>;
+
+/** 方案里的规则和修改共用一个 ID 空间。 */
+const takenIds = (profile: FilterProfile) => [...profile.rules.map((rule) => rule.id), ...profile.overlays.map((overlay) => overlay.id)];
+/** 特效里写了东西；空对象不算。 */
+const hasEffects = (effects: RuleEffects) => effects.beam !== undefined || effects.icon !== undefined || effects.sound !== undefined
+  || Object.keys(effects.font ?? {}).length > 0;
 
 export function shownRuleEffects(rule: FilterRule, inspection?: BaseInspection): RuleEffects {
   const itemId = rule.baselineEffectItemId;
@@ -43,7 +55,7 @@ export type EditorState = {
   dirty: boolean;
   /** 保存或读取方案期间为真，此时整个编辑器不可操作。 */
   schemeBusy: boolean;
-  /** 尚未保存的自定义音效文件，按规则 id 索引。 */
+  /** 尚未保存的自定义音效文件，按规则和修改的 id 索引。 */
   customSounds: Record<string, File>;
   activeRuleId: string | undefined;
   baseInspection: BaseInspection | undefined;
@@ -65,6 +77,17 @@ export type EditorState = {
   presetGalleryOpen: boolean;
   /** 最近删除的规则，供「撤销」恢复。 */
   lastRemoved: RemovedRule | null;
+  /** 选中的基础规则或失效的修改；选中自定义规则时为空。 */
+  activeBase: BaseSelection | null;
+  /** 基础过滤器里的规则表。打开开关或方案有修改时读取。 */
+  baseRules: BaseRules | undefined;
+  baseRulesError: string;
+  /** 复制的基础规则修改。离开编辑器后仍保留，可以粘贴到别的方案。 */
+  overlayClipboard: Array<{ overlay: BaseOverlay; file?: File }> | null;
+  /** 最近删除的修改，供「撤销」恢复。 */
+  lastRemovedOverlay: RemovedOverlay | null;
+  /** 最近一次还原基础规则时去掉的修改，供「撤销」恢复。 */
+  lastRestoredBaseRules: RestoredOverlays | null;
 };
 
 export type EditorActions = {
@@ -78,6 +101,25 @@ export type EditorActions = {
   /** 把当前规则的选择向前（负数）或向后（正数）移动一位。 */
   selectRule: (delta: number) => void;
   setActiveRuleId: (id: string | undefined) => void;
+  setActiveBase: (selection: BaseSelection | null) => void;
+  /** 把基础规则的选中向前（负数）或向后（正数）移动一条。 */
+  selectBaseRule: (delta: number) => void;
+  loadBaseRules: () => Promise<void>;
+  /** 改一条基础规则：按它原有的条件找到或建立修改；所有改动都清掉时删除修改。 */
+  editBaseRule: (index: number, patch: OverlayPatch) => void;
+  updateOverlay: (id: string, patch: Partial<BaseOverlay>) => void;
+  removeOverlay: (id: string) => void;
+  undoRemoveOverlay: () => void;
+  setOverlaySound: (id: string, file: File) => void;
+  pickOverlaySound: (id: string, option: { fileName: string; file: File }) => void;
+  copyOverlays: () => void;
+  /** 同一条基础规则的修改覆盖本方案原有的，其余追加。返回粘贴的数量和其中在当前基础过滤器上不生效的数量。 */
+  pasteOverlays: () => { pasted: number; invalid: number } | null;
+  /** 基础规则修改的总开关：关闭时全部修改不生效，编辑器里基础规则只读。 */
+  setEditsEnabled: (enabled: boolean) => void;
+  /** 还原基础规则：去掉方案里对基础规则的全部修改，记下来供「撤销」恢复。返回去掉的数量。 */
+  restoreBaseRules: () => number;
+  undoRestoreBaseRules: () => void;
   toggleSkipped: (toggle: ItemPickerToggle) => void;
   clearSkipped: () => void;
   setRuleAppearance: (id: string, appearance: RuleAppearance) => void;
@@ -131,6 +173,12 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   picker: null,
   presetGalleryOpen: false,
   lastRemoved: null,
+  activeBase: null,
+  baseRules: undefined,
+  baseRulesError: "",
+  overlayClipboard: null,
+  lastRemovedOverlay: null,
+  lastRestoredBaseRules: null,
 
   selectLeague: (league) => {
     counters.request += 1;
@@ -165,6 +213,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     set((state) => ({
       dirty: true,
       activeRuleId: id,
+      activeBase: null,
       profile: {
         ...state.profile,
         rules: [
@@ -211,6 +260,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
         profile: { ...state.profile, rules },
         customSounds: removed.sound ? { ...state.customSounds, [removed.rule.id]: removed.sound } : state.customSounds,
         activeRuleId: removed.rule.id,
+        activeBase: null,
         lastRemoved: null,
       };
     }),
@@ -233,7 +283,218 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       return next ? { activeRuleId: next.id } : state;
     }),
 
-  setActiveRuleId: (activeRuleId) => set({ activeRuleId }),
+  setActiveRuleId: (activeRuleId) => set({ activeRuleId, activeBase: null }),
+
+  setActiveBase: (activeBase) => set({ activeBase }),
+
+  selectBaseRule: (delta) =>
+    set((state) => {
+      if (state.activeBase?.kind !== "rule") return state;
+      const next = state.activeBase.index + delta;
+      return next >= 0 && next < (state.baseRules?.rules.length ?? 0) ? { activeBase: { kind: "rule", index: next } } : state;
+    }),
+
+  loadBaseRules: async () => {
+    const base = get().profile.baseFilter;
+    const request = ++counters.baseRules;
+    set({ baseRules: undefined, baseRulesError: "" });
+    if (!base) return;
+    try {
+      const rules = await local<BaseRules>("base_rules", { base, profile: get().profile });
+      if (request !== counters.baseRules) return;
+      // 重新读取后原来的序号可能已经不存在。
+      const activeBase = get().activeBase;
+      set({
+        baseRules: rules,
+        activeBase: activeBase?.kind === "rule" && !rules.rules[activeBase.index] ? null : activeBase,
+      });
+    } catch (cause) {
+      if (request === counters.baseRules) set({ baseRulesError: explain(cause) || "无法读取基础过滤器的规则。" });
+    }
+  },
+
+  editBaseRule: (index, patch) =>
+    set((state) => {
+      const rule = state.baseRules?.rules[index];
+      const base = state.profile.baseFilter;
+      if (!rule || !base || state.profile.editsEnabled === false) return state;
+      const overlays = state.profile.overlays;
+      // 规则表是读取时的快照，修改按规则原有的条件来找，不靠快照里记的对应关系。
+      const key = blockKey(rule.conditions);
+      const existing = overlays.find((overlay) => blockKey(overlay.conditions) === key);
+      const edit: BaseOverlay = {
+        id: existing?.id ?? newRuleId(takenIds(state.profile)),
+        baseName: existing?.baseName ?? base.name,
+        conditions: existing?.conditions ?? [...rule.conditions],
+        enabled: existing?.enabled ?? true,
+        hidden: existing?.hidden,
+        conditionLines: existing?.conditionLines,
+        effects: existing?.effects ?? {},
+        ...patch,
+      };
+      // 和基础规则原样相同的项不算修改。
+      if (edit.hidden === rule.hidden) delete edit.hidden;
+      if (edit.conditionLines && blockKey(edit.conditionLines) === key) delete edit.conditionLines;
+      const changed = edit.hidden !== undefined || edit.conditionLines !== undefined || hasEffects(edit.effects);
+      const customSounds = { ...state.customSounds };
+      if (existing && !changed) delete customSounds[existing.id];
+      return {
+        dirty: true,
+        customSounds,
+        profile: {
+          ...state.profile,
+          overlays: [...overlays.filter((overlay) => overlay !== existing), ...(changed ? [edit] : [])],
+        },
+      };
+    }),
+
+  updateOverlay: (id, patch) =>
+    set((state) => ({
+      dirty: true,
+      profile: { ...state.profile, overlays: state.profile.overlays.map((overlay) => overlay.id === id ? { ...overlay, ...patch } : overlay) },
+    })),
+
+  removeOverlay: (id) =>
+    set((state) => {
+      const index = state.profile.overlays.findIndex((overlay) => overlay.id === id);
+      if (index < 0) return state;
+      const customSounds = { ...state.customSounds };
+      const sound = customSounds[id];
+      delete customSounds[id];
+      return {
+        dirty: true,
+        profile: { ...state.profile, overlays: state.profile.overlays.filter((overlay) => overlay.id !== id) },
+        customSounds,
+        activeBase: state.activeBase?.kind === "edit" && state.activeBase.id === id ? null : state.activeBase,
+        lastRemovedOverlay: { overlay: state.profile.overlays[index], index, sound },
+      };
+    }),
+
+  undoRemoveOverlay: () =>
+    set((state) => {
+      const removed = state.lastRemovedOverlay;
+      if (!removed) return state;
+      const overlays = [...state.profile.overlays];
+      overlays.splice(Math.min(removed.index, overlays.length), 0, removed.overlay);
+      return {
+        dirty: true,
+        profile: { ...state.profile, overlays },
+        customSounds: removed.sound ? { ...state.customSounds, [removed.overlay.id]: removed.sound } : state.customSounds,
+        lastRemovedOverlay: null,
+      };
+    }),
+
+  setOverlaySound: (id, file) => {
+    const state = get();
+    const overlay = state.profile.overlays.find((entry) => entry.id === id);
+    if (!file || !overlay || state.profile.editsEnabled === false) return;
+    const existing = customSoundOptions(state.profile.rules, state.customSounds, state.profile.overlays.filter((entry) => entry.id !== id));
+    const fileName = customSoundFileName(file, existing);
+    const picked = existing.find((option) => option.fileName === fileName)?.file ?? file;
+    set({
+      dirty: true,
+      customSounds: { ...state.customSounds, [id]: picked },
+      profile: {
+        ...state.profile,
+        overlays: state.profile.overlays.map((entry) =>
+          entry.id === id ? { ...entry, effects: { ...entry.effects, sound: { type: "custom", fileName } } } : entry),
+      },
+    });
+  },
+
+  /** 在下拉里选一个方案里已有的自定义音效，给一处修改用，名字和文件都照原样用。 */
+  pickOverlaySound: (id, option) =>
+    set((state) => ({
+      dirty: true,
+      customSounds: { ...state.customSounds, [id]: option.file },
+      profile: {
+        ...state.profile,
+        overlays: state.profile.overlays.map((entry) =>
+          entry.id === id ? { ...entry, effects: { ...entry.effects, sound: { type: "custom", fileName: option.fileName } } } : entry),
+      },
+    })),
+
+  copyOverlays: () =>
+    set((state) => ({
+      overlayClipboard: state.profile.overlays.map((overlay) => ({
+        overlay: structuredClone(overlay),
+        file: overlay.effects.sound?.type === "custom" ? state.customSounds[overlay.id] : undefined,
+      })),
+    })),
+
+  pasteOverlays: () => {
+    const state = get();
+    const clipboard = state.overlayClipboard;
+    if (!clipboard?.length || state.profile.editsEnabled === false) return null;
+    const overlays = [...state.profile.overlays];
+    const customSounds = { ...state.customSounds };
+    for (const { overlay, file } of clipboard) {
+      const index = overlays.findIndex((entry) => blockKey(entry.conditions) === blockKey(overlay.conditions));
+      const id = newRuleId([...state.profile.rules.map((rule) => rule.id), ...overlays.map((entry) => entry.id)]);
+      if (index >= 0) delete customSounds[overlays[index].id];
+      const pasted = { ...structuredClone(overlay), id };
+      if (file) {
+        // 方案里已经有同名但内容不同的音效时，粘贴来的另起名字，两边的音效互不覆盖。
+        const fileName = customSoundFileName(file, customSoundOptions(state.profile.rules, customSounds, overlays.filter((_, at) => at !== index)));
+        if (pasted.effects.sound?.type === "custom") pasted.effects.sound.fileName = fileName;
+        customSounds[id] = file;
+      }
+      if (index >= 0) overlays[index] = pasted;
+      else overlays.push(pasted);
+    }
+    set({ dirty: true, customSounds, profile: { ...state.profile, overlays } });
+    const base = state.profile.baseFilter;
+    const known = state.baseRules && new Set(state.baseRules.rules.map((rule) => blockKey(rule.conditions)));
+    const invalid = clipboard.filter(({ overlay }) =>
+      !base || overlay.baseName !== base.name || Boolean(known && !known.has(blockKey(overlay.conditions)))).length;
+    if (base) void get().loadBaseRules();
+    return { pasted: clipboard.length, invalid };
+  },
+
+  setEditsEnabled: (enabled) => get().update("editsEnabled", enabled),
+
+  restoreBaseRules: () => {
+    const state = get();
+    const overlays = state.profile.overlays;
+    if (!overlays.length) return 0;
+    const customSounds = { ...state.customSounds };
+    const sounds: Record<string, File> = {};
+    for (const overlay of overlays) {
+      const file = customSounds[overlay.id];
+      if (file) sounds[overlay.id] = file;
+      delete customSounds[overlay.id];
+    }
+    set({
+      dirty: true,
+      customSounds,
+      profile: { ...state.profile, overlays: [] },
+      // 选中的失效修改已经不在了。
+      activeBase: state.activeBase?.kind === "edit" ? null : state.activeBase,
+      lastRestoredBaseRules: { overlays, sounds },
+      lastRemovedOverlay: null,
+    });
+    return overlays.length;
+  },
+
+  undoRestoreBaseRules: () => {
+    const state = get();
+    const restored = state.lastRestoredBaseRules;
+    if (!restored) return;
+    // 还原之后又给同一条规则建了修改的，保留新的。
+    const current = state.profile.overlays;
+    const overlays = restored.overlays.filter((overlay) => !current.some((entry) => blockKey(entry.conditions) === blockKey(overlay.conditions)));
+    const customSounds = { ...state.customSounds };
+    for (const overlay of overlays) {
+      const file = restored.sounds[overlay.id];
+      if (file) customSounds[overlay.id] = file;
+    }
+    set({
+      dirty: true,
+      profile: { ...state.profile, overlays: [...current, ...overlays] },
+      customSounds,
+      lastRestoredBaseRules: null,
+    });
+  },
 
   toggleSkipped: ({ ids, checked }) =>
     set((state) => {
@@ -275,10 +536,11 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     const rule = state.profile.rules.find((entry) => entry.id === id);
     if (!file || !rule || ruleEffectsPending(rule, state)) return;
     const effects = shownRuleEffects(rule, state.baseInspection);
-    // 和别的规则已经在用的音效同名时：内容相同就共用那一份，内容不同就另起一个名字，两边的音效互不覆盖。
+    // 和方案里别的规则、修改已经在用的音效同名时：内容相同就共用那一份，内容不同就另起一个名字，两边的音效互不覆盖。
     const existing = customSoundOptions(
       state.profile.rules.filter((entry) => entry.id !== id),
       state.customSounds,
+      state.profile.overlays,
     );
     const fileName = customSoundFileName(file, existing);
     const picked = existing.find((option) => option.fileName === fileName)?.file ?? file;
@@ -301,7 +563,10 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       dirty: true,
       baseInspection: undefined,
       baseStylesError: "",
+      baseRules: undefined,
+      baseRulesError: "",
       baseRevision: state.baseRevision + 1,
+      activeBase: null,
       profile: { ...state.profile, baseFilter: base, baseFilterHint: undefined },
     }));
   },
@@ -361,22 +626,23 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     const missing = new Set<string>();
     if (scheme && draft) {
       const reads = new Map<string, Promise<File>>();
-      await Promise.all(
-        draft.rules.map(async (rule) => {
-          const sound = rule.baselineEffectItemId ? undefined : rule.effects.sound;
-          if (sound?.type !== "custom") return;
-          let file = reads.get(sound.fileName);
-          if (!file) {
-            file = readSound(sound.fileName, scheme.id);
-            reads.set(sound.fileName, file);
-          }
-          try {
-            soundFiles[rule.id] = await file;
-          } catch {
-            missing.add(sound.fileName);
-          }
-        }),
-      );
+      const read = async (id: string, sound: PresetSound | undefined) => {
+        if (sound?.type !== "custom") return;
+        let file = reads.get(sound.fileName);
+        if (!file) {
+          file = readSound(sound.fileName, scheme.id);
+          reads.set(sound.fileName, file);
+        }
+        try {
+          soundFiles[id] = await file;
+        } catch {
+          missing.add(sound.fileName);
+        }
+      };
+      await Promise.all([
+        ...draft.rules.map((rule) => read(rule.id, rule.baselineEffectItemId ? undefined : rule.effects.sound)),
+        ...draft.overlays.map((overlay) => read(overlay.id, overlay.effects.sound)),
+      ]);
     }
     counters.request += 1;
     counters.inspection += 1;
@@ -395,7 +661,12 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
         : { ...structuredClone(DEFAULT_PROFILE), server: target, league, originalLeague: league },
       customSounds: soundFiles,
       activeRuleId: undefined,
+      activeBase: null,
       lastRemoved: null,
+      lastRemovedOverlay: null,
+      lastRestoredBaseRules: null,
+      baseRules: undefined,
+      baseRulesError: "",
       baseFilterOpen: false,
       generated: null,
       previewOpen: false,
@@ -419,9 +690,11 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     try {
       const uploads: Record<string, string> = {};
       let bytes = 0;
-      for (const rule of profile.rules) {
-        const sound = rule.effects.sound;
-        const file = customSounds[rule.id];
+      for (const { id, sound } of [
+        ...profile.rules.filter((rule) => !rule.baselineEffectItemId).map((rule) => ({ id: rule.id, sound: rule.effects.sound })),
+        ...profile.overlays.map((overlay) => ({ id: overlay.id, sound: overlay.effects.sound })),
+      ]) {
+        const file = customSounds[id];
         if (sound?.type !== "custom" || !file || Object.prototype.hasOwnProperty.call(uploads, sound.fileName)) continue;
         bytes += file.size;
         if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
@@ -474,6 +747,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       previewOpen: false,
       previewBusy: false,
       dirty: false,
+      activeBase: null,
       editorDialog: null,
       picker: null,
       presetGalleryOpen: false,

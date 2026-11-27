@@ -2,10 +2,11 @@ import { toExalted } from "../lib/pricing";
 import { tencentCatalog, tencentSnapshot } from "../worker/tencent-market";
 import { generateFilter } from "../lib/filter-engine";
 import { inspectBaseFilter } from "../lib/baseline-effects";
+import { inspectBaseRules } from "../lib/base-overlays";
 import { FALLBACK_SNAPSHOT, ITEM_CATALOG, shareCatalog } from "../lib/data";
 import { normalizeLeague } from "../lib/profile";
 import { validateProfile } from "../lib/profile-validation";
-import type { LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
+import type { BaseOverlay, LeagueCatalog, LeagueOption, MarketSnapshot } from "../lib/types";
 import { internationalSnapshot } from "../worker/international-market";
 import { NINJA_TYPES } from "../worker/market-adapter.mjs";
 
@@ -32,6 +33,9 @@ const api = {
   tencentSnapshot: (input: Parameters<typeof tencentSnapshot>[0]) => tencentSnapshot(input, ITEM_CATALOG),
   validate: validateProfile,
   baseStyles: ({ text, audio }: { text: string; audio: Record<string, string> }) => inspectBaseFilter(text, audio),
+  // 草稿里的修改可以还没填完，这里只读它的结构，不跑方案校验。
+  baseRules: ({ text, audio, baseName, overlays }: { text: string; audio: Record<string, string>; baseName: string; overlays: unknown }) =>
+    inspectBaseRules(text, audio, baseName, Array.isArray(overlays) ? overlays as BaseOverlay[] : []),
   requiresMarket: (input: unknown) => validateProfile(input).rules.some((rule) => rule.enabled && rule.target.priceEnabled !== false && Boolean(rule.target.range)),
   generate: ({ profile, baseline, baselineName, market }: { profile: unknown; baseline: string | null; baselineName: string | null; market?: MarketSnapshot }) => {
     const valid = validateProfile(profile);

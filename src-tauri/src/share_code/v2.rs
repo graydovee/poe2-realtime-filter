@@ -10,6 +10,7 @@ use super::{
     ShareDecoder, ShareEncoder, INFLATED_TOO_LARGE, MAX_JSON, MAX_PAYLOAD, SHARE_TOO_LARGE,
 };
 use crate::engine::Result;
+use serde_json::Value;
 
 const PREFIX: &str = "POE2F2";
 const UNSUPPORTED_HEADER: &str = "不支持的分享码格式、正文版本或压缩算法，请升级客户端";
@@ -27,9 +28,29 @@ struct BodyCodec {
     unpack: fn(&[u8]) -> Result<Share>,
 }
 
-// Read every released layout. Select the export layout separately.
-const BODY_CODECS: &[&BodyCodec] = &[&positional::CODEC, &positional::DESCRIBED_CODEC];
-const EXPORT_BODY: &BodyCodec = &positional::DESCRIBED_CODEC;
+// Read every released layout.
+const BODY_CODECS: &[&BodyCodec] = &[
+    &positional::CODEC,
+    &positional::DESCRIBED_CODEC,
+    &positional::EDITED_CODEC,
+];
+
+/// The writer uses the oldest revision that carries the scheme. Only a scheme with edits of
+/// base filter rules, or with their switch written off, needs revision 3; every other scheme
+/// stays on revision 2.
+fn export_body(share: &Share) -> &'static BodyCodec {
+    let edits = share
+        .profile
+        .get("overlays")
+        .and_then(Value::as_array)
+        .is_some_and(|edits| !edits.is_empty());
+    let switched_off = share.profile.get("editsEnabled") == Some(&Value::Bool(false));
+    if edits || switched_off {
+        &positional::EDITED_CODEC
+    } else {
+        &positional::DESCRIBED_CODEC
+    }
+}
 
 pub(super) struct Codec;
 
@@ -55,8 +76,8 @@ impl ShareDecoder for Codec {
 
 impl ShareEncoder for Codec {
     fn encode(&self, share: &Share) -> Result<String> {
-        let bytes = pack_body(share)?;
-        encode_shortest(&bytes, EXPORT_BODY.version, positional::catalog_version()?)
+        let (version, bytes) = pack_body(share)?;
+        encode_shortest(&bytes, version, positional::catalog_version()?)
     }
 }
 
@@ -68,16 +89,17 @@ fn body_codec(version: BodyVersion) -> Result<&'static BodyCodec> {
         .ok_or_else(|| UNSUPPORTED_HEADER.into())
 }
 
-fn pack_body(share: &Share) -> Result<Vec<u8>> {
+fn pack_body(share: &Share) -> Result<(BodyVersion, Vec<u8>)> {
     check_json_size(share, SHARE_TOO_LARGE)?;
     if let Some(server) = share.profile.get("server") {
         validate_server(server)?;
     }
-    let bytes = (EXPORT_BODY.pack)(share)?;
+    let body = export_body(share);
+    let bytes = (body.pack)(share)?;
     if bytes.len() > MAX_JSON {
         return Err(SHARE_TOO_LARGE.into());
     }
-    Ok(bytes)
+    Ok((body.version, bytes))
 }
 
 fn encode_shortest(bytes: &[u8], version: BodyVersion, catalog: u32) -> Result<String> {

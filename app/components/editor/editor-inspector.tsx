@@ -2,6 +2,9 @@
 
 import { scrollToModule } from "../../hooks/navigation";
 import { requestLeaveEditor } from "../../hooks/use-shortcuts";
+import { blockKey } from "../../../lib/base-overlays";
+import { useActiveEntry } from "../../state/active-entry";
+import { effectiveRule, useBaseEdits } from "../../state/base-edits";
 import { ruleEffectsPending, shownRuleEffects } from "../../state/editor";
 import { useAppStore } from "../../state/store";
 import { SoundPreviewButton } from "../sound-preview";
@@ -16,8 +19,11 @@ type SummaryRow = { label: string; value: string; warning?: boolean; jump: () =>
 /** 方案摘要：每一行都能跳到对应的模块。 */
 function Summary() {
   const profile = useAppStore((state) => state.profile);
+  const baseRules = useAppStore((state) => state.baseRules);
   const setBaseFilterOpen = useAppStore((state) => state.setBaseFilterOpen);
   const rules = profile.rules ?? [];
+  const edits = profile.overlays ?? [];
+  const invalidEdits = (baseRules ? Object.values(baseRules.overlays) : []).filter((status) => status.state === "invalid").length;
   const jumpToBase = () => {
     setBaseFilterOpen(true);
     scrollToModule("base");
@@ -46,6 +52,17 @@ function Summary() {
       jump: () => scrollToModule("rules"),
     },
   ];
+  if (edits.length) {
+    const editsOn = profile.editsEnabled !== false;
+    rows.push({
+      label: "基础规则修改",
+      value: editsOn
+        ? `${edits.length} 处 · 启用 ${edits.filter((edit) => edit.enabled).length}` + (invalidEdits ? ` · ${invalidEdits} 处不生效` : "")
+        : `${edits.length} 处 · 已关闭`,
+      warning: editsOn && invalidEdits > 0,
+      jump: () => scrollToModule("rules"),
+    });
+  }
   if (profile.baseFilter) {
     rows.push({ label: "跳过物品", value: `${profile.skippedItemIds.length} 项`, jump: jumpToBase });
   }
@@ -73,26 +90,32 @@ function Summary() {
   );
 }
 
-/** 编辑器的检查器：当前规则在游戏里的实时效果、方案摘要，以及保存 / 预览 / 取消。 */
+/** 编辑器的检查器：当前选中条目在游戏里的实时效果、方案摘要，以及保存 / 预览 / 取消。 */
 export function EditorInspector() {
-  const rules = useAppStore((state) => state.profile.rules);
-  const activeRuleId = useAppStore((state) => state.activeRuleId);
   const base = useAppStore((state) => state.profile.baseFilter);
   const baseInspection = useAppStore((state) => state.baseInspection);
   const customSounds = useAppStore((state) => state.customSounds);
+  const activeBase = useAppStore((state) => state.activeBase);
   const saveError = useAppStore((state) => state.saveError);
   const schemeBusy = useAppStore((state) => state.schemeBusy);
   const previewBusy = useAppStore((state) => state.previewBusy);
   const requestSave = useAppStore((state) => state.requestSave);
   const generate = useAppStore((state) => state.generate);
 
-  const active = rules.find((rule) => rule.id === activeRuleId) ?? rules[0];
+  const { rule: active, base: baseRule, baseSelected } = useActiveEntry();
+  const byKey = useBaseEdits();
+  const editsOn = useAppStore((state) => state.profile.editsEnabled !== false);
+  const edit = baseRule ? byKey.get(blockKey(baseRule.conditions)) : undefined;
+  const baseView = baseRule ? effectiveRule(baseRule, edit, editsOn) : undefined;
   const awaitingEffects = useAppStore((state) => Boolean(active && ruleEffectsPending(active, state)));
   const sourceId = active?.baselineEffectItemId;
   const sourceStyle = sourceId ? baseInspection?.styles[sourceId] : undefined;
   const previewBase = sourceId && (!sourceStyle || sourceStyle.warning) ? undefined : base;
   const shownEffects = active ? shownRuleEffects(active, baseInspection) : {};
-  const customFile = active && shownEffects.sound?.type === "custom" ? customSounds[active.id] : undefined;
+  const sound = baseSelected ? baseView?.effects.sound : shownEffects.sound;
+  const customFile = baseSelected
+    ? edit && baseView?.effects.sound?.type === "custom" ? customSounds[edit.id] : undefined
+    : active && shownEffects.sound?.type === "custom" ? customSounds[active.id] : undefined;
 
   return (
     <div className="flex h-full flex-col">
@@ -100,18 +123,37 @@ export function EditorInspector() {
         <section aria-label="实时预览" className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-xs font-semibold text-ink-muted">实时预览</h3>
-            {active && <SoundPreviewButton sound={shownEffects.sound} file={customFile} base={base} />}
+            {(active || baseView) && <SoundPreviewButton sound={sound} file={customFile} base={base} />}
           </div>
-          {sourceId && <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">特效来源 · {effectSourceLabel(sourceId)}</p>}
-          {awaitingEffects ? (
-            <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器特效…</p>
-          ) : active ? (
-            <>
-              <LootScene effects={shownEffects} label={active.name || "示例物品"} />
-              <EffectSummary effects={shownEffects} base={previewBase} />
-            </>
+          {baseSelected ? (
+            activeBase?.kind === "edit" ? (
+              <p className="text-sm text-ink-muted">选中的是一处失效的修改，它不生效。</p>
+            ) : baseView ? (
+              baseView.hidden ? (
+                <p className="text-sm text-ink-muted">这条规则隐藏命中的物品，没有光柱和地图图标。</p>
+              ) : (
+                <>
+                  <LootScene effects={baseView.effects} label={baseRule?.label ?? ""} />
+                  <EffectSummary effects={baseView.effects} base={editsOn && edit ? base : undefined} />
+                </>
+              )
+            ) : (
+              <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器的规则…</p>
+            )
           ) : (
-            <EmptyState compact title="还没有规则" description="新增一条规则后，这里会显示它在游戏里的掉落效果。" />
+            <>
+              {sourceId && <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">特效来源 · {effectSourceLabel(sourceId)}</p>}
+              {awaitingEffects ? (
+                <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器特效…</p>
+              ) : active ? (
+                <>
+                  <LootScene effects={shownEffects} label={active.name || "示例物品"} />
+                  <EffectSummary effects={shownEffects} base={previewBase} />
+                </>
+              ) : (
+                <EmptyState compact title="还没有规则" description="新增一条规则后，这里会显示它在游戏里的掉落效果。" />
+              )}
+            </>
           )}
         </section>
         <Separator orientation="horizontal" className="my-0" />

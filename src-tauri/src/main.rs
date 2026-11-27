@@ -579,6 +579,15 @@ async fn base_styles(app: tauri::AppHandle, base: BaseFilter) -> Result<Value> {
 }
 
 #[tauri::command]
+async fn base_rules(app: tauri::AppHandle, base: BaseFilter, profile: Value) -> Result<Value> {
+    on_worker(move || {
+        let overlays = profile["overlays"].clone();
+        app.state::<Desktop>().store.base_rules(base, &overlays)
+    })
+    .await
+}
+
+#[tauri::command]
 async fn preview(app: tauri::AppHandle, profile: Value) -> Result<Value> {
     on_worker(move || {
         let state = app.state::<Desktop>();
@@ -1201,6 +1210,7 @@ fn main() {
             base_download_offers,
             scheme_download_base,
             base_styles,
+            base_rules,
             preview,
             scheme_save,
             scheme_copy,

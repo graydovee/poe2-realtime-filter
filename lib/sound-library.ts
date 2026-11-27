@@ -1,4 +1,4 @@
-import type { FilterRule } from "./types";
+import type { BaseOverlay, FilterRule } from "./types";
 
 /** 音效文件定名时用得到的部分。 */
 export type SoundFile = { name: string; size: number };
@@ -8,15 +8,19 @@ export function safeSoundName(value: string): string {
   return value.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-/** 方案里各条规则正在使用的自定义音效，按文件名去重；别的规则可以直接选。 */
+/** 方案里各条规则和对基础规则的修改正在使用的自定义音效，按文件名去重；别的规则、修改可以直接选。 */
 export function customSoundOptions<T extends SoundFile>(
   rules: FilterRule[],
   files: Record<string, T>,
+  overlays: BaseOverlay[] = [],
 ): Array<{ fileName: string; file: T }> {
   const options = new Map<string, T>();
-  for (const rule of rules) {
-    const sound = rule.baselineEffectItemId ? undefined : rule.effects.sound;
-    const file = files[rule.id];
+  const used = [
+    ...rules.map((rule) => ({ id: rule.id, sound: rule.baselineEffectItemId ? undefined : rule.effects.sound })),
+    ...overlays.map((overlay) => ({ id: overlay.id, sound: overlay.effects.sound })),
+  ];
+  for (const { id, sound } of used) {
+    const file = files[id];
     if (sound?.type === "custom" && file && !options.has(sound.fileName)) options.set(sound.fileName, file);
   }
   return [...options].map(([fileName, file]) => ({ fileName, file }));

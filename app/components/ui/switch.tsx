@@ -5,7 +5,7 @@ import * as SwitchPrimitive from "@radix-ui/react-switch";
 
 import { cn } from "../../../lib/cn";
 
-/** 开关 + 文字标签。禁用时轨道改为虚线描边，状态说明保持正常对比度。 */
+/** 开关 + 文字标签。禁用时轨道改为虚线描边，状态说明保持正常对比度。`title` 是悬停时的完整说明。 */
 export function Switch({
   checked,
   onCheckedChange,
@@ -13,6 +13,7 @@ export function Switch({
   className,
   disabled,
   describedBy,
+  title,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
@@ -20,10 +21,11 @@ export function Switch({
   className?: string;
   disabled?: boolean;
   describedBy?: string;
+  title?: string;
 }) {
   const id = useId();
   return (
-    <div className={cn("inline-flex min-h-8 items-center gap-2", className)}>
+    <div className={cn("inline-flex min-h-8 items-center gap-2", className)} title={title}>
       <SwitchPrimitive.Root
         id={id}
         aria-describedby={describedBy}

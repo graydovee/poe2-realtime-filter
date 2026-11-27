@@ -1,7 +1,7 @@
 import rulesData from "../data/default-rules.json";
 import { CLASS_MATCH_BY_ID, FILTER_ITEMS_BY_ID, PICKER_ITEMS, RETIRED_ITEM_IDS, legacyEffectItemId } from "./data";
 import { DEFAULT_PROFILE } from "./default-profile";
-import type { FilterProfile, FilterRule, PriceCurrency, PricePoint, PriceRange } from "./types";
+import type { BaseOverlay, FilterProfile, FilterRule, PriceCurrency, PricePoint, PriceRange } from "./types";
 
 const legacyEffectSnapshots = new Map(rulesData.rules.map((rule) => [rule.id, rule]));
 /** 选择器里显示的条目；不在其中的整类条目读取时换成它那一类的逐件物品。 */
@@ -93,8 +93,9 @@ export function normalizeProfile(input: unknown): FilterProfile {
     return rule;
   });
   const skippedItemIds = items(raw.skippedItemIds);
+  const overlays: BaseOverlay[] = Array.isArray(raw.overlays) ? raw.overlays : [];
   const variantId = (id: unknown) => typeof id === "string" && /^(base|unique):/.test(id);
-  const version3 = raw.schemaVersion === 3 || skippedItemIds.some(variantId) || rules.some((rule) =>
+  const version3 = raw.schemaVersion === 3 || overlays.length > 0 || skippedItemIds.some(variantId) || rules.some((rule) =>
     rule.target.dropConditions !== undefined || rule.target.itemIds.some(variantId) || variantId(rule.baselineEffectItemId),
   );
   return {
@@ -110,6 +111,8 @@ export function normalizeProfile(input: unknown): FilterProfile {
     originalLeague: typeof raw.originalLeague === "string" && raw.originalLeague.trim() ? season(raw.originalLeague) : league,
     rules,
     skippedItemIds,
+    overlays,
+    editsEnabled: raw.editsEnabled === undefined ? true : raw.editsEnabled,
   };
 }
 
