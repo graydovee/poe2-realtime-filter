@@ -28,8 +28,8 @@ struct BodyCodec {
 }
 
 // Read every released layout. Select the export layout separately.
-const BODY_CODECS: &[&BodyCodec] = &[&positional::CODEC];
-const EXPORT_BODY: &BodyCodec = &positional::CODEC;
+const BODY_CODECS: &[&BodyCodec] = &[&positional::CODEC, &positional::DESCRIBED_CODEC];
+const EXPORT_BODY: &BodyCodec = &positional::DESCRIBED_CODEC;
 
 pub(super) struct Codec;
 
@@ -43,6 +43,7 @@ impl ShareDecoder for Codec {
         let bytes = decode_base64(payload.ok_or(super::UNSUPPORTED_VERSION)?, MAX_PAYLOAD)?;
         let frame = frame::Frame::read(&bytes)?;
         let body = body_codec(frame.version)?;
+        positional::check_catalog_version(frame.catalog)?;
         let share = (body.unpack)(&frame.inflate()?)?;
         check_json_size(&share, INFLATED_TOO_LARGE)?;
         Ok(DecodedShare {
@@ -55,7 +56,7 @@ impl ShareDecoder for Codec {
 impl ShareEncoder for Codec {
     fn encode(&self, share: &Share) -> Result<String> {
         let bytes = pack_body(share)?;
-        encode_shortest(&bytes, EXPORT_BODY.version)
+        encode_shortest(&bytes, EXPORT_BODY.version, positional::catalog_version()?)
     }
 }
 
@@ -79,11 +80,11 @@ fn pack_body(share: &Share) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn encode_shortest(bytes: &[u8], version: BodyVersion) -> Result<String> {
+fn encode_shortest(bytes: &[u8], version: BodyVersion, catalog: u32) -> Result<String> {
     let checksum = crc32fast::hash(bytes);
     let mut best: Option<String> = None;
     for &encoder in ENCODERS {
-        let code = frame::encode(bytes, version, checksum, encoder)?;
+        let code = frame::encode(bytes, version, checksum, encoder, catalog)?;
         if best
             .as_ref()
             .is_none_or(|current| code.len() < current.len())

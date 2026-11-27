@@ -4,9 +4,16 @@ import type { BaseFilter, FilterProfile, GameServer } from "./types";
 export type LocalScheme = {
   id: string;
   name: string;
+  /** 一行说明，显示在方案库的卡片上。 */
+  description: string;
   profile: FilterProfile;
   autoRefresh: boolean;
-  installed: { name: string; directory: string } | null;
+  installed: {
+    name: string;
+    directory: string;
+    /** 已安装的过滤器所用行情的抓取时间（ISO）。升级前安装的方案和当时没有行情的方案为空。 */
+    marketCapturedAt?: string | null;
+  } | null;
   status: string;
 };
 

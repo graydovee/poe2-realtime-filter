@@ -27,7 +27,9 @@ export function SeasonModule() {
   const statusText = loading
     ? `正在加载 ${league} 行情…`
     : marketError ||
-      (shown.rates ? (usable ? "最新报价时间：" : "缓存已过期 · ") + new Date(shown.capturedAt).toLocaleString("zh-CN") : "暂无可用行情");
+      (shown.rates
+        ? `行情时间 ${new Date(shown.capturedAt).toLocaleString("zh-CN")}${usable ? "" : " · 缓存已过期"}`
+        : "暂无可用行情");
 
   const leagueGroups: SelectGroup[] | undefined = leagueCatalog
     ? [false, true].map((permanent) => ({

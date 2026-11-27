@@ -1,3 +1,4 @@
+import { EQUIPMENT_CLASSES } from "./catalog-view";
 import { FILTER_ITEMS_BY_ID } from "./data";
 import type { DropBound, DropConditions, DropField, DropNumber, FilterRule, ItemDefinition, ItemRarity } from "./types";
 
@@ -34,12 +35,15 @@ export function rarityInterval(item: ItemDefinition, rarity?: ItemRarity): Inter
   return [Math.max(low, value), Math.min(high, value)];
 }
 
+/** 装备的客户端类别编号里，这几类没有孔：饰品、箭袋、珠宝和圣物。 */
+const NO_SOCKETS = new Set([4, 5, 20, 21, 42, 86]);
+const isEquipment = (item: ItemDefinition) => item.itemClass !== undefined && EQUIPMENT_CLASSES.has(item.itemClass);
+
 export function supportsDropField(item: ItemDefinition, field: DropField): boolean {
-  const [group] = item.categoryPath;
   switch (field) {
     case "stackSize": return Boolean(item.stackable);
-    case "sockets": return group === "equipment" && item.categoryPath.some((key) => ["body-armour", "helmets", "gloves", "boots", "weapons", "one-hand", "two-hand", "shields", "bucklers", "foci"].includes(key));
-    case "unidentifiedTier": return group === "equipment" && !item.categoryPath.some((key) => ["jewels", "relics"].includes(key)) && item.matcher.rarity !== "Unique";
+    case "sockets": return isEquipment(item) && !NO_SOCKETS.has(item.itemClass!);
+    case "unidentifiedTier": return isEquipment(item) && item.itemClass !== 42 && item.itemClass !== 86 && item.matcher.rarity !== "Unique";
     case "itemLevel": return true;
   }
 }

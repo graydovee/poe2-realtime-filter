@@ -4,6 +4,7 @@ import { FileArchive, FilePen, MoreHorizontal, Pencil, RefreshCw, Share2, Trash2
 
 import { cn } from "../../../lib/cn";
 import type { LocalScheme } from "../../../lib/desktop";
+import { formatMarketTime, formatMarketTimeFull } from "../../../lib/time";
 import type { GameServer } from "../../../lib/types";
 import { revealInspector, useAppStore } from "../../state/store";
 import type { DownloadOffer } from "../../state/types";
@@ -21,7 +22,7 @@ import { baseLabel, missingBaseHint, schemeIssue, schemeTone } from "./scheme-me
 
 const toneLabels = { sage: "已安装，运行正常", ember: "需要处理", muted: "未安装" } as const;
 
-/** 方案库里的一行：名称、状态和常用操作。点名称区域在检查器里查看详情。 */
+/** 方案库里的一行：名称、描述、状态和常用操作。点名称区域在检查器里查看详情。 */
 export function SchemeRow({
   scheme,
   server,
@@ -49,6 +50,8 @@ export function SchemeRow({
   const issue = schemeIssue(scheme.status);
   const missingBase = missingBaseHint(scheme);
   const meta = `${baseLabel(scheme.profile.baseFilter, scheme.profile.baseFilterHint)} · ${(scheme.profile.rules ?? []).length} 条规则`;
+  const marketTime = formatMarketTime(scheme.installed?.marketCapturedAt);
+  const marketTimeFull = formatMarketTimeFull(scheme.installed?.marketCapturedAt);
 
   return (
     <li
@@ -82,9 +85,22 @@ export function SchemeRow({
               <Badge tone={scheme.installed ? "sage" : "muted"}>{scheme.installed ? "已安装" : "未安装"}</Badge>
               {scheme.installed && scheme.autoRefresh && <Badge tone="gold">自动刷新</Badge>}
             </span>
+            {scheme.description && (
+              <span className="block w-full truncate text-xs text-ink-muted" title={scheme.description}>
+                {scheme.description}
+              </span>
+            )}
             {!missingBase && (
-              <span className={cn("block w-full truncate text-xs", issue ? "text-ink-muted" : "text-ink-faint")} title={issue || undefined}>
-                {issue || meta}
+              // 摘要和行情时间同行：放不下时行情时间折到下一行，摘要本身过长时才截断。
+              <span className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                <span className={cn("min-w-0 grow truncate", issue ? "text-ink-muted" : "text-ink-faint")} title={issue || undefined}>
+                  {issue || meta}
+                </span>
+                {marketTime && (
+                  <span className="shrink-0 whitespace-nowrap text-ink-faint" title={marketTimeFull ?? undefined}>
+                    行情时间 {marketTime}
+                  </span>
+                )}
               </span>
             )}
           </button>
@@ -132,9 +148,9 @@ export function SchemeRow({
                 <FileArchive aria-hidden="true" />
                 导出方案包
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openManagerDialog("rename", scheme)}>
+              <DropdownMenuItem onSelect={() => openManagerDialog("nameDescription", scheme)}>
                 <Pencil aria-hidden="true" />
-                重命名
+                编辑名称和描述
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => void copyScheme(scheme.id)}>
                 <Copy aria-hidden="true" />

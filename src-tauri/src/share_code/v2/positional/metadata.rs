@@ -27,7 +27,7 @@ const fn field(name: &'static str, kind: Kind) -> Field {
     (name, kind)
 }
 
-pub(super) fn pack(mut share: Share, max_rules: usize) -> Result<Vec<u8>> {
+pub(super) fn pack(mut share: Share, max_rules: usize, described: bool) -> Result<Vec<u8>> {
     let profile = share.profile.as_object_mut().ok_or_else(invalid)?;
     let Some(Value::Array(rules)) = profile.remove("rules") else {
         return Err(invalid());
@@ -35,6 +35,9 @@ pub(super) fn pack(mut share: Share, max_rules: usize) -> Result<Vec<u8>> {
     check_limit(rules.len(), max_rules)?;
     let mut out = Vec::new();
     write_text(&mut out, &share.name);
+    if described {
+        write_text(&mut out, &share.description);
+    }
     write_object(&mut out, profile, schema::PROFILE, None)?;
     put_uint(&mut out, rules.len());
     for rule in &rules {
@@ -48,9 +51,14 @@ pub(super) fn pack(mut share: Share, max_rules: usize) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-pub(super) fn unpack(bytes: &[u8], max_rules: usize) -> Result<Share> {
+pub(super) fn unpack(bytes: &[u8], max_rules: usize, described: bool) -> Result<Share> {
     let mut input = Reader(bytes);
     let name = read_text(&mut input)?;
+    let description = if described {
+        read_text(&mut input)?
+    } else {
+        String::new()
+    };
     let mut profile = read_object(&mut input, schema::PROFILE)?;
     let count = input.uint()?;
     check_limit(count, max_rules)?;
@@ -62,6 +70,7 @@ pub(super) fn unpack(bytes: &[u8], max_rules: usize) -> Result<Share> {
     profile.insert("rules".into(), Value::Array(rules));
     Ok(Share {
         name,
+        description,
         profile: Value::Object(profile),
     })
 }
@@ -263,6 +272,7 @@ mod tests {
     fn positional_wire_vector() {
         let share = Share {
             name: "N".into(),
+            description: String::new(),
             profile: json!({
                 "server":"tencent", "schemaVersion":3, "league":"L", "rules":[{
                     "name":"R", "enabled":true, "hidden":false, "effects":{},
@@ -275,13 +285,45 @@ mod tests {
             0x67, 1, b'R', 1, 0, // rule mask, name and switches
             3, 0, 1, 3, 0x81, 1, 3, 0, // target, minimum price, empty effects
         ];
-        assert_eq!(pack(share.clone(), 1).unwrap(), expected);
-        assert_eq!(unpack(&expected, 1).unwrap(), share);
+        assert_eq!(pack(share.clone(), 1, false).unwrap(), expected);
+        assert_eq!(unpack(&expected, 1, false).unwrap(), share);
         for cut in 0..expected.len() {
-            assert!(unpack(&expected[..cut], 1).is_err());
+            assert!(unpack(&expected[..cut], 1, false).is_err());
         }
-        assert!(unpack(&expected, 0).is_err());
-        assert!(unpack(&[&expected[..], &[0]].concat(), 1).is_err());
+        assert!(unpack(&expected, 0, false).is_err());
+        assert!(unpack(&[&expected[..], &[0]].concat(), 1, false).is_err());
+    }
+
+    #[test]
+    fn described_wire_vector_writes_the_description_after_the_name() {
+        let share = Share {
+            name: "N".into(),
+            description: "描述".into(),
+            profile: json!({"schemaVersion":3,"league":"L","rules":[]}),
+        };
+        let expected = [
+            1, b'N', // name
+            6, 0xe6, 0x8f, 0x8f, 0xe8, 0xbf, 0xb0, // description
+            0x0c, 3, 1, b'L', 0, // profile and rule count
+        ];
+        assert_eq!(pack(share.clone(), 1, true).unwrap(), expected);
+        assert_eq!(unpack(&expected, 1, true).unwrap(), share);
+        for cut in 0..expected.len() {
+            assert!(unpack(&expected[..cut], 1, true).is_err());
+        }
+        assert!(unpack(&[&expected[..], &[0]].concat(), 1, true).is_err());
+        // Revision 1 reads another field where the description starts.
+        assert!(unpack(&expected, 1, false).is_err());
+        let mut bare = share.clone();
+        bare.description = String::new();
+        assert_eq!(
+            pack(bare.clone(), 1, true).unwrap(),
+            [1, b'N', 0, 0x0c, 3, 1, b'L', 0]
+        );
+        assert_eq!(
+            unpack(&[1, b'N', 0, 0x0c, 3, 1, b'L', 0], 1, true).unwrap(),
+            bare
+        );
     }
 
     #[test]
@@ -306,14 +348,17 @@ mod tests {
         }));
         let share = Share {
             name: "配置".into(),
+            description: String::new(),
             profile: json!({"schemaVersion":3, "baseFilterHint":"reference.filter",
             "originalLeague":"Original", "league":"", "strictness":6, "style":"customsounds", "locale":"tw",
             "server":"tencent", "rules":rules}),
         };
-        let data = pack(share.clone(), 100).unwrap();
-        assert_eq!(unpack(&data, 100).unwrap(), share);
+        let data = pack(share.clone(), 100, false).unwrap();
+        assert_eq!(unpack(&data, 100, false).unwrap(), share);
         let mut unsupported = share;
         unsupported.profile["rules"][0]["effects"]["newEffect"] = json!(true);
-        assert!(pack(unsupported, 100).unwrap_err().contains("newEffect"));
+        assert!(pack(unsupported, 100, false)
+            .unwrap_err()
+            .contains("newEffect"));
     }
 }

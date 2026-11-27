@@ -33,50 +33,72 @@ test("default rules ship four price tiers", () => {
   }
 });
 
-test("未切割宝石按等级拆成独立物品，宝石分组按游戏里的叫法", () => {
+test("未切割宝石按等级拆成独立物品，宝石分组的叫法照物品列表", () => {
   const items = JSON.parse(readFileSync("data/item-catalog.json", "utf8")).items;
   const gems = items.filter((item) => item.categoryPath[0] === "gems");
   const count = (path) => gems.filter((item) => item.categoryPath.join("/") === path).length;
   assert.deepEqual(
-    Object.fromEntries(["uncut-skill-gems", "uncut-spirit-gems", "uncut-support-gems", "blood-gems", "rune-gems"].map((key) => [key, count("gems/" + key)])),
-    { "uncut-skill-gems": 20, "uncut-spirit-gems": 20, "uncut-support-gems": 5, "blood-gems": 85, "rune-gems": 22 },
+    Object.fromEntries(["lineage", "skill", "spirit", "support", "runic"].map((key) => [key, count("gems/" + key)])),
+    // 未切割精魂宝石从 4 级起才有，和交易所「Uncut Gems」栏里的 20 + 17 + 5 件一致。
+    // 符文技能里除了 23 颗符文技能宝石和 7 颗符文辅助宝石，还有按等级卖的 16 档泰瑟奇术通量。
+    { lineage: 77, skill: 20, spirit: 17, support: 5, runic: 46 },
   );
-  // 客户端的 Support Gems 类别里是血脉宝石，Skill Gems 类别里是符文宝石。
-  assert.ok(gems.some((item) => item.categoryPath[1] === "blood-gems" && item.name === "Atalui's Bloodletting"));
-  assert.ok(gems.some((item) => item.categoryPath[1] === "rune-gems" && item.name === "Frostflame Nova"));
+  // 客户端的 Support Gems 类别里是血脉宝石和符文辅助宝石，Skill Gems 类别里是符文技能宝石。
+  assert.ok(gems.some((item) => item.categoryPath[1] === "lineage" && item.name === "Atalui's Bloodletting"));
+  assert.ok(gems.some((item) => item.categoryPath[1] === "runic" && item.name === "Frostflame Nova"));
+  // NeverSink 把这两颗宝石名字里的 of 小写；卡古兰之拳是符文辅助宝石，往昔碎片是符文技能宝石。
+  assert.ok(gems.some((item) => item.categoryPath[1] === "runic" && item.name === "Fist Of Kalguur"));
+  assert.ok(gems.some((item) => item.categoryPath[1] === "runic" && item.name === "Fragments Of The Past"));
   // 命源碎片在客户端数据里单独占一个类别，但它就是一枚符文技能宝石，不该自成一组。
-  assert.deepEqual(items.find((item) => item.id === "animus-splinters").categoryPath, ["gems", "rune-gems"]);
-  assert.ok(!gems.some((item) => ["uncut", "skill-gems", "support-gems", "spirit-gems", "gem-materials"].includes(item.categoryPath[1])), "旧的宝石分组不该残留");
+  assert.deepEqual(items.find((item) => item.id === "animus-splinters").categoryPath, ["gems", "runic"]);
+  // 泰瑟奇术通量在物品列表里是 5–20 级，每级一件。
+  assert.deepEqual(items.filter((item) => /^Thaumaturgic Flux \(Level \d+\)$/.test(item.name)).map((item) => item.categoryPath.join("/")), Array(16).fill("gems/runic"));
+  for (const key of ["uncut", "blood-gems", "rune-gems", "skill-gems", "support-gems", "spirit-gems", "gem-materials"]) assert.ok(!gems.some((item) => item.categoryPath[1] === key), "旧的宝石分组不该残留：" + key);
   const uncut = items.filter((item) => /^Uncut (Skill|Spirit|Support) Gem \(Level \d+\)$/.exec(item.name));
-  assert.equal(uncut.length, 45);
+  assert.equal(uncut.length, 42);
   assert.ok(!items.some((item) => /^uncut-(skill|spirit|support)-gem$/.test(item.id)), "不分等级的旧条目不该残留");
   for (const item of uncut) {
     const [, kind, level] = /^Uncut (Skill|Spirit|Support) Gem \(Level (\d+)\)$/.exec(item.name);
+    assert.ok(kind !== "Spirit" || Number(level) >= 4, "未切割精魂宝石没有 1–3 级：" + item.name);
     assert.equal(item.id, "uncut-" + kind.toLowerCase() + "-gem-" + level);
     assert.equal(item.marketKey, item.name, "行情按「Uncut Skill Gem (Level N)」这个名字报价");
     assert.equal(item.baseType, "Uncut " + kind + " Gem");
     assert.deepEqual(item.matcher, { baseType: "Uncut " + kind + " Gem", gemLevel: Number(level) });
-    assert.equal(item.categoryPath.join("/"), "gems/uncut-" + kind.toLowerCase() + "-gems");
+    assert.equal(item.categoryPath.join("/"), "gems/" + kind.toLowerCase());
     assert.equal(item.priceable, true);
   }
-  for (const key of ["uncut-skill-gems", "uncut-spirit-gems", "uncut-support-gems", "blood-gems", "rune-gems"]) {
-    assert.notEqual(groupName(key, "cn"), key, "缺少分组名：" + key);
+  for (const key of ["lineage", "skill", "spirit", "support", "runic"]) {
+    assert.notEqual(groupName(["gems", key], "cn"), key, "缺少分组名：" + key);
   }
-  assert.equal(groupName("blood-gems", "cn"), "血脉宝石");
-  assert.equal(groupName("rune-gems", "cn"), "符文宝石");
-  assert.equal(groupName("uncut-support-gems", "cn"), "未切割的辅助宝石");
-  // 分类菜单里未切割的三类排在前面，然后是血脉、符文。
-  assert.ok(groupOrder("uncut-support-gems") < groupOrder("blood-gems") && groupOrder("blood-gems") < groupOrder("rune-gems"));
+  assert.equal(groupName(["gems", "lineage"], "cn"), "血脉宝石");
+  assert.equal(groupName(["gems", "runic"], "cn"), "符文技能");
+  assert.equal(groupName(["gems", "support"], "cn"), "辅助宝石");
+  // 分类菜单里技能下面依次是血脉、技能、精魄、辅助、符文技能。
+  const order = ["lineage", "skill", "spirit", "support", "runic"].map((key) => groupOrder(["gems", key]));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
 });
 
 test("catalog exposes category menus and keeps every group", () => {
   const catalog = JSON.parse(readFileSync("data/item-catalog.json", "utf8"));
-  const groups = new Set(catalog.items.map((item) => item.categoryPath[0]));
-  assert.ok(groups.has("crafting"));
-  assert.ok(groups.has("equipment"));
-  assert.ok(groups.has("gems"));
-  const crafting = catalog.items.filter((item) => item.categoryPath[0] === "crafting").map((item) => item.categoryPath[1]);
-  for (const key of ["currency", "bones", "omens", "temple"]) assert.ok(crafting.includes(key), "缺少分组 " + key);
+  const items = catalog.items.filter((item) => !item.matcher.class);
+  const roots = new Set(items.map((item) => item.categoryPath[0]));
+  // 顶层分类和顺序照物品列表：通货、传奇、玩法、终局、符文、精髓、技能、装备、其他（传奇条目由基底派生，目录里没有这一层）。
+  for (const key of ["currency", "gameplay", "endgame", "runes", "essences", "gems", "equipment", "other"]) assert.ok(roots.has(key), "缺少顶层分类 " + key);
+  assert.equal(roots.size, 8);
+  const under = (...prefix) => new Set(items.filter((item) => item.categoryPath.slice(0, prefix.length).join("/") === prefix.join("/")).map((item) => item.categoryPath[prefix.length]));
+  assert.deepEqual([...under("gameplay")].sort(), ["abyss", "breach", "delirium", "expedition", "ritual", "temple"]);
+  assert.deepEqual([...under("equipment")].sort(), ["accessories", "body-armour", "boots", "gloves", "helmets", "off-hand", "one-hand", "two-hand"]);
+  assert.deepEqual([...under("equipment", "helmets")].sort(), ["dex", "dex-int", "int", "str", "str-dex", "str-dex-int", "str-int"]);
+  assert.deepEqual([...under("runes")].sort(), ["greater", "greater-idols", "greater-soul-cores", "idols", "normal", "perfect", "soul-cores", "special"]);
+  // 名字按路径取：同一个 key 在不同父分类下叫法不同。
+  assert.equal(groupName(["gameplay", "expedition", "omens"], "cn"), "预兆");
+  assert.equal(groupName(["gameplay", "temple", "currency"], "cn"), "通货");
+  assert.equal(groupName(["equipment", "helmets", "str-dex-int"], "cn"), "头盔(力敏智)");
+  assert.equal(groupName(["equipment", "off-hand", "shields-str-dex"], "cn"), "盾🔴⚡");
+  assert.equal(groupName(["endgame", "waystones", "class-selection"], "cn"), "换界石");
+  // 顶层分类的先后就是菜单里的先后。
+  const top = ["currency", "gameplay", "endgame", "runes", "essences", "gems", "equipment", "other"].map((key) => groupOrder([key]));
+  assert.deepEqual(top, [...top].sort((a, b) => a - b));
 });
 
 test("market adapter is valid JavaScript", () => {

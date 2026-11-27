@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FileSearch, FolderOpen, PackageSearch, Trash2 } from "lucide-react";
 
 import { itemLabel as itemName } from "../../../lib/catalog";
 import { displayDirectory, explain, local } from "../../../lib/desktop";
 import { FILTER_ITEMS_BY_ID } from "../../../lib/data";
 import type { BaseFilter } from "../../../lib/types";
+import { DOWNLOAD_CANCELLED, subscribeDownloadProgress, type DownloadProgress } from "../../state/downloads";
 import { useAppStore } from "../../state/store";
 import { Alert } from "../ui/alert";
 import { Badge, Chip } from "../ui/badge";
@@ -14,6 +15,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader } from "../ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { CollapsiblePanel } from "../ui/panel";
+import { ProgressBar } from "../ui/progress";
 import { Switch } from "../ui/switch";
 
 const sources = [{ id: "neversink", name: "NeverSink" }] as const;
@@ -64,6 +66,23 @@ function itemLabel(id: string) {
   return item ? itemName(item, "cn") : id;
 }
 
+const CANCELLED_NOTICE = "已取消。可以重新检查，或先用已下载的版本。";
+
+function byteSize(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.floor(bytes / 1024))} KB`;
+}
+
+/** 检查新版本时的进度说明；正在下载且知道总大小时带百分比。 */
+function downloadStatus(progress: DownloadProgress | null): { text: string; percent?: number } {
+  if (!progress) return { text: "正在连接 GitHub…" };
+  if (progress.state === "checking") return { text: "正在检查 GitHub 上的最新版本…" };
+  if (progress.state === "extracting") return { text: "正在解压…" };
+  const received = byteSize(progress.received);
+  if (progress.total === null || progress.total <= 0) return { text: `正在下载，已收到 ${received}…` };
+  const percent = Math.min(100, Math.floor((progress.received / progress.total) * 100));
+  return { text: `正在下载 ${received} / ${byteSize(progress.total)}（${percent}%）`, percent };
+}
+
 /** 选择基础过滤器的对话框：列出游戏目录和方案包导入的过滤器，或选一个下载来源再选版本。 */
 function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () => void }) {
   const setBaseFilter = useAppStore((state) => state.setBaseFilter);
@@ -73,6 +92,13 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [hideSubscriptions, setHideSubscriptions] = useState(true);
+  /** 检查新版本期间的进度和已等待的秒数。 */
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  /** 正在检查新版本的来源。取消或关闭对话框后，它后来的结果不再采纳。 */
+  const checking = useRef<string | null>(null);
+  const attempt = useRef(0);
 
   const scan = useCallback(async () => {
     setBusy(true);
@@ -88,26 +114,67 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
   }, []);
 
   const loadSource = useCallback(async (source: Source, cachedOnly: boolean) => {
+    const run = ++attempt.current;
+    const current = () => run === attempt.current;
     setBusy(true);
     setError("");
     setNotice("");
-    setOptions([]);
+    setProgress(null);
+    checking.current = cachedOnly ? null : source.id;
+    setStartedAt(cachedOnly ? null : Date.now());
     try {
-      setOptions(await local<BaseFilter[]>("source_filters", { source: source.id, cachedOnly }));
+      if (cachedOnly) {
+        setOptions([]);
+      } else {
+        // 已下载的版本先列出来，检查新版本期间就能直接选用。
+        const cached = await local<BaseFilter[]>("source_filters", { source: source.id, cachedOnly: true });
+        if (!current()) return;
+        setOptions(cached);
+      }
+      const filters = await local<BaseFilter[]>("source_filters", { source: source.id, cachedOnly });
+      if (!current()) return;
+      setOptions(filters);
     } catch (cause) {
-      setError(explain(cause));
+      if (!current()) return;
+      const message = explain(cause);
+      if (message === DOWNLOAD_CANCELLED) {
+        setNotice(CANCELLED_NOTICE);
+        return;
+      }
+      setError(message);
       if (!cachedOnly) {
-        // 下载失败时退回到已下载的版本。
+        // 检查失败时退回到已下载的版本。
         try {
           const cached = await local<BaseFilter[]>("source_filters", { source: source.id, cachedOnly: true });
+          if (!current()) return;
           setOptions(cached);
           if (cached.length) setNotice("请从下方列表选择已下载的版本。");
         } catch {
-          // 保留下载失败的错误信息。
+          // 保留检查失败的错误信息。
         }
       }
     } finally {
-      setBusy(false);
+      if (current()) {
+        checking.current = null;
+        setBusy(false);
+        setProgress(null);
+        setStartedAt(null);
+      }
+    }
+  }, []);
+
+  const cancel = useCallback(async () => {
+    // 后面到达的结果不再采纳；后端收到取消后停止下载。
+    attempt.current += 1;
+    checking.current = null;
+    setBusy(false);
+    setProgress(null);
+    setStartedAt(null);
+    setNotice(CANCELLED_NOTICE);
+    try {
+      await local("base_download_cancel");
+    } catch {
+      // 没有正在进行的下载。
     }
   }, []);
 
@@ -115,6 +182,22 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
     if (initial.kind === "scan") void scan();
     else if (initial.kind === "versions") void loadSource(initial.source, false);
   }, [initial, scan, loadSource]);
+
+  useEffect(
+    () =>
+      subscribeDownloadProgress((source, update) => {
+        if (checking.current === source) setProgress(update);
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    if (startedAt === null) return;
+    const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
 
   const visibleOptions: ScannedFilter[] =
     picker.kind === "scan" && hideSubscriptions ? options.filter((option) => option.kind !== "subscribed") : options;
@@ -128,12 +211,21 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
   }
 
   const title = picker.kind === "scan" ? "选择已有过滤器" : picker.kind === "source" ? "选择下载来源" : picker.source.name;
+  const checkingRelease = busy && startedAt !== null;
+  const status = downloadStatus(progress);
+  // 一直没有进展时说明原因，并提醒可以先取消。
+  const slow = checkingRelease && elapsed >= 8 && progress?.state !== "downloading";
+  // 关闭对话框时顺带停止还没结束的检查。
+  const close = () => {
+    if (checking.current) void cancel();
+    onClose();
+  };
 
   return (
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+        if (!open) close();
       }}
     >
       <DialogContent aria-busy={busy || undefined}>
@@ -160,11 +252,27 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
             {picker.kind === "scan" && (
               <Switch label="隐藏订阅过滤器" checked={hideSubscriptions} onCheckedChange={setHideSubscriptions} />
             )}
-            {busy && (
-              <p role="status" className="text-sm text-ink-muted">
-                {picker.kind === "scan" ? "正在扫描…" : "正在读取来源…"}
-              </p>
-            )}
+            {busy &&
+              (checkingRelease ? (
+                <div role="status" aria-live="polite" className="rounded-md border border-line bg-surface-2 px-3 py-2.5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 text-sm text-ink">{status.text}</span>
+                    <span className="shrink-0 text-xs text-ink-faint tabular-nums">{elapsed} 秒</span>
+                  </div>
+                  {progress?.state === "downloading" && (
+                    <ProgressBar label="下载进度" value={status.percent} className="mt-2 h-1.5 w-full" />
+                  )}
+                  {slow && (
+                    <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">
+                      GitHub 连接较慢。可以取消后先用已下载的版本，或稍后再试。
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p role="status" className="text-sm text-ink-muted">
+                  正在扫描…
+                </p>
+              ))}
             {error && <Alert tone="ember">{error}</Alert>}
             {notice && <Alert tone="gold">{notice}</Alert>}
             {!busy && !error && !visibleOptions.length && (
@@ -173,10 +281,10 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
                   ? options.length
                     ? "关闭「隐藏订阅过滤器」以查看订阅文件。"
                     : "没有找到可用的过滤器。可以选择本地文件，或下载过滤器。"
-                  : "关闭列表后，点击「其他来源 › 下载过滤器」并选择来源。"}
+                  : "本机没有已下载的版本。点「重新检查」从 GitHub 下载。"}
               </p>
             )}
-            {!busy && optionGroups.size > 0 && (
+            {(!busy || checkingRelease) && optionGroups.size > 0 && (
               <div className="max-h-[50dvh] space-y-4 overflow-y-auto overscroll-contain py-1 pr-2 [scrollbar-gutter:stable]">
                 {[...optionGroups].map(([group, options]) => {
                   const names = new Map<string, number>();
@@ -208,7 +316,7 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
                                   // 登记时间只用于显示，方案里只存来源。
                                   const { registeredAt: _registered, ...base } = option;
                                   setBaseFilter(base);
-                                  onClose();
+                                  close();
                                 }}
                                 className="flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-md border border-line bg-surface-2 px-3 py-2 text-left transition-colors duration-150 hover:border-gold/50 hover:bg-surface-3"
                               >
@@ -227,12 +335,15 @@ function BaseFilterDialog({ initial, onClose }: { initial: Picker; onClose: () =
           </div>
         )}
         <DialogFooter>
-          {picker.kind === "versions" && (
-            <Button disabled={busy} onClick={() => void loadSource(picker.source, true)}>
-              查看已下载版本
-            </Button>
-          )}
-          <Button disabled={busy} onClick={onClose}>
+          {picker.kind === "versions" &&
+            (checkingRelease ? (
+              <Button onClick={() => void cancel()}>取消下载</Button>
+            ) : (
+              <Button disabled={busy} onClick={() => void loadSource(picker.source, false)}>
+                重新检查
+              </Button>
+            ))}
+          <Button disabled={busy && !checkingRelease} onClick={close}>
             关闭
           </Button>
         </DialogFooter>

@@ -9,7 +9,11 @@ use std::{
     fs,
     io::{self, Cursor, Read},
     path::{Component, Path, PathBuf},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, Mutex,
+    },
+    thread,
     time::{Duration, Instant},
 };
 
@@ -25,6 +29,13 @@ const DOWNLOAD_SOURCES: &[DownloadSource] = &[DownloadSource {
 pub(crate) const MAX_FILTER: usize = 8 * 1024 * 1024;
 const MAX_ARCHIVE: usize = 32 * 1024 * 1024;
 const MAX_EXTRACTED: usize = 160 * 1024 * 1024;
+/// Upper bound for one archive request. A connection that stops sending is noticed earlier.
+const ARCHIVE_REQUEST: Duration = Duration::from_secs(30 * 60);
+/// A download that receives nothing for this long is reported as interrupted.
+const DOWNLOAD_STALL: Duration = Duration::from_secs(30);
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
+const CHUNK: usize = 256 * 1024;
+pub const DOWNLOAD_CANCELLED: &str = "已取消下载";
 /// The base filter registry, next to `library.json`.
 const REGISTRY: &str = "base-filters.json";
 /// Copies stored from scheme packages, below `base-filters/`.
@@ -667,8 +678,63 @@ impl DownloadSource {
     }
 }
 
+/// What a source download is doing right now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "state")]
+pub enum DownloadProgress {
+    Checking,
+    Downloading { received: u64, total: Option<u64> },
+    Extracting,
+}
+
+/// Follows one download: reports its progress and stops it on request.
+#[derive(Clone)]
+pub struct DownloadControl {
+    cancelled: Arc<AtomicBool>,
+    report: Arc<dyn Fn(DownloadProgress) + Send + Sync>,
+}
+
+impl Default for DownloadControl {
+    fn default() -> Self {
+        Self::reporting(|_| {})
+    }
+}
+
+impl DownloadControl {
+    pub fn reporting(report: impl Fn(DownloadProgress) + Send + Sync + 'static) -> Self {
+        Self {
+            cancelled: Arc::default(),
+            report: Arc::new(report),
+        }
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
+    }
+
+    fn report(&self, progress: DownloadProgress) {
+        (self.report)(progress);
+    }
+
+    fn is(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.cancelled, &other.cancelled)
+    }
+
+    fn check(&self) -> Result<()> {
+        if self.cancelled.load(Ordering::Relaxed) {
+            Err(DOWNLOAD_CANCELLED.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Default)]
-pub struct SourceDownloads(Mutex<BTreeMap<&'static str, ReleaseCache>>);
+pub struct SourceDownloads {
+    releases: Mutex<BTreeMap<&'static str, ReleaseCache>>,
+    /// The download that is running now, so that the interface can stop it.
+    running: Mutex<Option<DownloadControl>>,
+}
 
 #[derive(Default)]
 struct ReleaseCache {
@@ -712,7 +778,8 @@ struct Asset {
 
 fn source_client() -> Result<Client> {
     Client::builder()
-        .timeout(Duration::from_secs(45))
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(20))
         .user_agent("PoE2-Realtime-Filter")
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             let url = attempt.url();
@@ -745,12 +812,19 @@ fn get(client: &Client, url: &str) -> Result<Response> {
 }
 
 impl ReleaseCache {
-    fn latest(&mut self, client: &Client, source: &DownloadSource) -> Result<&Release> {
+    fn latest(
+        &mut self,
+        client: &Client,
+        source: &DownloadSource,
+        control: &DownloadControl,
+    ) -> Result<&Release> {
         // Opening multiple schemes in succession shares a release check with the tray task.
         if !self
             .checked
             .is_some_and(|time| time.elapsed() < Duration::from_secs(60))
         {
+            control.report(DownloadProgress::Checking);
+            control.check()?;
             let mut request = client.get(source.release);
             if let Some(etag) = &self.etag {
                 request = request.header(reqwest::header::IF_NONE_MATCH, etag);
@@ -759,6 +833,7 @@ impl ReleaseCache {
                 .send()
                 .and_then(Response::error_for_status)
                 .map_err(|error| format!("无法检查 {} 发布：{error}", source.label))?;
+            control.check()?;
             if response.status() != reqwest::StatusCode::NOT_MODIFIED {
                 let etag = response.headers().get(reqwest::header::ETAG).cloned();
                 let release: Release = read_metadata(response)?;
@@ -784,7 +859,10 @@ impl ReleaseCache {
         client: &Client,
         source: &DownloadSource,
     ) -> Result<Vec<String>> {
-        let version = self.latest(client, source)?.tag_name.clone();
+        let version = self
+            .latest(client, source, &DownloadControl::default())?
+            .tag_name
+            .clone();
         let cached = cached_entries(data_root, source.id, &version)?;
         if !cached.is_empty() {
             return Ok(cached
@@ -862,7 +940,7 @@ impl SourceDownloads {
             return Ok(offers);
         }
         let client = source_client()?;
-        let mut releases = self.0.lock().map_err(|error| error.to_string())?;
+        let mut releases = self.releases.lock().map_err(|error| error.to_string())?;
         for source in DOWNLOAD_SOURCES {
             let entries = releases
                 .entry(source.id)
@@ -893,18 +971,52 @@ impl SourceDownloads {
         data_root: &Path,
         id: &str,
         current_versions: &BTreeSet<String>,
+        report: impl Fn(DownloadProgress) + Send + Sync + 'static,
+    ) -> Result<Vec<BaseFilter>> {
+        let control = DownloadControl::reporting(report);
+        let outcome = self.run(data_root, id, current_versions, &control);
+        if let Ok(mut running) = self.running.lock() {
+            // A download that replaced this one keeps its place.
+            if running.as_ref().is_some_and(|current| current.is(&control)) {
+                *running = None;
+            }
+        }
+        outcome
+    }
+
+    /// Stops the download that is running now.
+    pub fn cancel_download(&self) {
+        let running = self
+            .running
+            .lock()
+            .ok()
+            .and_then(|mut running| running.take());
+        if let Some(control) = running {
+            control.cancel();
+        }
+    }
+
+    fn run(
+        &self,
+        data_root: &Path,
+        id: &str,
+        current_versions: &BTreeSet<String>,
+        control: &DownloadControl,
     ) -> Result<Vec<BaseFilter>> {
         let source = DownloadSource::find(id)?;
+        control.check()?;
         let client = source_client()?;
-        let mut releases = self.0.lock().map_err(|error| error.to_string())?;
+        let mut releases = self.releases.lock().map_err(|error| error.to_string())?;
+        // Recorded once the lock is held: a download waiting for the lock must not replace the running one.
+        *self.running.lock().map_err(|error| error.to_string())? = Some(control.clone());
         let release = releases
             .entry(source.id)
             .or_default()
-            .latest(&client, source)?;
+            .latest(&client, source, control)?;
         if current_versions.len() == 1 && current_versions.contains(&release.tag_name) {
             return Ok(vec![]);
         }
-        download_release(data_root, &client, source, release)
+        download_release(data_root, &client, source, release, control)
     }
 }
 
@@ -933,6 +1045,7 @@ fn download_release(
     client: &Client,
     source: &DownloadSource,
     release: &Release,
+    control: &DownloadControl,
 ) -> Result<Vec<BaseFilter>> {
     let cached = cached_entries(data_root, source.id, &release.tag_name)?;
     if !cached.is_empty() {
@@ -947,8 +1060,15 @@ fn download_release(
         None if release.zipball_url.starts_with(source.zipball) => &release.zipball_url,
         _ => return Err("GitHub 发布缺少有效的过滤器压缩包".into()),
     };
-    let bytes = read_bounded(get(client, url)?, MAX_ARCHIVE)
-        .map_err(|error| format!("读取过滤器压缩包失败：{error}"))?;
+    let response = client
+        .get(url)
+        .timeout(ARCHIVE_REQUEST)
+        .send()
+        .and_then(Response::error_for_status)
+        .map_err(|error| format!("无法从 GitHub 下载过滤器：{error}"))?;
+    let bytes = read_archive(response, MAX_ARCHIVE, control)?;
+    control.report(DownloadProgress::Extracting);
+    control.check()?;
     cache_archive(
         data_root,
         source.id,
@@ -956,6 +1076,76 @@ fn download_release(
         &bytes,
         asset.is_none(),
     )
+}
+
+fn read_archive(response: Response, limit: usize, control: &DownloadControl) -> Result<Vec<u8>> {
+    let total = response.content_length();
+    read_chunks(response, total, limit, DOWNLOAD_STALL, control)
+}
+
+/// Reads a download in chunks so that the caller can follow it and stop it. The reading itself
+/// runs on its own thread: a connection that stops sending is noticed after `stall`, without
+/// waiting for the end of the request timeout.
+fn read_chunks(
+    reader: impl Read + Send + 'static,
+    total: Option<u64>,
+    limit: usize,
+    stall: Duration,
+    control: &DownloadControl,
+) -> Result<Vec<u8>> {
+    let (send, receive) = mpsc::sync_channel::<io::Result<Vec<u8>>>(1);
+    thread::spawn(move || {
+        let mut reader = reader;
+        let mut buffer = vec![0u8; CHUNK];
+        loop {
+            // An empty chunk is the end of the stream.
+            let chunk = match reader.read(&mut buffer) {
+                Ok(0) => Ok(Vec::new()),
+                Ok(read) => Ok(buffer[..read].to_vec()),
+                Err(error) => Err(error),
+            };
+            // Once the receiver is gone the send fails, and the connection is dropped with it.
+            if send.send(chunk).is_err() {
+                break;
+            }
+        }
+    });
+    let received = |bytes: &[u8]| DownloadProgress::Downloading {
+        received: bytes.len() as u64,
+        total,
+    };
+    let mut bytes = Vec::new();
+    let mut last = Instant::now();
+    control.report(received(&bytes));
+    loop {
+        control.check()?;
+        let chunk = match receive.recv_timeout(stall) {
+            Ok(chunk) => chunk,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                return Err(format!(
+                    "下载中断：{} 秒没有收到数据，请重试",
+                    stall.as_secs()
+                ))
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err("读取过滤器压缩包失败：连接意外中断".into())
+            }
+        };
+        let chunk = chunk.map_err(|error| format!("读取过滤器压缩包失败：{error}"))?;
+        if chunk.is_empty() {
+            break;
+        }
+        if bytes.len() + chunk.len() > limit {
+            return Err("读取过滤器压缩包失败：文件超过大小限制".into());
+        }
+        bytes.extend_from_slice(&chunk);
+        if last.elapsed() >= PROGRESS_INTERVAL {
+            control.report(received(&bytes));
+            last = Instant::now();
+        }
+    }
+    control.report(received(&bytes));
+    Ok(bytes)
 }
 
 fn cached_entries(data_root: &Path, source: &str, version: &str) -> Result<Vec<BaseFilter>> {
@@ -1107,10 +1297,22 @@ mod tests {
         });
         let client = source_client().unwrap();
         let mut cache = ReleaseCache::default();
-        assert_eq!(cache.latest(&client, &source).unwrap().tag_name, "0.1.0");
+        assert_eq!(
+            cache
+                .latest(&client, &source, &DownloadControl::default())
+                .unwrap()
+                .tag_name,
+            "0.1.0"
+        );
         cache.catalog = Some(vec!["Strict.filter".into()]);
         cache.checked = None;
-        assert_eq!(cache.latest(&client, &source).unwrap().tag_name, "0.1.0");
+        assert_eq!(
+            cache
+                .latest(&client, &source, &DownloadControl::default())
+                .unwrap()
+                .tag_name,
+            "0.1.0"
+        );
         assert_eq!(cache.catalog.unwrap(), ["Strict.filter"]);
         server.join().unwrap();
     }
@@ -1182,6 +1384,60 @@ mod tests {
     }
 
     #[test]
+    fn download_reports_progress_and_stops_on_request() {
+        let stall = Duration::from_millis(200);
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let seen = log.clone();
+        let control =
+            DownloadControl::reporting(move |progress| seen.lock().unwrap().push(progress));
+        let total = CHUNK + 123;
+        let bytes = read_chunks(
+            Cursor::new(vec![7u8; total]),
+            Some(total as u64),
+            1024 * 1024,
+            stall,
+            &control,
+        )
+        .unwrap();
+        assert_eq!(bytes.len(), total);
+        let log = log.lock().unwrap().clone();
+        let received = |progress: &DownloadProgress| match progress {
+            DownloadProgress::Downloading { received, .. } => *received,
+            _ => unreachable!(),
+        };
+        assert_eq!(received(&log[0]), 0);
+        assert_eq!(received(&log[log.len() - 1]), total as u64);
+        assert!(log
+            .windows(2)
+            .all(|pair| received(&pair[0]) <= received(&pair[1])));
+
+        // A download that was stopped reads nothing.
+        control.cancel();
+        assert_eq!(
+            read_chunks(Cursor::new(vec![1; 16]), None, 1024, stall, &control).unwrap_err(),
+            DOWNLOAD_CANCELLED
+        );
+        // Stopping when nothing runs is harmless.
+        SourceDownloads::default().cancel_download();
+        // An archive above the limit is rejected while it streams.
+        let control = DownloadControl::default();
+        let error = read_chunks(Cursor::new(vec![1; 16]), None, 15, stall, &control).unwrap_err();
+        assert!(error.contains("大小限制"), "{error}");
+
+        // A connection that stops sending is reported as interrupted.
+        struct Stalled;
+        impl Read for Stalled {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                thread::sleep(Duration::from_secs(2));
+                Ok(0)
+            }
+        }
+        let error =
+            read_chunks(Stalled, None, 1024, Duration::from_millis(100), &control).unwrap_err();
+        assert!(error.contains("没有收到数据"), "{error}");
+    }
+
+    #[test]
     #[ignore = "downloads an official GitHub release for local verification"]
     fn downloads_real_neversink_release() {
         let directory = tempfile::tempdir().unwrap();
@@ -1195,14 +1451,14 @@ mod tests {
         assert!(!offers.contains_key(&names[1]));
         assert!(!directory.path().join("base-filters").exists());
         let filters = downloads
-            .download(directory.path(), SOURCE, &BTreeSet::new())
+            .download(directory.path(), SOURCE, &BTreeSet::new(), |_| {})
             .unwrap();
         let selected = matching_download(&filters, &names[0], None).unwrap();
         let BaseFilter::Downloaded { version, .. } = selected else {
             unreachable!()
         };
         assert!(downloads
-            .download(directory.path(), SOURCE, &BTreeSet::from([version]))
+            .download(directory.path(), SOURCE, &BTreeSet::from([version]), |_| {})
             .unwrap()
             .is_empty());
         assert!(filters.len() >= 7);

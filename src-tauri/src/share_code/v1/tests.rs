@@ -15,6 +15,7 @@ const DROP_CONDITIONS_VECTOR: &str = "POE2F1.eyJhbGciOiJiciIsInAiOjN9.ElCTgBcGAm
 fn plain() -> Share {
     Share {
         name: "打宝".into(),
+        description: String::new(),
         profile: json!({"schemaVersion":2,"league":"Standard","rules":[],"skippedItemIds":["albino-rhoa-feather"]}),
     }
 }
@@ -22,6 +23,7 @@ fn plain() -> Share {
 fn with_server() -> Share {
     Share {
         name: "打宝".into(),
+        description: String::new(),
         profile: json!({"schemaVersion":2,"league":"Standard","server":"tencent",
             "rules":[{"id":"default-exalted","name":"崇高石价格档","enabled":true,"hidden":false,
                 "followBaseline":true,"effects":{},"target":{"itemIds":["exalted-orb","chaos-orb"],
@@ -33,6 +35,7 @@ fn with_server() -> Share {
 fn with_drop_conditions() -> Share {
     Share {
         name: "通货数量档".into(),
+        description: String::new(),
         profile: json!({"schemaVersion":3,"server":"international","league":"Standard",
             "rules":[{"effects":{"beam":"Blue Temp","font":{"fontSize":42,"textColor":"0 0 0 255"},
                 "icon":"1 Blue Circle","sound":{"id":9,"type":"builtin","volume":300}},
@@ -64,6 +67,15 @@ fn brotli_checks_crc_and_exact_stream_end() {
         decode(&format!("{BROTLI_PREFIX}*=")).unwrap_err(),
         "分享码不是有效的 Base64URL"
     );
+}
+
+#[test]
+fn json_bodies_read_the_description_and_default_it_to_empty() {
+    let mut share = plain();
+    share.description = "开荒到终局".into();
+    let json = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&share).unwrap());
+    assert_eq!(decode(&format!("POE2F1.{json}")).unwrap().share, share);
+    assert_eq!(decode(JSON_VECTOR).unwrap().share.description, "");
 }
 
 #[test]

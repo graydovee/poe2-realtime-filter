@@ -132,10 +132,9 @@ export function canFollowBaselineItem(item: ItemDefinition | undefined): item is
 
 function catalogProbe(item: ItemDefinition): Probe {
   const { baseType, gemLevel, rarity, nonUnique } = item.matcher;
-  const [group, section] = item.categoryPath;
-  // 通货用「Stackable Currency」加普通品质的探针。其他物品只用目录有把握的条件，不假定其掉落属性。
-  const currency = group === "crafting" && item.stackable === true
-    && (section === "currency" || (section === "shards" && item.category === "currency"));
+  const [group, leaf] = item.categoryPath;
+  // 通货用「Stackable Currency」加普通品质的探针：通货分类里可堆叠的物品，碎片里只取通货碎片，不取各种裂片。其他物品只用目录有把握的条件，不假定其掉落属性。
+  const currency = group === "currency" && item.stackable === true && (leaf !== "shards" || item.category === "currency");
   const className = item.matcher.class ?? CLASS_OF_ITEM.get(item.id)?.item.matcher.class ?? (currency ? "Stackable Currency" : undefined);
   return {
     baseType: baseType!.toLowerCase(), className: className?.toLowerCase(), gemLevel,

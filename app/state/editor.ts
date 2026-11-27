@@ -38,6 +38,8 @@ function readableProfile(profile: FilterProfile): FilterProfile {
 export type EditorState = {
   schemeId: string | null;
   schemeName: string;
+  /** 已保存的描述；新建的方案在「保存新方案」里填写。 */
+  schemeDescription: string;
   profile: FilterProfile;
   dirty: boolean;
   /** 保存或读取方案期间为真，此时整个编辑器不可操作。 */
@@ -60,7 +62,6 @@ export type EditorState = {
   previewError: string;
   saveError: string;
   editorDialog: EditorDialog | null;
-  newName: string;
   picker: PickerTarget | null;
   presetGalleryOpen: boolean;
   /** 最近删除的规则，供「撤销」恢复。 */
@@ -89,14 +90,14 @@ export type EditorActions = {
   loadMarket: (server: GameServer, league: string) => Promise<void>;
   refreshMarket: () => Promise<void>;
   openDraft: (scheme: LocalScheme | null, server: GameServer) => Promise<void>;
-  saveScheme: (name: string) => Promise<void>;
+  /** 保存方案。名称和描述随方案一起保存；失败时抛出错误信息。 */
+  saveScheme: (name: string, description: string) => Promise<void>;
   requestSave: () => void;
   generate: () => Promise<void>;
   closePreview: () => void;
   leaveEditor: () => void;
   setEditorDialog: (dialog: EditorDialog | null) => void;
   setSaveError: (error: string) => void;
-  setNewName: (name: string) => void;
   openPicker: (target: PickerTarget) => void;
   closePicker: () => void;
   setPresetGalleryOpen: (open: boolean) => void;
@@ -107,6 +108,7 @@ export type EditorSlice = EditorState & EditorActions;
 export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (set, get) => ({
   schemeId: null,
   schemeName: "",
+  schemeDescription: "",
   profile: DEFAULT_PROFILE,
   dirty: false,
   schemeBusy: false,
@@ -126,7 +128,6 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   previewError: "",
   saveError: "",
   editorDialog: null,
-  newName: "",
   picker: null,
   presetGalleryOpen: false,
   lastRemoved: null,
@@ -371,6 +372,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       baseStylesError: "",
       schemeId: scheme?.id ?? null,
       schemeName: scheme?.name ?? "",
+      schemeDescription: scheme?.description ?? "",
       leagueCatalog: catalog,
       profile: draft
         ? { ...draft, server: target }
@@ -395,7 +397,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     });
   },
 
-  saveScheme: async (name) => {
+  saveScheme: async (name, description) => {
     const { profile, customSounds, schemeId } = get();
     set({ schemeBusy: true, saveError: "" });
     try {
@@ -410,23 +412,23 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
         uploads[sound.fileName] = await fileToBase64(file);
       }
       await local<string>("scheme_save", {
-        edit: { id: schemeId, name: name.trim(), profile, sounds: uploads, baseFilterChanged: counters.baseFilterChanged },
+        edit: { id: schemeId, name, description, profile, sounds: uploads, baseFilterChanged: counters.baseFilterChanged },
       });
-      toast.success(`「${name.trim()}」已保存`);
-      get().leaveEditor();
     } catch (cause) {
-      set({ saveError: explain(cause) });
+      throw explain(cause);
     } finally {
       set({ schemeBusy: false });
     }
+    toast.success(`「${name}」已保存`);
+    get().leaveEditor();
   },
 
   requestSave: () => {
-    const { schemeId, schemeName } = get();
+    const { schemeId, schemeName, schemeDescription } = get();
     set({ saveError: "" });
     if (get().schemeBusy) return;
-    if (schemeId) void get().saveScheme(schemeName);
-    else set({ newName: "", editorDialog: "saveName" });
+    if (schemeId) void get().saveScheme(schemeName, schemeDescription).catch((cause) => set({ saveError: explain(cause) }));
+    else set({ editorDialog: "saveName" });
   },
 
   generate: async () => {
@@ -465,7 +467,6 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
 
   setEditorDialog: (editorDialog) => set({ editorDialog }),
   setSaveError: (saveError) => set({ saveError }),
-  setNewName: (newName) => set({ newName }),
   openPicker: (target) => set({ picker: target }),
   closePicker: () => set({ picker: null }),
   setPresetGalleryOpen: (presetGalleryOpen) => set({ presetGalleryOpen }),

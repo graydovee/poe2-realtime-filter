@@ -224,6 +224,7 @@ pub(super) fn unpack(bytes: &[u8]) -> Option<Share> {
     let (name, profile): (String, Value) = serde_json::from_slice(metadata).ok()?;
     let mut share = Share {
         name,
+        description: String::new(),
         profile: transform_object(Layout::Profile, profile, false)?,
     };
     let mut descriptors = Vec::new();
@@ -482,6 +483,7 @@ mod tests {
         }
         let share = Share {
             name: "我的过滤器".into(),
+            description: String::new(),
             profile: json!({
                 "schemaVersion": 2, "league": "Standard", "locale": "cn", "baseFilterHint": "基础.filter",
                 "rules": rules, "skippedItemIds": ["exalted-orb", "albino-rhoa-feather", "exalted-orb"]
@@ -509,6 +511,7 @@ mod tests {
         assert!(decode_list([DELTA, 1, 0, 3], &[0xff, 0xff, 0x7f], &history).is_none());
         let share = Share {
             name: "Test".into(),
+            description: String::new(),
             profile: json!({"rules":[],"skippedItemIds":[]}),
         };
         let mut packed = pack(&share).unwrap();
@@ -522,6 +525,7 @@ mod tests {
         let selected = vec![*id; MAX_SELECTED];
         let mut share = Share {
             name: "Test".into(),
+            description: String::new(),
             profile: json!({"rules": [],"skippedItemIds":[]}),
         };
         let selected = json!({"target":{"itemIds": selected}});

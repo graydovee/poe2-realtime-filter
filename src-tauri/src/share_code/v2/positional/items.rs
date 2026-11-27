@@ -26,6 +26,7 @@ pub(super) type Address = (usize, usize);
 
 #[derive(Deserialize)]
 pub(super) struct Catalog {
+    pub(super) version: u32,
     groups: Vec<Group>,
     current: HashMap<String, Address>,
     tree: Node,
@@ -47,6 +48,28 @@ struct Group {
 }
 
 impl Catalog {
+    /// Addresses are only stable within one item catalog. A code from an older catalog cannot be
+    /// restored, and a newer one is unknown here.
+    pub(super) fn check_version(&self, written: Option<u32>) -> Result<()> {
+        // Codes written before the field existed all used the first catalog.
+        let written = written.unwrap_or(1);
+        if written == self.version {
+            return Ok(());
+        }
+        Err(if written > self.version {
+            format!(
+                "分享码来自第 {written} 版物品目录，当前客户端使用第 {} 版，请升级客户端",
+                self.version
+            )
+        } else {
+            format!(
+                "分享码来自第 {written} 版物品目录，当前客户端使用第 {} 版，无法还原其中的物品，请让分享者用新版客户端重新导出",
+                self.version
+            )
+        }
+        .into())
+    }
+
     pub(super) fn address(&self, id: &str) -> Result<Address> {
         self.current
             .get(id)
@@ -567,6 +590,7 @@ mod tests {
             })
             .collect();
         Catalog {
+            version: 1,
             groups,
             current,
             tree: Node {
@@ -574,6 +598,24 @@ mod tests {
                 children,
             },
         }
+    }
+
+    #[test]
+    fn a_code_from_another_catalog_version_is_rejected() {
+        let mut catalog = groups(&[items(0, 3)]);
+        catalog.version = 2;
+        catalog.check_version(Some(2)).unwrap();
+        // Codes written before the field existed carry the first catalog.
+        let older = "分享码来自第 1 版物品目录，当前客户端使用第 2 版，无法还原其中的物品，请让分享者用新版客户端重新导出";
+        assert_eq!(catalog.check_version(None).unwrap_err(), older);
+        assert_eq!(catalog.check_version(Some(1)).unwrap_err(), older);
+        assert_eq!(
+            catalog.check_version(Some(3)).unwrap_err(),
+            "分享码来自第 3 版物品目录，当前客户端使用第 2 版，请升级客户端"
+        );
+        catalog.version = 1;
+        catalog.check_version(None).unwrap();
+        catalog.check_version(Some(1)).unwrap();
     }
 
     fn nest_under_first(catalog: &mut Catalog) {
@@ -617,10 +659,11 @@ mod tests {
         let catalog = groups(&[items(0, 3)]);
         let share = Share {
             name: "N".into(),
+            description: String::new(),
             profile: json!({"rules":[],"skippedItemIds":["test-0","test-1","test-2"]}),
         };
-        assert_eq!(pack_with(&share, &catalog).unwrap(), BYTES);
-        assert_eq!(unpack_with(BYTES, &catalog).unwrap(), share);
+        assert_eq!(pack_with(&share, &catalog, false).unwrap(), BYTES);
+        assert_eq!(unpack_with(BYTES, &catalog, false).unwrap(), share);
     }
 
     #[test]
@@ -721,13 +764,14 @@ mod tests {
         };
         let mut share = Share {
             name: "自定义方案".into(),
+            description: String::new(),
             profile: json!({"schemaVersion":3,"baseFilterHint":"custom.filter",
                 "rules":[make_rule("stack-id", json!(["test-3","test-0","test-0"])),
                          make_rule("rule-0f3a1c2d-3e4f-4a5b-8c6d-0e1f2a3b4c5d", json!(["test-0","test-3"]))],
                 "skippedItemIds":[]}),
         };
         share.profile["rules"][0]["baselineEffectItemId"] = json!("test-0");
-        let data = pack_with(&share, &catalog).unwrap();
+        let data = pack_with(&share, &catalog, false).unwrap();
         let mut lists = Reader(&data);
         lists.segment().unwrap();
         assert_eq!(lists.uint().unwrap(), 0);
@@ -743,7 +787,7 @@ mod tests {
         let bound = share.profile["rules"][0].as_object_mut().unwrap();
         bound.remove("effects");
         bound.remove("effectPresetId");
-        assert_eq!(unpack_with(&data, &catalog).unwrap(), share);
+        assert_eq!(unpack_with(&data, &catalog, false).unwrap(), share);
     }
 
     #[test]
@@ -831,12 +875,15 @@ mod tests {
             .contains("分类路径编号 1"));
         let mut share = Share {
             name: "test".into(),
+            description: String::new(),
             profile: json!({"rules":[],"skippedItemIds":[]}),
         };
-        let mut body = pack_with(&share, &catalog).unwrap();
+        let mut body = pack_with(&share, &catalog, false).unwrap();
         body.push(0);
-        assert!(unpack_with(&body, &catalog).is_err());
+        assert!(unpack_with(&body, &catalog, false).is_err());
         share.profile["skippedItemIds"] = json!(["test-99"]);
-        assert!(pack_with(&share, &catalog).unwrap_err().contains("test-99"));
+        assert!(pack_with(&share, &catalog, false)
+            .unwrap_err()
+            .contains("test-99"));
     }
 }

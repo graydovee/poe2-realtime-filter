@@ -18,6 +18,10 @@ async function catalogShareInputs(catalog) {
   return { view: deriveCatalogView(catalog.items, metadata), allocateShareGroups, allocateShareTree, projectShareCatalog };
 }
 
+/**
+ * 按选择器里的条目分配分享码的槽位和分类路径序号，写回目录文件。
+ * 条目用磁盘上掉落数据里的物品类别编号来分普通基底和传奇，掉落数据有改动时先写它。
+ */
 export async function writeCatalogWithShareData(file, catalog) {
   const { view, allocateShareGroups, allocateShareTree } = await catalogShareInputs(catalog);
   const shareGroups = allocateShareGroups(catalog.shareGroups, view);
@@ -29,4 +33,10 @@ export async function writeCatalogWithShareData(file, catalog) {
 export async function validateCatalogShareData(catalog) {
   const { view, projectShareCatalog } = await catalogShareInputs(catalog);
   return projectShareCatalog(catalog.shareGroups, view, catalog.shareTree);
+}
+
+/** 选择器里的条目所在的分类路径；整类条目记它代表的那一个分类。 */
+export async function catalogPickerPaths(catalog) {
+  const { view } = await catalogShareInputs(catalog);
+  return new Set(view.pickerItems.map((item) => item.categoryPath.join("/").replace(/\/class-selection$/, "")));
 }

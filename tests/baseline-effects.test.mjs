@@ -114,7 +114,9 @@ test('only resolved catalog styles add source candidates to the gallery', () => 
 });
 
 test('general catalog probes use known rarity and gem level without assuming gear rarity', () => {
-  const unique = data.FILTER_ITEMS.find((item) => item.id.startsWith('unique:') && item.matcher.baseType);
+  // 取一件既有普通基底、也有传奇的装备，两种变体都要在。
+  const unique = data.FILTER_ITEMS.find((item) => item.id.startsWith('unique:') && item.matcher.baseType
+    && data.FILTER_ITEMS_BY_ID.has(item.id.replace('unique:', 'base:')));
   const baseId = unique.id.replace('unique:', 'base:');
   const rawId = unique.id.slice('unique:'.length);
   const styles = baseStyles(`Show
@@ -241,12 +243,13 @@ test('profile validation accepts a wire reference without an effect snapshot and
   assert.throws(() => validWith({ ...rule, followBaseline: true }), /无效的基础特效跟随设置/);
 });
 
-test('new price tiers cover all crafting items, skipping equipment and unquoted crafting items', () => {
+test('new price tiers cover currency, gameplay, runes and essences, skipping equipment', () => {
   // 整类条目没有行情，不在默认价格档的物品范围里。
-  const crafting = data.ITEM_CATALOG.filter((item) => item.categoryPath[0] === 'crafting' && !item.matcher.class);
-  const equipment = data.ITEM_CATALOG.find((item) => item.categoryPath[0] === 'equipment' && item.priceable && !item.ambiguous);
+  const pricedRoots = ['currency', 'gameplay', 'runes', 'essences'];
+  const priced = data.ITEM_CATALOG.filter((item) => pricedRoots.includes(item.categoryPath[0]) && !item.matcher.class);
+  const equipment = data.ITEM_CATALOG.find((item) => item.categoryPath[0] === 'equipment' && item.categoryPath[1] === 'one-hand' && item.priceable && !item.ambiguous);
   for (const rule of DEFAULT_PROFILE.rules) {
-    assert.deepEqual(rule.target.itemIds, crafting.map((item) => item.id));
+    assert.deepEqual(rule.target.itemIds, priced.map((item) => item.id));
     assert.equal(rule.target.itemEnabled, true);
     assert.equal(rule.baselineEffectItemId, DEFAULT_EFFECT_ITEMS[rule.id]);
     assert.equal(rule.followBaseline, undefined);

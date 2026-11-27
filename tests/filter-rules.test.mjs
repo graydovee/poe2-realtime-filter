@@ -44,7 +44,7 @@ test("没有填写的特效不生成动作，避免凭空出现的音效", () =>
 });
 
 test("物品集合与价格区间同时使用时取交集", () => {
-  const currency = data.ITEM_CATALOG.filter((item) => item.categoryPath[0] === "crafting" && item.categoryPath[1] === "currency").map((item) => item.id);
+  const currency = data.ITEM_CATALOG.filter((item) => item.categoryPath.join("/") === "currency/currency").map((item) => item.id);
   const target = { itemIds: currency, range: { min: { amount: 1, currency: "exalted" }, max: { amount: 2, currency: "divine" } } };
   const priced = withPrice(snapshot, "gnawed-jawbone", 0.5);
   const generated = generateFilter(profile({ rules: [makeRule({ target, effects: { beam: "Blue" } })] }), priced);

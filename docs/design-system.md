@@ -63,9 +63,9 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **顶栏**：方案库里可切换服务器；编辑中服务器只读显示。方案名右侧是未保存状态。
+- **顶栏**：方案库里可切换服务器；编辑中服务器只读显示。方案名是一个按钮，前面带铅笔图标，点开修改名称和描述；方案名右侧是未保存状态。
 - **检查器**：宽于 1180px 时停靠在右侧（默认 320px，可拖到 280–440px，展开状态记在本地）；更窄时默认收起，用顶栏按钮或 `Ctrl+\` 从侧边滑出。
-- **方案库**：工具栏左侧是「新建方案」和两个导入入口（方案包、分享码），搜索框旁是「导出方案包…」。方案详情的「分享」一节以「导出方案包」为唯一的大按钮，「分享码」和「下载 ZIP」是它下面并排的两个小按钮。
+- **方案库**：工具栏左侧是「新建方案」和两个导入入口（方案包、分享码），搜索框旁是「导出方案包…」。方案卡片从上到下是名称和状态徽标、描述（有才显示，单行截断）、摘要；已安装的方案在摘要同一行的右端显示行情时间，放不下时折到下一行。方案详情的「分享」一节以「导出方案包」为唯一的大按钮，「分享码」和「下载 ZIP」是它下面并排的两个小按钮。
 - **编辑器**：三个模块自上而下——赛季与行情、基础过滤器（含跳过物品，默认折叠，需要处理时自动展开）、自定义规则。规则模块在内容区宽于 768px 时排成「规则列表 | 规则编辑器」两栏，更窄时规则列表变成一行可横向滚动的标签。
 - **容器查询**：规则模块和规则编辑器的断点按各自内容区宽度计算（`@container` / `@3xl:`），与窗口宽度无关，所以拖动检查器时会自然重排。查询条件相对祖先容器求值，列模板要写在容器的子元素上。
 - 最小窗口 720×600 下所有界面可用。
@@ -75,6 +75,7 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 - 成功的操作用 toast（`sonner`）反馈；错误就近显示在对话框内或列表顶部，不打断操作。
 - 对话框统一用 Radix Dialog（`ConfirmDialog`），菜单用 DropdownMenu，提示用 Tooltip，下拉选择用 Select。
 - 删除规则后 toast 里提供「撤销」。
+- **耗时操作显示进度，并且能取消。** 下载基础过滤器时显示当前阶段（检查新版本、已下载大小和百分比、解压）和已等待的秒数；已下载的版本先列出来，检查期间就能选用。
 - 拖拽排序（`@dnd-kit`）始终配有等价的按钮操作（上移 / 下移）和键盘操作（手柄上按空格拿起、上下键移动）。
 - 每个视图外层有错误边界，单个模块渲染出错不会拖垮整个窗口。
 - **界面只显示名字和来源。** 基础过滤器显示名字和来源（本地文件 / 订阅类型 / 下载来源和版本），完整路径放在悬停提示里；「过滤器目录」设置框显示并编辑路径。
@@ -99,9 +100,9 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 - `app/components/ui/`：基础组件，Radix 无样式原语 + CVA 变体，写法与 shadcn/ui 一致。
   - `button`（Button / IconButton）、`input`（Input / Textarea / SearchInput）、`select`、`switch`、`checkbox`、`field`
   - `dialog`（Dialog / ConfirmDialog / SheetContent）、`dropdown-menu`、`popover`、`collapsible`（Disclosure）、`tabs`、`tooltip`
-  - `badge`（Badge / Chip / StatusDot）、`panel`（Panel / CollapsiblePanel）、`alert`、`empty-state`、`separator`、`kbd`、`segmented`、`error-boundary`、`toast`
+  - `badge`（Badge / Chip / StatusDot）、`panel`（Panel / CollapsiblePanel）、`progress`（ProgressBar）、`alert`、`empty-state`、`separator`、`kbd`、`segmented`、`error-boundary`、`toast`
 - `app/components/layout/`：`app-frame`、`top-bar`、`status-bar`、`inspector`。
-- `app/components/manager/`：`scheme-library`（按赛季分组的列表）、`scheme-row`、`scheme-dialogs`（重命名、卸载、删除、分享码导入）、`package-dialogs`（导出方案包、导入方案包）、`manager-inspector`（方案详情 + 刷新、启动、过滤器目录三张设置卡片）。
+- `app/components/manager/`：`scheme-library`（按赛季分组的列表）、`scheme-row`、`scheme-info-dialog`（名称和描述）、`scheme-dialogs`（卸载、删除、分享码导入）、`package-dialogs`（导出方案包、导入方案包）、`manager-inspector`（方案详情 + 刷新、启动、过滤器目录三张设置卡片）。
 - `app/components/editor/`：`season-module`、`base-filter-module`、`rules-module`、`rule-list`、`rule-editor`、`effect-section`、`preset-gallery`、`appearance-preview`、`editor-inspector`。
 - `app/components/`：`item-picker`（选择物品对话框）、`preview-view`（生成预览）、`sound-preview`、`desktop-update`、`command-palette`。
 - `app/state/`：zustand store，分界面、编辑器、方案库三个切片；`bridge.ts` 负责把 Tauri 事件接到 store。`app/page.tsx` 只负责选择视图。
@@ -120,10 +121,12 @@ Windows 客户端使用深色工作台：铺满窗口的应用框架、右侧常
 物品选择器（`item-picker`）的交互约定：
 
 - 左侧是分类树（三态勾选），右侧是当前分类的子类卡片或物品列表（虚拟滚动）。
-- 分类顺序按 poe.ninja 经济侧栏排列，写在 `data/item-mechanics.json` 的 `order` 字段；宝石下的子类（未切割的技能 / 精魂 / 辅助宝石、血脉宝石、符文宝石）按 `lib/catalog.ts` 的 `EXTRA_ORDER` 排列；其余分支保持原有插入顺序。
-- 顶部有搜索、仅看已选、全选本类 / 取消所选 / 全选可堆叠物品。未切割宝石的每个等级是一件独立物品，直接勾选对应的等级；子类卡片要放得下「未切割的技能宝石」这样的分类名，列宽不小于 `15rem`，名字最多两行。
+- 分类树：顶层依次是通货、传奇、玩法、终局、符文、精髓、技能、装备、其他。「装备」只收录会以普通、魔法或稀有掉落的基底，防具按属性需求拆开（例如「头盔(力敏智)」）；「传奇」是独立的顶层分类，条目的名字是传奇的名字，第二行是「传奇 · 基底名」，按基底名也能搜到。
+- 分类的名字和顺序取自 `data/item-categories.json`，名字按完整路径取（同一个名字可以在不同父分类下重复出现，例如各玩法下的「碎片」），最深四层（装备 › 头盔 › 头盔(力)）。
+- 分类树每一行和子类卡片都带图标。分类自己的图片记在 `data/item-categories.json` 的 `icon` 里，是图床上的地址，和物品图标一样第一次用到时取回并缓存在本地；没有单独图片的分类用分类下第一件带图标的物品的图标，子分类按显示顺序找，都没有时用和物品一样的占位图标。分类树里是 16px 的图，和勾选框同宽；子类卡片是和物品行相同的 40px 图标位；「全部分类」用 `Layers`。
+- 顶部有搜索、仅看已选、全选本类 / 取消所选 / 全选可堆叠物品。未切割宝石的每个等级是一件独立物品，直接勾选对应的等级；子类卡片要放得下「头盔(力敏智)」这样的分类名，列宽不小于 `15rem`，名字最多两行。
 - 物品列表是两列虚拟列表。每个格子是一条独立的虚拟行，行容器不接收鼠标事件，只有自己的那一格可以点；列宽写死等分，不随内容变化。
-- 全选一个分类保存的是逐件物品，生成过滤器时由生成器判断要不要合并成一条 `Class` 条件（规则见 `docs/filter-generation.md`）。换界石、远征日志、任务物品没有逐件物品，在各自分类下就是一件普通物品（按分类名显示），选中它就是整类匹配。
+- 全选一个分类保存的是逐件物品，生成过滤器时由生成器判断要不要合并成一条 `Class` 条件（规则见 `docs/filter-generation.md`）。换界石按阶数各是一件物品，「终局 › 换界石」从 16 阶排到 1 阶。远征日志、任务物品是没有逐件物品的整类条目，在各自的分类下就是一件普通物品（按分类名显示），选中它就是整类匹配。
 - 规则物品和跳过物品共用同一个对话框，改动即时生效，关闭即完成。
 
 ## 开发预览

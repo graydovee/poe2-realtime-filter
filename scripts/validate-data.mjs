@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateCatalogShareData } from "./lib/catalog-data.mjs";
+import { CATEGORY_NODES, EQUIPMENT_CLASSES } from "./lib/item-classes.mjs";
+import { validateCatalogShareData, catalogPickerPaths } from "./lib/catalog-data.mjs";
+import { CATEGORY_REFERENCE, ITEM_LIST } from "./lib/item-data.mjs";
 
 const root = process.cwd();
 const vendor = path.join(root, "vendor", "neversink");
@@ -27,54 +29,95 @@ for (const name of required) {
 
 const catalog = JSON.parse(fs.readFileSync(path.join(root, "data", "item-catalog.json"), "utf8"));
 if (!Array.isArray(catalog.items) || catalog.items.length < 1000) problems.push("catalog: expected at least 1000 parsed items");
+if (!Number.isInteger(catalog.catalogVersion) || catalog.catalogVersion < 1) problems.push("catalog: catalogVersion must be a positive integer");
+// 参考数据是由当前的物品列表生成的：两边的版本、取数日期和内容散列一致。
+if (["hash", "version", "captured"].some((field) => CATEGORY_REFERENCE[field] !== ITEM_LIST[field])) {
+  problems.push("reference: data/item-category-reference.json was not built from the current data/item-list.json，运行 npm run catalog:update -- --client <客户端版本目录> --apply 重新生成");
+}
+const expectedSourceVersion = ITEM_LIST.version + " 版本物品列表";
+if (catalog.sourceVersion !== expectedSourceVersion) problems.push("catalog: sourceVersion must be " + expectedSourceVersion + ", found " + catalog.sourceVersion);
+const dropMetadata = JSON.parse(fs.readFileSync(path.join(root, "data", "item-drop-metadata.json"), "utf8"));
+const dropEnabled = dropMetadata.dropEnabled ?? {};
+const itemClasses = dropMetadata.items ?? {};
 const itemIds = new Set();
 for (const item of catalog.items || []) {
   if (!item.id || itemIds.has(item.id)) problems.push("catalog: duplicate or empty item id " + item.id);
   itemIds.add(item.id);
-  if (!item.name || !item.matcher || (!item.matcher.baseType && !item.matcher.class)) problems.push("catalog: invalid matcher " + item.id);
+  if (!item.name || !item.matcher || (!item.matcher.baseType && !item.matcher.class && item.matcher.waystoneTier === undefined)) problems.push("catalog: invalid matcher " + item.id);
   if (!Array.isArray(item.categoryPath) || item.categoryPath.length < 2) problems.push("catalog: missing category path " + item.id);
+  // 分类路径都在分类树里：可选物品在叶子上，整类条目以 class-selection 结尾、前面是它所代表的那个节点。
+  const categoryPath = item.categoryPath ?? [];
+  const isClassEntry = Boolean(item.matcher?.class);
+  const classMarker = isClassEntry && categoryPath.at(-1) === "class-selection";
+  if (isClassEntry && !classMarker) problems.push("catalog: class entry path must end with class-selection " + item.id);
+  const known = CATEGORY_NODES.some((entry) => entry.path === (classMarker ? categoryPath.slice(0, -1) : categoryPath).join("/") && (classMarker || entry.leaf));
+  if (!known && categoryPath[1] !== "other-items") {
+    problems.push("catalog: category path is not in the category tree: " + categoryPath.join("/") + " (" + item.id + ")，运行 node scripts/build-catalog-groups.mjs <客户端版本目录> 重新定分类");
+  }
+  // 落进「其他物品」的不是可选的物品：客户端表里没有它，或者它的类别还没有登记分类。
+  if (categoryPath[1] === "other-items") problems.push("catalog: item filed under other/other-items " + item.id);
   if (!item.localeNames?.cn || !item.localeNames?.tw || !item.localeNames?.us) problems.push("catalog: missing locale name " + item.id);
   // 未切割宝石每个等级是一件独立物品：id 里的等级、GemLevel 和分组必须一致。
   const uncut = /^uncut-(skill|spirit|support)-gem-(\d+)$/.exec(item.id || "");
-  if (uncut && (item.matcher.gemLevel !== Number(uncut[2]) || item.categoryPath?.join("/") !== "gems/uncut-" + uncut[1] + "-gems")) {
+  if (uncut && (item.matcher.gemLevel !== Number(uncut[2]) || categoryPath.join("/") !== "gems/" + uncut[1])) {
     problems.push("catalog: inconsistent uncut gem level " + item.id);
   }
+  // 每件物品的客户端类别编号都要记下，整类匹配按它认出同一个类别的物品。
+  if (!isClassEntry && !itemClasses[item.name] && !/\(Level \d+\)$/.test(item.name)) problems.push("catalog: missing item class " + item.name);
 }
-for (const [kind, levels] of [["skill", 20], ["spirit", 20], ["support", 5]]) {
-  const found = (catalog.items || []).filter((item) => uncutGroup(item) === "uncut-" + kind + "-gems").length;
-  if (found !== levels) problems.push("catalog: expected " + levels + " uncut " + kind + " gem levels, found " + found);
+// 未切割宝石每个等级是一件独立物品，等级范围和客户端一致：技能 1–20，精魂 4–20，辅助 1–5。
+for (const [kind, first, last] of [["skill", 1, 20], ["spirit", 4, 20], ["support", 1, 5]]) {
+  const levels = (catalog.items || []).filter((item) => uncutGroup(item) === kind).map((item) => item.matcher.gemLevel);
+  const expected = Array.from({ length: last - first + 1 }, (_, index) => first + index);
+  if (levels.length !== expected.length || expected.some((level) => !levels.includes(level))) {
+    problems.push("catalog: expected uncut " + kind + " gem levels " + first + "-" + last + ", found " + levels.join(","));
+  }
+}
+// 换界石每个阶数是一件独立物品，1–16 阶各一条，名字、阶数和分类一致。
+for (let tier = 1; tier <= 16; tier += 1) {
+  const waystones = (catalog.items || []).filter((item) => item.id === "waystone-tier-" + tier || item.name === "Waystone (Tier " + tier + ")" || item.matcher?.waystoneTier === tier);
+  const [waystone] = waystones;
+  if (waystones.length !== 1 || waystone.id !== "waystone-tier-" + tier || waystone.name !== "Waystone (Tier " + tier + ")"
+    || JSON.stringify(waystone.matcher) !== JSON.stringify({ waystoneTier: tier }) || waystone.categoryPath.join("/") !== "endgame/waystones") {
+    problems.push("catalog: waystone tier " + tier + " must be one item waystone-tier-" + tier + " with matcher {waystoneTier: " + tier + "} under endgame/waystones");
+  }
+}
+// 物品目录就是物品列表：列表里的每件物品和每件传奇都在目录里，目录里也没有列表里没有的物品和传奇。
+// 目录里另有按类别匹配的整类条目（远征日志在选择器里就是一件整类条目），和只给列表里的传奇挂基底的几件（列表里的 uniqueBases）。
+const listedNames = new Set(CATEGORY_REFERENCE.items.map((entry) => entry.name.toLowerCase()));
+const catalogNames = new Set((catalog.items || []).map((item) => item.name.toLowerCase()));
+const selectableNames = new Set((catalog.items || []).filter((item) => !item.matcher?.class).map((item) => item.name.toLowerCase()));
+const carrierNames = new Set(CATEGORY_REFERENCE.uniqueBases.map((entry) => entry.name.toLowerCase()));
+const missingItems = [...listedNames].filter((name) => !catalogNames.has(name));
+const extraItems = [...selectableNames].filter((name) => !listedNames.has(name) && !carrierNames.has(name));
+const listedUniques = new Set(CATEGORY_REFERENCE.uniques.map((entry) => entry.name));
+const catalogUniques = new Set(Object.values(dropMetadata.uniques ?? {}).flatMap((variants) => Object.keys(variants)));
+const missingUniques = [...listedUniques].filter((name) => !catalogUniques.has(name));
+const extraUniques = [...catalogUniques].filter((name) => !listedUniques.has(name));
+for (const name of missingItems) console.error("FAIL: 物品列表里有、目录里没有的物品：" + name);
+for (const name of extraItems) console.error("FAIL: 目录里有、物品列表里没有的物品：" + name);
+for (const name of missingUniques) console.error("FAIL: 物品列表里有、目录里没有的传奇：" + name);
+for (const name of extraUniques) console.error("FAIL: 目录里有、物品列表里没有的传奇：" + name);
+const listedDiffers = missingItems.length + extraItems.length + missingUniques.length + extraUniques.length;
+if (listedDiffers) {
+  problems.push("catalog: " + listedDiffers + " entries differ from the item list (see FAIL lines above)，运行 npm run catalog:update -- --client <客户端版本目录> --apply");
+}
+// 分类树里的每个叶子在选择器里都有条目。
+const pickerPaths = await catalogPickerPaths(catalog);
+const emptyLeaves = CATEGORY_NODES.filter((entry) => entry.leaf).map((entry) => entry.path).filter((path) => !pickerPaths.has(path));
+if (emptyLeaves.length) problems.push("category tree: leaves without items in the picker: " + emptyLeaves.join(", "));
+// 每件装备基底都要有会不会以普通、魔法或稀有掉落的记录，选择器据此决定给不给它普通基底。
+const unrecorded = (catalog.items || [])
+  .filter((item) => item.matcher?.baseType && !item.matcher.class && EQUIPMENT_CLASSES.has(itemClasses[item.name]?.itemClass) && typeof dropEnabled[item.name] !== "boolean")
+  .map((item) => item.name);
+if (unrecorded.length) {
+  for (const name of unrecorded.slice(0, 10)) console.warn("WARN: 装备基底没有掉落记录，请运行 node scripts/sync-client-items.mjs <客户端版本目录>：" + name);
+  problems.push(unrecorded.length + " equipment bases have no drop record (see WARN above)");
 }
 try {
   await validateCatalogShareData(catalog);
 } catch (error) {
-  problems.push("share catalog: " + error.message + "。更新槽位及分类路径序号请运行 node scripts/apply-catalog-mechanics.mjs --share-only");
-}
-
-const mechanics = JSON.parse(fs.readFileSync(path.join(root, "data", "item-mechanics.json"), "utf8"));
-const groupLabels = mechanics.groups || {};
-const mechanicKeys = Object.keys(groupLabels);
-if (!mechanicKeys.length) problems.push("item mechanics: missing group vocabulary");
-for (const [key, labels] of Object.entries(groupLabels)) {
-  if (!labels?.cn || !labels?.tw || !labels?.us) problems.push("item mechanics: missing labels for " + key);
-}
-const order = mechanics.order || [];
-for (const key of mechanicKeys) if (!order.includes(key)) problems.push("item mechanics: group missing from display order: " + key);
-for (const key of order) if (!mechanicKeys.includes(key) && !["essences", "socketables"].includes(key)) problems.push("item mechanics: unknown key in display order: " + key);
-const mapping = mechanics.items || {};
-const mapped = new Set(Object.keys(mapping));
-const unmapped = [];
-for (const item of catalog.items || []) {
-  if (item.categoryPath?.[0] !== "crafting") continue;
-  const mechanic = item.categoryPath[1];
-  const known = mechanicKeys.includes(mechanic) || ["essences", "socketables", "class-selection"].includes(mechanic);
-  if (!known) problems.push("catalog: unknown crafting group '" + mechanic + "' on " + item.id);
-  // 整类条目不是逐件物品，不归属玩法：它留在所代表分类的末尾（如预兆 › class-selection）。
-  if (mechanicKeys.includes(mechanic) && item.categoryPath.length > 2 && !item.matcher?.class) problems.push("catalog: unexpected extra level under " + mechanic + " on " + item.id);
-  if (mechanicKeys.includes(mechanic) && !mapped.has(item.name) && !item.matcher?.class) unmapped.push(item.name);
-}
-for (const [name, entry] of Object.entries(mapping)) {
-  if (!mechanicKeys.includes(entry?.mechanic)) problems.push("item mechanics: unknown mechanic " + entry?.mechanic + " for " + name);
-  if (typeof entry?.evidence !== "string" || !entry.evidence.trim()) problems.push("item mechanics: missing evidence for " + name);
+  problems.push("share catalog: " + error.message + "。更新槽位及分类路径序号请运行 node scripts/sync-share-addresses.mjs");
 }
 
 const defaultRules = JSON.parse(fs.readFileSync(path.join(root, "data", "default-rules.json"), "utf8")).rules || [];
@@ -99,13 +142,8 @@ defaultRules.forEach((rule, index) => {
   if (!rule.effectPresetId || !rule.effects?.beam || !rule.effects?.icon || !rule.effects?.font) problems.push("default rules: incomplete appearance " + rule.id);
 });
 
-if (unmapped.length) {
-  for (const name of unmapped.slice(0, 10)) console.warn("WARN: 未登记来源玩法，先运行 node scripts/build-item-mechanics.mjs：" + name);
-  problems.push(unmapped.length + " 件通货与材料物品缺少来源玩法归属（见上方 WARN）");
-}
-
 if (problems.length) {
   for (const problem of problems) console.error("FAIL: " + problem);
   process.exit(1);
 }
-console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + Object.keys(mapping).length + " mechanic assignments, " + defaultRules.length + " default rules)");
+console.log("data validation: ok (" + required.length + " baselines, " + catalog.items.length + " catalog items, " + defaultRules.length + " default rules)");

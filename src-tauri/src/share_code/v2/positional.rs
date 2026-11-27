@@ -1,5 +1,6 @@
-//! Format 2, revision 1. A length-prefixed metadata record, then the skip list and one
-//! item list per rule. Keep this layout readable when later versions are added.
+//! Format 2, revisions 1 and 2. A length-prefixed metadata record, then the skip list and one
+//! item list per rule. Revision 2 writes the scheme description after the name. Keep these
+//! layouts readable when later versions are added.
 
 mod items;
 mod metadata;
@@ -15,6 +16,16 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use wire::{invalid, put_uint, Reader};
 
+/// Version of the item catalog that share codes are written against.
+pub(super) fn catalog_version() -> Result<u32> {
+    Ok(catalog()?.version)
+}
+
+/// Rejects a code that was written against another item catalog.
+pub(super) fn check_catalog_version(written: Option<u32>) -> Result<()> {
+    catalog()?.check_version(written)
+}
+
 pub(super) const CODEC: BodyCodec = BodyCodec {
     version: BodyVersion {
         format: 2,
@@ -23,19 +34,35 @@ pub(super) const CODEC: BodyCodec = BodyCodec {
     pack,
     unpack,
 };
+pub(super) const DESCRIBED_CODEC: BodyCodec = BodyCodec {
+    version: BodyVersion {
+        format: 2,
+        revision: 2,
+    },
+    pack: pack_described,
+    unpack: unpack_described,
+};
 const MAX_RULES: usize = 100;
 const MAX_SELECTED: usize = 2000;
 const MAX_SKIPPED: usize = 5000;
 
 fn pack(share: &Share) -> Result<Vec<u8>> {
-    pack_with(share, catalog()?)
+    pack_with(share, catalog()?, false)
 }
 
 fn unpack(bytes: &[u8]) -> Result<Share> {
-    unpack_with(bytes, catalog()?)
+    unpack_with(bytes, catalog()?, false)
 }
 
-fn pack_with(share: &Share, catalog: &Catalog) -> Result<Vec<u8>> {
+fn pack_described(share: &Share) -> Result<Vec<u8>> {
+    pack_with(share, catalog()?, true)
+}
+
+fn unpack_described(bytes: &[u8]) -> Result<Share> {
+    unpack_with(bytes, catalog()?, true)
+}
+
+fn pack_with(share: &Share, catalog: &Catalog, described: bool) -> Result<Vec<u8>> {
     let mut metadata = share.clone();
     for rule in rules_mut(&mut metadata.profile)? {
         let fields = rule.as_object_mut().ok_or_else(invalid)?;
@@ -71,7 +98,7 @@ fn pack_with(share: &Share, catalog: &Catalog) -> Result<Vec<u8>> {
         write_list(&mut lists, slots, &mut prior, index, catalog)?;
         Ok(())
     })?;
-    let metadata = metadata::pack(metadata, MAX_RULES)?;
+    let metadata = metadata::pack(metadata, MAX_RULES, described)?;
     if metadata.len() + lists.len() > MAX_JSON {
         return Err(invalid());
     }
@@ -85,12 +112,12 @@ fn pack_with(share: &Share, catalog: &Catalog) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-fn unpack_with(bytes: &[u8], catalog: &Catalog) -> Result<Share> {
+fn unpack_with(bytes: &[u8], catalog: &Catalog, described: bool) -> Result<Share> {
     if bytes.len() > MAX_JSON {
         return Err(invalid());
     }
     let mut reader = Reader(bytes);
-    let mut share = metadata::unpack(reader.segment()?, MAX_RULES)?;
+    let mut share = metadata::unpack(reader.segment()?, MAX_RULES, described)?;
     for rule in rules_mut(&mut share.profile)? {
         let fields = rule.as_object().ok_or_else(invalid)?;
         if fields.contains_key("baselineEffectItemId")

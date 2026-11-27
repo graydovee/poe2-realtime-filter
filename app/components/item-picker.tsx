@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, ChevronDown, ChevronRight, Coins, Gem, Package, SearchX, Shield, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Coins, Gem, Layers, Package, SearchX, Shield, X } from "lucide-react";
 
 import { canFollowBaselineItem } from "../../lib/baseline-effects";
-import { buildCatalogTree, catalogItems, catalogNode, groupName, groupOrder, itemLabel, searchCatalog, type CatalogNode } from "../../lib/catalog";
+import { buildCatalogTree, catalogIcons, catalogItems, catalogNode, groupName, groupOrder, itemLabel, searchCatalog, type CatalogNode } from "../../lib/catalog";
 import { cn } from "../../lib/cn";
 import { FILTER_ITEMS_BY_ID, PICKER_ITEMS } from "../../lib/data";
 import type { ItemDefinition, Locale } from "../../lib/types";
@@ -26,7 +26,7 @@ const ROW_GAP = 8;
 function ItemImage({ item }: { item: ItemDefinition }) {
   const [failed, setFailed] = useState(false);
   const group = item.categoryPath[0];
-  const Icon = group === "gems" ? Gem : group === "equipment" ? Shield : item.stackable ? Coins : Package;
+  const Icon = group === "gems" ? Gem : group === "equipment" || group === "uniques" ? Shield : item.stackable ? Coins : Package;
   return (
     <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-md border border-line/60 bg-surface">
       {item.iconUrl && !failed ? (
@@ -38,11 +38,24 @@ function ItemImage({ item }: { item: ItemDefinition }) {
   );
 }
 
+/** 没有图片的分类用的占位图标，和同一类物品的占位图标一致。 */
+function CategoryGlyph({ root, className }: { root: string | undefined; className?: string }) {
+  const Icon = root === "gems" ? Gem : root === "equipment" || root === "uniques" ? Shield : root === "currency" ? Coins : Package;
+  return <Icon aria-hidden="true" className={className} />;
+}
+
+/** 分类的图标。图片和物品图标一样取自图床，第一次用到时取回并缓存在本地；取不回来时换成占位图标。 */
+function CategoryImage({ src, root, size, glyph }: { src?: string; root: string | undefined; size: number; glyph: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <CategoryGlyph root={root} className={glyph} />;
+  return <CachedItemImage src={src} alt="" width={size} height={size} className="size-full object-contain" onError={() => setFailed(true)} />;
+}
+
 function itemMeta(item: ItemDefinition) {
   const parts: string[] = [];
-  if (item.category === "unique") parts.push(`传奇 · ${item.matcher.baseType}`);
+  if (item.category === "unique") parts.push(`传奇 · ${item.baseLocaleNames?.[LOCALE] ?? item.matcher.baseType}`);
   if (item.matcher.nonUnique) {
-    parts.push(groupName(item.categoryPath.at(-1) ?? "equipment", LOCALE) + (item.dropLevel ? ` · 掉落等级 ${item.dropLevel}` : ""));
+    parts.push(groupName(item.categoryPath, LOCALE) + (item.dropLevel ? ` · 掉落等级 ${item.dropLevel}` : ""));
   }
   if (itemLabel(item, LOCALE) !== item.name) parts.push(item.name);
   return parts.join(" · ");
@@ -123,7 +136,7 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
   const scope = search ? matching : catalogItems(current);
   const stackables = scope.filter((item) => item.stackable);
   const canBatch = Boolean(search || path.length);
-  const group = search ? "搜索结果" : path.length ? groupName(current.key, LOCALE) : "全部物品";
+  const group = search ? "搜索结果" : path.length ? groupName(current.path, LOCALE) : "全部物品";
   const count = (items: ItemDefinition[]) => items.reduce((total, item) => total + (selected.has(item.id) ? 1 : 0), 0);
 
   // 每个分类的物品总数只和目录有关，算一次就够。
@@ -139,10 +152,13 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
     return map;
   }, [tree]);
 
+  // 每个分类的图标：分类自己的图片，没有的用分类下第一件带图标的物品的图标。
+  const icons = useMemo(() => catalogIcons(tree), [tree]);
+
   const rows = useMemo(() => {
     const list: TreeRow[] = [];
     const walk = (node: CatalogNode, depth: number) => {
-      for (const child of [...node.children].sort((a, b) => groupOrder(a.key) - groupOrder(b.key))) {
+      for (const child of [...node.children].sort((a, b) => groupOrder(a.path) - groupOrder(b.path))) {
         const open = expanded.has(child.path.join("/"));
         list.push({ node: child, depth, open });
         if (open) walk(child, depth + 1);
@@ -195,7 +211,7 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
     scrollRef.current?.scrollTo({ top: 0 });
   }, [query, path, selectedOnly]);
 
-  const childNodes = [...current.children].sort((a, b) => groupOrder(a.key) - groupOrder(b.key));
+  const childNodes = [...current.children].sort((a, b) => groupOrder(a.path) - groupOrder(b.path));
   const showCategories = !flat && !selectedOnly && !search && childNodes.length > 0;
 
   return (
@@ -212,6 +228,9 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
                 onCheckedChange={(checked) => toggle(items, checked === true, "全部分类", "")}
               />
             )}
+            <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">
+              <Layers className="size-4 text-ink-faint" />
+            </span>
             <button
               type="button"
               aria-current={!path.length ? "location" : undefined}
@@ -227,14 +246,15 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
           </div>
           {rows.map(({ node, depth, open }) => {
             const id = node.path.join("/");
-            const name = groupName(node.key, LOCALE);
+            const name = groupName(node.path, LOCALE);
             const total = totals.get(id) ?? 0;
             const chosen = count(catalogItems(node));
             const active = id === path.join("/");
             return (
+              // 分类名最长的是「头盔(力敏智)」，加上图标后行内间距收紧，名字才放得下。
               <div
                 key={id}
-                className={cn("flex h-8 items-center gap-1.5 rounded-sm pr-1.5 transition-colors duration-150 hover:bg-surface-3", active && "bg-surface-3")}
+                className={cn("flex h-8 items-center gap-1 rounded-sm pr-1.5 transition-colors duration-150 hover:bg-surface-3", active && "bg-surface-3")}
                 style={{ paddingLeft: 6 + depth * 12 }}
               >
                 <button
@@ -254,6 +274,9 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
                     onCheckedChange={(checked) => toggle(catalogItems(node), checked === true, name, id)}
                   />
                 )}
+                <span aria-hidden="true" className="grid size-4 shrink-0 place-items-center">
+                  <CategoryImage src={icons.get(id)} root={node.path[0]} size={16} glyph="size-3.5 text-ink-faint" />
+                </span>
                 <button
                   type="button"
                   aria-current={active ? "location" : undefined}
@@ -306,7 +329,7 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
                   onClick={() => navigate(path.slice(0, index + 1))}
                   className={cn("cursor-pointer truncate rounded-sm px-1 py-0.5 hover:text-ink", index === path.length - 1 && "font-medium text-gold-bright")}
                 >
-                  {groupName(key, LOCALE)}
+                  {groupName(path.slice(0, index + 1), LOCALE)}
                 </button>
               </span>
             ))}
@@ -341,12 +364,12 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
         )}
 
         {showCategories && (
-          // 列宽要放得下「未切割的技能宝石」这样的分类名：右边还有「全选」按钮，太窄会把名字截得分不清。
+          // 列宽要放得下「头盔(力敏智)」这样的分类名：右边还有「全选」按钮，太窄会把名字截得分不清。
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-2" role="group" aria-label="物品分类">
             {childNodes.map((child) => {
               const items = catalogItems(child);
               const chosen = count(items);
-              const name = groupName(child.key, LOCALE);
+              const name = groupName(child.path, LOCALE);
               return (
                 <div key={child.path.join("/")} className="flex min-w-0 rounded-md border border-line bg-surface transition-colors duration-150 hover:border-line-strong">
                   <button
@@ -354,11 +377,16 @@ function ItemPicker({ itemIds, items = PICKER_ITEMS, flat = false, onToggle, onC
                     onClick={() => navigate(child.path)}
                     className="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-2 px-2.5 py-2 text-left hover:text-gold-bright"
                   >
-                    <span className="min-w-0">
-                      <span className="line-clamp-2 text-sm leading-snug text-ink">{name}</span>
-                      <span className="text-xs text-ink-muted">
-                      {onPick ? `${items.length} 项物品` : `已选 ${chosen} / ${items.length}`}
-                    </span>
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-md border border-line/60 bg-surface p-1">
+                        <CategoryImage src={icons.get(child.path.join("/"))} root={child.path[0]} size={32} glyph="size-4 text-ink-muted" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 text-sm leading-snug text-ink">{name}</span>
+                        <span className="text-xs text-ink-muted">
+                          {onPick ? `${items.length} 项物品` : `已选 ${chosen} / ${items.length}`}
+                        </span>
+                      </span>
                     </span>
                     <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-ink-muted" />
                   </button>

@@ -10,6 +10,7 @@ const match = (id) => data.CLASS_MATCHES.find((entry) => entry.item.id === id);
 const memberIds = (id) => match(id).members.map((item) => item.id);
 const omenIds = () => memberIds("class-omen");
 const pathOf = (item) => item.categoryPath.join("/");
+const leafOf = (id) => data.FILTER_ITEMS_BY_ID.get(id).categoryPath.join("/");
 // 规则名用 id，方便在生成的块里认出来。
 const build = (rules, skippedItemIds = []) => validateProfile({ ...DEFAULT_PROFILE, rules, skippedItemIds });
 const itemRule = (id, itemIds, overrides = {}) => makeRule({ id, name: id, target: { itemIds }, ...overrides });
@@ -17,16 +18,17 @@ const classLines = (filter) => ruleBlocks(filter).filter((block) => block.includ
 
 test("整类条目不是可选物品", () => {
   const selectable = data.PICKER_ITEMS.filter((item) => item.matcher.class);
-  // 只有换界石、远征日志、任务物品没有逐件物品，全选这几个分类时直接保存整类条目。
-  assert.deepEqual(selectable.map((item) => item.id).sort(), ["class-expedition-logbook", "class-quest-items", "class-waystones"]);
-  for (const item of selectable) {
-    assert.equal(data.ITEM_CATALOG.filter((entry) => pathOf(entry) === pathOf(item) && !entry.matcher.class).length, 0, item.id + " 所在的分类不该有逐件物品");
-  }
+  // 只有远征日志、任务物品没有逐件物品，全选这两个分类时直接保存整类条目。
+  assert.deepEqual(selectable.map((item) => item.id).sort(), ["class-expedition-logbook", "class-quest-items"]);
+  // 任务物品自己占一个分类；远征日志和两件三曲碎片同在「探险 › 碎片」里。
+  const shown = (id) => data.PICKER_ITEMS.find((item) => item.id === id);
+  assert.equal(pathOf(shown("class-quest-items")), "other/quest-items");
+  assert.equal(pathOf(shown("class-expedition-logbook")), "gameplay/expedition/fragments");
+  assert.deepEqual(data.PICKER_ITEMS.filter((item) => item.id !== "class-expedition-logbook" && pathOf(item) === "gameplay/expedition/fragments").map((item) => item.name), ["Shattered Triskelion", "The Triskelion Reforged"]);
   // 搜索也找不到其他整类条目。
-  const hidden = ["Amulets", "Stackable Currency", "Map Fragments", "Omen"];
+  const hidden = ["Amulets", "Stackable Currency", "Map Fragments", "Omen", "Waystones"];
   for (const query of hidden) assert.ok(!data.PICKER_ITEMS.some((item) => item.name === query), query);
-  // 这三个条目在界面上就是普通物品的名字（按分类叫），不显示英文类名，也不带「整类」字样。
-  assert.equal(itemLabel(data.FILTER_ITEMS_BY_ID.get("class-waystones"), "cn"), "换界石");
+  // 这两个条目在界面上就是普通物品的名字（按分类叫），不显示英文类名，也不带「整类」字样。
   assert.equal(itemLabel(data.FILTER_ITEMS_BY_ID.get("class-expedition-logbook"), "cn"), "远征日志");
   assert.equal(itemLabel(data.FILTER_ITEMS_BY_ID.get("class-quest-items"), "cn"), "任务物品");
   for (const item of data.PICKER_ITEMS) assert.ok(!itemLabel(item, "cn").includes("整类"), item.id);
@@ -34,30 +36,37 @@ test("整类条目不是可选物品", () => {
   for (const rule of DEFAULT_PROFILE.rules) assert.ok(!rule.target.itemIds.some((id) => data.FILTER_ITEMS_BY_ID.get(id)?.matcher.class), rule.id);
 });
 
-test("登记表里的每条整类匹配对应选择器里的一个分类", () => {
+test("登记表里的每条整类匹配，成员是它那个类别的逐件物品", () => {
+  const classOnly = ["class-expedition-logbook", "class-quest-items"];
   assert.equal(data.CLASS_MATCHES.length, 56);
   for (const entry of data.CLASS_MATCHES) {
-    const key = entry.path.join("/");
-    const inCategory = data.PICKER_ITEMS.filter((item) => pathOf(item) === key && !item.matcher.class);
-    assert.deepEqual(entry.members.map((item) => item.id), inCategory.map((item) => item.id), key);
-    for (const item of entry.members) assert.equal(data.CLASS_OF_ITEM.get(item.id), entry, item.id + " 应该登记在自己的分类下");
+    assert.ok(entry.members.length > 0 || classOnly.includes(entry.item.id), entry.item.id);
+    for (const item of entry.members) assert.equal(data.CLASS_OF_ITEM.get(item.id), entry, item.id + " 应该登记在自己的类别下");
   }
   const nonEquipment = data.CLASS_MATCHES.filter((entry) => !/^(base|unique):class-/.test(entry.item.id));
   assert.deepEqual(nonEquipment.map((entry) => entry.item.id), [
     "class-charms", "class-expedition-logbook", "class-incubators", "class-life-flasks", "class-mana-flasks",
     "class-omen", "class-pinnacle-keys", "class-quest-items", "class-skill-gems", "class-support-gems", "class-vault-keys", "class-waystones",
   ]);
-  assert.equal(memberIds("class-omen").length, 37);
-  assert.equal(memberIds("class-skill-gems").length, 22);
-  assert.equal(memberIds("class-support-gems").length, 85);
-  assert.equal(match("class-waystones").members.length, 0);
+  // 预兆的类别里也有探险的五个传说（Vorana's Saga 这些），它们在客户端里的类别同样是 Omen。
+  assert.equal(memberIds("class-omen").length, 42);
+  assert.equal(memberIds("class-skill-gems").length, 23);
+  assert.equal(memberIds("class-support-gems").length, 84);
+  // 换界石每一阶是一件物品，16 阶合起来是 Waystones 这一个类别。
+  assert.deepEqual(memberIds("class-waystones").map(leafOf), Array(16).fill("endgame/waystones"));
+  // 一个类别的物品可以分布在几个分类里：预兆分在四个玩法下，头盔的普通基底按属性分成七个。
+  const leaves = (ids) => [...new Set(ids.map(leafOf))].sort();
+  assert.deepEqual(leaves(memberIds("class-omen")), ["gameplay/abyss/omens", "gameplay/expedition/omens", "gameplay/ritual/equipment-omens", "gameplay/ritual/map-omens", "other/unavailable"]);
+  assert.deepEqual(leaves(memberIds("base:class-helmets")), ["equipment/helmets/str", "equipment/helmets/dex", "equipment/helmets/int", "equipment/helmets/str-dex", "equipment/helmets/str-int", "equipment/helmets/dex-int", "equipment/helmets/str-dex-int"].sort());
+  assert.deepEqual(leaves(memberIds("base:class-shields")), ["equipment/off-hand/shields-str", "equipment/off-hand/shields-str-dex", "equipment/off-hand/shields-str-int"]);
+  assert.deepEqual(leaves(memberIds("unique:class-helmets")), ["uniques/equipment/helmets"]);
   // 装备的每个类型各有普通基底、传奇两个变体，带各自的稀有度条件。
   const equipment = data.CLASS_MATCHES.filter((entry) => /^(base|unique):class-/.test(entry.item.id));
   assert.equal(equipment.length, 44);
   for (const entry of equipment) {
     const [group] = entry.item.id.split(":");
-    assert.deepEqual(entry.path.slice(0, 2), ["equipment", group === "base" ? "normal-bases" : "unique-equipment"], entry.item.id);
     assert.deepEqual(entry.item.matcher, group === "base" ? { class: entry.item.matcher.class, nonUnique: true } : { class: entry.item.matcher.class, rarity: "Unique" });
+    assert.ok(entry.members.every((item) => (group === "base") === Boolean(item.matcher.nonUnique)), entry.item.id);
   }
   // 这几个整类条目不代表任何选择器分类，保持不可用。
   for (const id of ["class-stackable-currency", "class-map-fragments", "class-tablet", "class-fishing-rods", "class-instance-local-items", "class-amulets", "class-jewels", "class-augment"]) {
@@ -99,17 +108,24 @@ test("登记的类别确实对应它所代表分类里的物品", () => {
 
   // 这几类在 NeverSink 里没法用物品名单核对，依据写在本测试后半部分：
   // 药剂只写了档位名；符文宝石只按名字匹配、Skill Gems 和 Support Gems 写在同一个条件里；
-  // 巅峰钥匙和宝库钥匙用的是不带物品名单的整类块。
-  const unverifiableInReference = new Set(["class-life-flasks", "class-mana-flasks", "class-skill-gems", "class-pinnacle-keys", "class-vault-keys"]);
+  // 巅峰钥匙和宝库钥匙用的是不带物品名单的整类块；换界石只写 Class 和 WaystoneTier。
+  const unverifiableInReference = new Set(["class-life-flasks", "class-mana-flasks", "class-skill-gems", "class-pinnacle-keys", "class-vault-keys", "class-waystones"]);
   for (const entry of data.CLASS_MATCHES) {
     if (/^(base|unique):class-/.test(entry.item.id) || !entry.members.length || unverifiableInReference.has(entry.item.id)) continue;
     const paired = pairedWith(entry.item.matcher.class);
     const overlap = entry.members.filter((item) => paired.includes(item.name)).map((item) => item.name);
-    assert.ok(overlap.length > 0, entry.item.matcher.class + "：NeverSink 在这个类别下点过 " + paired.length + " 件物品，没有一件属于「" + entry.path.join("/") + "」");
+    assert.ok(overlap.length > 0, entry.item.matcher.class + "：NeverSink 在这个类别下点过 " + paired.length + " 件物品，没有一件属于「" + entry.item.id + "」");
   }
-  // NeverSink 点名的物品和分类成员完全重合的几类。
+  // 换界石：NeverSink 的条件从 1 阶写到 16 阶，目录里的 16 阶正好是整个类别。
+  const waystoneTiers = [...readFileSync("vendor/neversink/NeverSink's filter 2 - 2-SEMI-STRICT.filter", "utf8").matchAll(/WaystoneTier (>=|<=) (\d+)/g)].map(([, operator, value]) => operator + value);
+  for (const bound of [">=16", ">=1", "<=14", "<=5"]) assert.ok(waystoneTiers.includes(bound), bound);
+  // NeverSink 点名的物品和分类成员完全重合的几类。药瓶和咒符上的传奇也是这些类别的成员，NeverSink 的名单只对得上普通物品。
   for (const [className, id] of [["Omen", "class-omen"], ["Charms", "class-charms"], ["Incubators", "class-incubators"]]) {
-    assert.deepEqual(memberIds(id).map((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name).filter((name) => !pairedWith(className).includes(name)), [], className);
+    assert.deepEqual(memberIds(id).map((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId)).filter((item) => item.category !== "unique").map((item) => item.name).filter((name) => !pairedWith(className).includes(name)), [], className);
+  }
+  // 药瓶和咒符上的传奇跟着基底进了同一个类别的成员里。
+  for (const [id, count] of [["class-charms", 12], ["class-life-flasks", 2], ["class-mana-flasks", 3]]) {
+    assert.equal(memberIds(id).filter((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).category === "unique").length, count, id);
   }
   // 下面几类在 NeverSink 里没法用物品名单核对，依据逐条写在这里。按名字查目录，不凭印象写 id。
   const catalogId = (name) => {
@@ -124,10 +140,10 @@ test("登记的类别确实对应它所代表分类里的物品", () => {
   // wiki 上 Origin Spark 是 Pinnacle Key、Olroth's Reliquary Key 是 Vault Key；NeverSink 对这两类只用不带物品名单的整类块。
   assert.ok(memberIds("class-pinnacle-keys").includes(catalogId("Origin Spark")));
   assert.ok(memberIds("class-vault-keys").includes(catalogId("Olroth's Reliquary Key")));
-  assert.ok(memberIds("class-vault-keys").every((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name.endsWith(" Reliquary Key")));
+  assert.ok(memberIds("class-vault-keys").every((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name.includes("Reliquary Key")));
   // NeverSink 点名药剂时只写档位（"Gargantuan"），和全名对不上；类别和物品类型同名。
   for (const [id, suffix] of [["class-life-flasks", " Life Flask"], ["class-mana-flasks", " Mana Flask"]]) {
-    assert.ok(memberIds(id).every((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId).name.endsWith(suffix)), id);
+    assert.ok(memberIds(id).map((itemId) => data.FILTER_ITEMS_BY_ID.get(itemId)).filter((item) => item.category !== "unique").every((item) => item.name.endsWith(suffix)), id);
   }
 });
 
@@ -140,13 +156,20 @@ test("石板按逐件输出，不生成 Class 条件", () => {
   assert.equal(ruleBlocks(output.filterFile).length, 8);
 });
 
-test("全选一个分类时输出一条整类块", () => {
+test("全选一个类别时输出一条整类块", () => {
   const output = generateOnBase(build([itemRule("omens", omenIds())]), null, snapshot);
   // 注释和逐件块一样用条目自己的名字，不另加「整类」标记。
   assert.deepEqual(ruleBlocks(output.filterFile), ['Show # poe2-filter rule: omens / Omen\n\tClass == "Omen"']);
-  assert.equal(output.appliedRules[0].itemCount, 37);
+  assert.equal(output.appliedRules[0].itemCount, 42);
   assert.equal(output.safetyReport.ambiguousItems, 0);
   assert.ok(!output.safetyReport.warnings.some((line) => line.includes("歧义")), output.safetyReport.warnings.join(" / "));
+  // 预兆分散在四个玩法的叶子下：只全选其中一个叶子，或者全选「祭祀」，都还不是整个类别，按逐件输出。
+  for (const leaf of ["gameplay/ritual/equipment-omens", "gameplay/ritual"]) {
+    const ids = omenIds().filter((id) => leafOf(id) === leaf || leafOf(id).startsWith(leaf + "/"));
+    const partial = generateOnBase(build([itemRule("omens", ids)]), null, snapshot).filterFile;
+    assert.equal(classLines(partial).length, 0, leaf);
+    assert.equal(ruleBlocks(partial).length, ids.length, leaf);
+  }
 });
 
 test("带价格条件的规则不合并：整类条目没有行情", () => {
@@ -156,18 +179,18 @@ test("带价格条件的规则不合并：整类条目没有行情", () => {
   const blocks = ruleBlocks(generateOnBase(build([rule]), null, market).filterFile);
   assert.equal(blocks.length, 2, "只有两件预兆有报价且达到 1 E");
   assert.equal(classLines(generateOnBase(build([rule]), null, market).filterFile).length, 0);
-  assert.ok(blocks.every((block) => /\n\tBaseType == "Omen/.test(block)));
+  assert.ok(blocks.every((block) => /\n\tBaseType == "/.test(block)));
 });
 
 test("少选一件、或者这一类里有物品被跳过时，按逐件输出", () => {
   const ids = omenIds();
   const partial = generateOnBase(build([itemRule("omens", ids.slice(1))]), null, snapshot).filterFile;
   assert.equal(classLines(partial).length, 0);
-  assert.equal(ruleBlocks(partial).length, 36);
+  assert.equal(ruleBlocks(partial).length, 41);
   // 跳过物品只在有基础过滤器时生效，所以这里带着基础过滤器生成。
   const skipped = engine.generateFilter(build([itemRule("omens", ids)], [ids[0]]), snapshot).filterFile;
   assert.equal(classLines(skipped).length, 0);
-  assert.equal(ruleBlocks(skipped).length, 36);
+  assert.equal(ruleBlocks(skipped).length, 41);
 });
 
 test("装备按普通基底和传奇分别整类，各带稀有度条件", () => {
@@ -201,14 +224,14 @@ test("整类块能覆盖后面的规则，逐件块覆盖不了后面的整类�
 });
 
 test("只能整类选择的分类可以直接选", () => {
-  const output = generateOnBase(build([itemRule("maps", ["class-waystones"]), { ...itemRule("logs", ["class-expedition-logbook"]), hidden: true }]), null, snapshot);
+  const output = generateOnBase(build([itemRule("logs", ["class-expedition-logbook"]), { ...itemRule("quests", ["class-quest-items"]), hidden: true }]), null, snapshot);
   assert.deepEqual(ruleBlocks(output.filterFile), [
-    'Show # poe2-filter rule: maps / Waystones\n\tClass == "Waystones"',
-    'Hide # poe2-filter rule: logs / Expedition Logbook\n\tClass == "Expedition Logbook"',
+    'Show # poe2-filter rule: logs / Expedition Logbook\n\tClass == "Expedition Logbook"',
+    'Hide # poe2-filter rule: quests / Quest Items\n\tClass == "Quest Items"',
   ]);
   assert.equal(output.appliedRules[0].itemCount, 1);
   // 在跳过物品里的整类条目不生成规则。
-  const skipped = engine.generateFilter(build([itemRule("maps", ["class-waystones"])], ["class-waystones"]), snapshot);
+  const skipped = engine.generateFilter(build([itemRule("logs", ["class-expedition-logbook"])], ["class-expedition-logbook"]), snapshot);
   assert.equal(ruleBlocks(skipped.filterFile).length, 0);
 });
 

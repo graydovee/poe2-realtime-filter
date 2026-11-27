@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Pencil, Search } from "lucide-react";
 
 import { requestLeaveEditor } from "../../hooks/use-shortcuts";
 import { SERVER_LABELS } from "../../../lib/desktop";
@@ -51,6 +51,9 @@ function ViewContext() {
   const schemeName = useAppStore((state) => state.schemeName);
   const schemeId = useAppStore((state) => state.schemeId);
   const dirty = useAppStore((state) => state.dirty);
+  const schemeBusy = useAppStore((state) => state.schemeBusy);
+  const requestSave = useAppStore((state) => state.requestSave);
+  const setEditorDialog = useAppStore((state) => state.setEditorDialog);
 
   if (view === "manager") {
     return <h1 className="truncate text-sm font-semibold text-ink">方案库</h1>;
@@ -64,7 +67,18 @@ function ViewContext() {
         方案库
       </Button>
       <Separator />
-      <span className="min-w-0 truncate text-sm font-semibold text-ink">{schemeName || "未命名方案"}</span>
+      {/* 点方案名修改名称和描述；未保存的新方案还没有这两项，点了直接去保存。 */}
+      <Tooltip label={schemeId ? "修改名称和描述" : "保存新方案"}>
+        <Button
+          variant="ghost"
+          disabled={schemeBusy}
+          onClick={() => (schemeId ? setEditorDialog("nameDescription") : requestSave())}
+          className="h-auto min-w-0 max-w-full shrink gap-1.5 px-1.5 py-1 font-semibold text-ink"
+        >
+          <Pencil aria-hidden="true" className="text-ink-faint" />
+          <span className="min-w-0 truncate">{schemeName || "未命名方案"}</span>
+        </Button>
+      </Tooltip>
       {!schemeId ? (
         <Badge tone="muted" className={badgeClassName}>
           <StatusDot tone="muted" />

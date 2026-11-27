@@ -6,14 +6,15 @@ export type View = "manager" | "editor";
 /** 物品选择器正在编辑的条件、跳过物品或特效来源。 */
 export type PickerTarget = "rule" | "skipped" | { kind: "effect-source"; ruleId: string; itemIds?: string[] };
 
-export type EditorDialog = "saveName" | "discard";
+export type EditorDialog = "saveName" | "nameDescription" | "discard";
 
-export type ManagerDialogKind = "rename" | "remove" | "uninstall";
+export type ManagerDialogKind = "nameDescription" | "remove" | "uninstall";
 export type ManagerDialog = { kind: ManagerDialogKind; scheme: LocalScheme };
 
 export type ShareDetails = {
   server: GameServer;
   name: string;
+  description: string;
   league: string | null;
   hasServer: boolean;
   catalog: LeagueCatalog;

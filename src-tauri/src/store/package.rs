@@ -257,6 +257,7 @@ impl Store {
             planned.push(PackageScheme {
                 id: scheme.id.clone(),
                 name: scheme.name.clone(),
+                description: scheme.description.clone(),
                 base,
                 sounds: entry_sounds,
                 profile,
@@ -574,6 +575,7 @@ impl Store {
                     let current_profile =
                         without_base(engine::call("validate", current.profile.clone())?);
                     if current.name == entry.name
+                        && current.description == entry.description
                         && current_profile == without_base(profile.clone())
                         && current.sounds == entry.sounds
                         && same_base
@@ -911,12 +913,13 @@ impl Store {
                 }
             };
             let name = decisions.names.get(&index).unwrap_or(&default);
+            let description = package.manifest.schemes[index].description.clone();
             let mut profile = package_profile(package, index, &provided, league, leagues)?;
             if !with_content {
                 self.bind_hint(library, &mut profile);
             }
             let sounds = package.sounds(index)?;
-            let scheme = self.prepare_scheme(library, id, name, profile, sounds)?;
+            let scheme = self.prepare_scheme(library, id, name, &description, profile, sounds)?;
             taken.insert(scheme.name.to_lowercase());
             ids.push(scheme.id.clone());
             library.schemes.push(scheme);
@@ -936,9 +939,14 @@ impl Store {
         league: Option<&str>,
         leagues: &[String],
     ) -> Result<()> {
-        let (id, name, with_content) = {
+        let (id, name, description, with_content) = {
             let entry = &package.manifest.schemes[index];
-            (entry.id.clone(), entry.name.clone(), entry.base.is_some())
+            (
+                entry.id.clone(),
+                entry.name.clone(),
+                entry.description.clone(),
+                entry.base.is_some(),
+            )
         };
         let mut profile = package_profile(package, index, provided, league, leagues)?;
         if !with_content {
@@ -949,8 +957,8 @@ impl Store {
         updated.profile = profile;
         self.store_sound_bytes(&mut updated, sounds)?;
         self.check_unique(library, updated.server(), &name, Some(&id))?;
-        // Renaming moves the installed filter too. It is the only step that may write early.
-        self.rename(library, &id, &name)?;
+        // A changed name moves the installed filter too. It is the only step that may write early.
+        self.set_info(library, &id, &name, &description)?;
         let scheme = Store::get_mut(library, &id)?;
         scheme.profile = updated.profile;
         scheme.sounds = updated.sounds;
@@ -1134,7 +1142,7 @@ mod tests {
         fn add(&mut self, name: &str, profile: Value, sounds: BTreeMap<String, String>) -> String {
             let id = self
                 .store
-                .add(&mut self.library, name, profile, sounds)
+                .add(&mut self.library, name, "", profile, sounds)
                 .unwrap();
             self.store.persist(&self.library).unwrap();
             id
@@ -1418,6 +1426,48 @@ mod tests {
         assert!(fs::read_to_string(receiver.copy_of(&identity))
             .unwrap()
             .contains("SetFontSize 32"));
+    }
+
+    #[test]
+    fn a_description_travels_with_the_package_and_a_changed_one_updates() {
+        let mut sender = World::new();
+        let id = sender.add("开荒", profile(None, json!([])), BTreeMap::new());
+        let bare = sender.export(&["开荒"], None);
+        assert_eq!(manifest(&bare).schemes[0].description, "");
+
+        sender
+            .store
+            .set_info(&mut sender.library, &id, "开荒", "开荒期，保留崇高石光柱")
+            .unwrap();
+        let first = sender.export(&["开荒"], None);
+        assert_eq!(
+            manifest(&first).schemes[0].description,
+            "开荒期，保留崇高石光柱"
+        );
+        let mut receiver = World::new();
+        let imported = receiver.apply(&first, PackageDecisions::default())[0].clone();
+        assert_eq!(
+            receiver.scheme(&imported).description,
+            "开荒期，保留崇高石光柱"
+        );
+        assert!(matches!(
+            receiver.plan(&first).schemes[0],
+            SchemeAction::Latest { .. }
+        ));
+
+        // The author changes only the description.
+        sender
+            .store
+            .set_info(&mut sender.library, &id, "开荒", "开荒到终局")
+            .unwrap();
+        let second = sender.export(&["开荒"], None);
+        assert!(matches!(
+            receiver.plan(&second).schemes[0],
+            SchemeAction::Update { blocked: false, .. }
+        ));
+        let ids = receiver.apply(&second, PackageDecisions::default());
+        assert_eq!(ids, vec![imported.clone()]);
+        assert_eq!(receiver.scheme(&imported).description, "开荒到终局");
     }
 
     #[test]

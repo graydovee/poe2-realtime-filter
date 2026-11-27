@@ -61,6 +61,8 @@ pub struct PackageFile {
 pub struct PackageScheme {
     pub id: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
     /// The ID of an entry in `bases`. Absent when the scheme carries no filter content.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base: Option<String>,
@@ -186,6 +188,7 @@ fn validate(manifest: &Manifest) -> Result<()> {
             return Err("方案包里的方案 ID 无效或重复".into());
         }
         crate::store::scheme_name(&scheme.name)?;
+        crate::store::scheme_description(&scheme.description)?;
         if scheme
             .base
             .as_ref()
@@ -509,6 +512,7 @@ mod tests {
         PackageScheme {
             id: id.into(),
             name: "方案".into(),
+            description: String::new(),
             base: base.map(str::to_owned),
             sounds,
             profile: json!({"server":"international","schemaVersion":3,"league":"Standard",
@@ -634,6 +638,12 @@ mod tests {
     fn manifest_round_trip_and_rejects_malformed_content() {
         let bytes = serde_json::to_vec_pretty(&manifest()).unwrap();
         assert_eq!(parse_manifest(&bytes).unwrap(), manifest());
+        // A scheme without a description leaves the field out.
+        assert!(!String::from_utf8_lossy(&bytes).contains("description"));
+        let mut long: Value = serde_json::from_slice(&bytes).unwrap();
+        long["schemes"][0]["description"] = json!("长".repeat(201));
+        let error = parse_manifest(&serde_json::to_vec(&long).unwrap()).unwrap_err();
+        assert!(error.contains("描述"), "{error}");
         let mut newer = manifest();
         newer.format = 2;
         let error = parse_manifest(&serde_json::to_vec(&newer).unwrap()).unwrap_err();

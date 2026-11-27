@@ -1,0 +1,337 @@
+{
+  "itemClasses": {
+    "equipment": [4, 5, 8, 12, 13, 14, 17, 20, 21, 22, 23, 24, 25, 26, 32, 42, 58, 79, 80, 81, 86, 94, 110],
+    "uniqueBases": [0, 1, 33, 107]
+  },
+  "roots": [
+    {
+      "key": "currency",
+      "name": { "cn": "通货", "tw": "通貨", "us": "Currency" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Currency/CurrencyModValues.webp",
+      "children": [
+        { "key": "currency", "name": { "cn": "通货", "tw": "通貨", "us": "Currency" } },
+        { "key": "tiered", "name": { "cn": "系列通货", "tw": "系列通貨", "us": "Tiered Currency" } },
+        { "key": "quality", "name": { "cn": "品质通货", "tw": "品質通貨", "us": "Quality Currency" } },
+        { "key": "shards", "name": { "cn": "碎片", "tw": "碎片", "us": "Shards" } }
+      ]
+    },
+    {
+      "key": "uniques",
+      "name": { "cn": "传奇", "tw": "傳奇", "us": "Uniques" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DArt/minimap/player/IncursionRewardUniqueActive.webp",
+      "children": [
+        {
+          "key": "one-hand",
+          "name": { "cn": "传奇单手", "tw": "傳奇單手", "us": "Unique One-Handed" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Weapons/OneHandWeapons/Scepters/Uniques/OpenPalmOfTheDreamer.webp",
+          "children": [
+            { "key": "one-hand-maces", "name": { "cn": "单手锤", "tw": "單手錘", "us": "One Hand Maces" } },
+            { "key": "wands", "name": { "cn": "法杖", "tw": "法杖", "us": "Wands" } },
+            { "key": "sceptres", "name": { "cn": "权杖", "tw": "權杖", "us": "Sceptres" } },
+            { "key": "spears", "name": { "cn": "长锋", "tw": "戰矛", "us": "Spears" } }
+          ]
+        },
+        {
+          "key": "two-hand",
+          "name": { "cn": "传奇双手", "tw": "傳奇雙手", "us": "Unique Two-Handed" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Weapons/TwoHandWeapons/Bows/Uniques/Widowhail.webp",
+          "children": [
+            { "key": "bows", "name": { "cn": "弓", "tw": "弓", "us": "Bows" } },
+            { "key": "talismans", "name": { "cn": "魔符", "tw": "魔符", "us": "Talismans" } },
+            { "key": "crossbows", "name": { "cn": "十字弓", "tw": "十字弓", "us": "Crossbows" } },
+            { "key": "two-hand-maces", "name": { "cn": "双手锤", "tw": "雙手錘", "us": "Two Hand Maces" } },
+            { "key": "quarterstaves", "name": { "cn": "细杖", "tw": "細杖", "us": "Quarterstaves" } },
+            { "key": "staves", "name": { "cn": "长杖", "tw": "長杖", "us": "Staves" } }
+          ]
+        },
+        {
+          "key": "off-hand",
+          "name": { "cn": "传奇副手", "tw": "傳奇副手", "us": "Unique Off Hand" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Offhand/Foci/Uniques/RathpithGlobe.webp",
+          "children": [
+            { "key": "shields", "name": { "cn": "盾牌", "tw": "盾牌", "us": "Shields" } },
+            { "key": "foci", "name": { "cn": "法器", "tw": "法器", "us": "Foci" } },
+            { "key": "quivers", "name": { "cn": "箭袋", "tw": "箭袋", "us": "Quivers" } },
+            { "key": "bucklers", "name": { "cn": "轻盾", "tw": "輕盾", "us": "Bucklers" } }
+          ]
+        },
+        {
+          "key": "equipment",
+          "name": { "cn": "传奇装备", "tw": "傳奇裝備", "us": "Unique Equipment" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Armours/BodyArmours/Uniques/PilgrimsImage.webp",
+          "children": [
+            { "key": "body-armour", "name": { "cn": "服装", "tw": "服裝", "us": "Body Armours" } },
+            { "key": "gloves", "name": { "cn": "手套", "tw": "手套", "us": "Gloves" } },
+            { "key": "helmets", "name": { "cn": "头盔", "tw": "頭盔", "us": "Helmets" } },
+            { "key": "boots", "name": { "cn": "鞋子", "tw": "鞋子", "us": "Boots" } }
+          ]
+        },
+        {
+          "key": "accessories",
+          "name": { "cn": "传奇配件", "tw": "傳奇配件", "us": "Unique Accessories" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Rings/Uniques/VentorsGamble.webp",
+          "children": [
+            { "key": "rings", "name": { "cn": "戒指", "tw": "戒指", "us": "Rings" } },
+            { "key": "amulets", "name": { "cn": "项链", "tw": "項鍊", "us": "Amulets" } },
+            { "key": "belts", "name": { "cn": "腰带", "tw": "腰帶", "us": "Belts" } },
+            { "key": "charms", "name": { "cn": "护符", "tw": "護符", "us": "Charms" } },
+            { "key": "flasks", "name": { "cn": "药剂", "tw": "藥劑", "us": "Flasks" } },
+            { "key": "jewels", "name": { "cn": "珠宝", "tw": "珠寶", "us": "Jewels" } }
+          ]
+        },
+        {
+          "key": "misc",
+          "name": { "cn": "其他传奇", "tw": "其他傳奇", "us": "Other Uniques" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Currency/PrecursorTablets/PrecursorTabletAbyssUnique1.webp",
+          "children": [
+            { "key": "tablets", "name": { "cn": "碑牌", "tw": "碑牌", "us": "Tablets" } },
+            { "key": "relics", "name": { "cn": "圣物", "tw": "聖物", "us": "Relics" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "gameplay",
+      "name": { "cn": "玩法", "tw": "玩法", "us": "Gameplay" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DArt/minimap/player/UniqueMonsterAlive.webp",
+      "children": [
+        {
+          "key": "breach",
+          "name": { "cn": "裂隙", "tw": "裂隙", "us": "Breach" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentBreach.webp",
+          "children": [
+            { "key": "catalysts", "name": { "cn": "催化剂", "tw": "催化劑", "us": "Catalysts" } },
+            { "key": "refined-catalysts", "name": { "cn": "精致催化剂", "tw": "精緻催化劑", "us": "Refined Catalysts" } },
+            { "key": "legacies", "name": { "cn": "遗赠", "tw": "遺贈", "us": "Legacies" } },
+            { "key": "fragments", "name": { "cn": "碎片", "tw": "碎片", "us": "Breach Fragments" } }
+          ]
+        },
+        {
+          "key": "delirium",
+          "name": { "cn": "迷雾", "tw": "迷霧", "us": "Delirium" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentDelirium.webp",
+          "children": [
+            { "key": "ancient-oils", "name": { "cn": "远古涂油", "tw": "遠古塗油", "us": "Ancient Oils" } },
+            { "key": "oils", "name": { "cn": "涂油", "tw": "塗油", "us": "Oils" } },
+            { "key": "fragments", "name": { "cn": "碎片", "tw": "碎片", "us": "Delirium Fragments" } }
+          ]
+        },
+        {
+          "key": "ritual",
+          "name": { "cn": "祭祀", "tw": "祭祀", "us": "Ritual" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentRitual.webp",
+          "children": [
+            { "key": "equipment-omens", "name": { "cn": "装备预兆", "tw": "裝備預兆", "us": "Equipment Omens" } },
+            { "key": "map-omens", "name": { "cn": "地图预兆", "tw": "地圖預兆", "us": "Map Omens" } },
+            { "key": "fragments", "name": { "cn": "碎片", "tw": "碎片", "us": "Ritual Fragments" } }
+          ]
+        },
+        {
+          "key": "expedition",
+          "name": { "cn": "探险", "tw": "探險", "us": "Expedition" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentExpedition.webp",
+          "children": [
+            { "key": "alloys", "name": { "cn": "合金", "tw": "合金", "us": "Alloys" } },
+            { "key": "anvils", "name": { "cn": "铁砧", "tw": "鐵砧", "us": "Anvils" } },
+            { "key": "solvents", "name": { "cn": "溶剂", "tw": "溶劑", "us": "Solvents" } },
+            { "key": "omens", "name": { "cn": "预兆", "tw": "預兆", "us": "Expedition Omens" } },
+            { "key": "fragments", "name": { "cn": "碎片", "tw": "碎片", "us": "Expedition Fragments" } }
+          ]
+        },
+        {
+          "key": "abyss",
+          "name": { "cn": "深渊", "tw": "深淵", "us": "Abyss" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentAbyss.webp",
+          "children": [
+            { "key": "bones", "name": { "cn": "骨头", "tw": "骨頭", "us": "Bones" } },
+            { "key": "omens", "name": { "cn": "预兆", "tw": "預兆", "us": "Abyss Omens" } },
+            { "key": "runes", "name": { "cn": "符文", "tw": "符文", "us": "Abyss Runes" } },
+            { "key": "fragments", "name": { "cn": "碎片", "tw": "碎片", "us": "Abyss Fragments" } }
+          ]
+        },
+        {
+          "key": "temple",
+          "name": { "cn": "神庙", "tw": "神廟", "us": "Temple" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DArt/UIImages/InGame/AtlasScreen/AtlasIconContent/AtlasIconContentIncursion.webp",
+          "children": [
+            { "key": "currency", "name": { "cn": "通货", "tw": "通貨", "us": "Temple Currency" } },
+            { "key": "cores", "name": { "cn": "核心", "tw": "核心", "us": "Temple Cores" } }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "endgame",
+      "name": { "cn": "终局", "tw": "終局", "us": "Endgame" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DItems/QuestItems/PinnacleKey2.webp",
+      "children": [
+        { "key": "keys", "name": { "cn": "钥匙", "tw": "鑰匙", "us": "Keys" } },
+        { "key": "waystones", "name": { "cn": "换界石", "tw": "換界石", "us": "Waystones" } },
+        { "key": "tablets", "name": { "cn": "碑牌", "tw": "碑牌", "us": "Tablets" }, "uniques": "uniques/misc/tablets" },
+        { "key": "vault-keys", "name": { "cn": "宝库钥匙", "tw": "寶庫鑰匙", "us": "Vault Keys" } },
+        { "key": "sekhema-trials", "name": { "cn": "丝克玛试炼", "tw": "絲克瑪試煉", "us": "Trial of the Sekhemas" }, "uniques": "uniques/misc/relics" },
+        { "key": "chaos-trials", "name": { "cn": "混沌试炼", "tw": "混沌試煉", "us": "Trial of Chaos" } }
+      ]
+    },
+    {
+      "key": "runes",
+      "name": { "cn": "符文", "tw": "符文", "us": "Runes" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Currency/Runes/EnhanceRuneTier2.webp",
+      "children": [
+        { "key": "special", "name": { "cn": "特殊符文", "tw": "特殊符文", "us": "Special Runes" } },
+        { "key": "greater", "name": { "cn": "高阶符文", "tw": "高階符文", "us": "Greater Runes" } },
+        { "key": "soul-cores", "name": { "cn": "核心", "tw": "核心", "us": "Soul Cores" } },
+        { "key": "greater-soul-cores", "name": { "cn": "高级核心", "tw": "高級核心", "us": "Greater Soul Cores" } },
+        { "key": "idols", "name": { "cn": "魔偶", "tw": "魔偶", "us": "Idols" } },
+        { "key": "greater-idols", "name": { "cn": "高级魔偶", "tw": "高級魔偶", "us": "Greater Idols" } },
+        { "key": "normal", "name": { "cn": "普通符文", "tw": "普通符文", "us": "Normal Runes" } },
+        { "key": "perfect", "name": { "cn": "完美符文", "tw": "完美符文", "us": "Perfect Runes" } }
+      ]
+    },
+    {
+      "key": "essences",
+      "name": { "cn": "精髓", "tw": "精髓", "us": "Essences" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Currency/Essence/AttributeEssencePerfect.webp",
+      "children": [
+        { "key": "corrupted", "name": { "cn": "污染精髓", "tw": "污染精髓", "us": "Corrupted Essences" } },
+        { "key": "perfect", "name": { "cn": "完美精髓", "tw": "完美精髓", "us": "Perfect Essences" } },
+        { "key": "greater", "name": { "cn": "高级精髓", "tw": "高級精髓", "us": "Greater Essences" } },
+        { "key": "normal", "name": { "cn": "普通精髓", "tw": "普通精髓", "us": "Normal Essences" } }
+      ]
+    },
+    {
+      "key": "gems",
+      "name": { "cn": "技能", "tw": "技能", "us": "Skills" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Gems/UncutSkillGem.webp",
+      "children": [
+        { "key": "lineage", "name": { "cn": "血脉宝石", "tw": "血脈寶石", "us": "Lineage Gems" } },
+        { "key": "skill", "name": { "cn": "技能宝石", "tw": "技能寶石", "us": "Skill Gems" } },
+        { "key": "spirit", "name": { "cn": "精魄宝石", "tw": "精魄寶石", "us": "Spirit Gems" } },
+        { "key": "support", "name": { "cn": "辅助宝石", "tw": "輔助寶石", "us": "Support Gems" } },
+        { "key": "runic", "name": { "cn": "符文技能", "tw": "符文技能", "us": "Runic Skills" } }
+      ]
+    },
+    {
+      "key": "equipment",
+      "name": { "cn": "装备", "tw": "裝備", "us": "Equipment" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DArt/minimap/player/IncursionCraft.webp",
+      "children": [
+        {
+          "key": "accessories",
+          "name": { "cn": "饰品", "tw": "飾品", "us": "Accessories" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Amulets/Basetypes/SolarAmulet.webp",
+          "children": [
+            { "key": "rings", "name": { "cn": "戒指", "tw": "戒指", "us": "Rings" }, "uniques": "uniques/accessories/rings" },
+            { "key": "amulets", "name": { "cn": "项链", "tw": "項鍊", "us": "Amulets" }, "uniques": "uniques/accessories/amulets" },
+            { "key": "belts", "name": { "cn": "腰带", "tw": "腰帶", "us": "Belts" }, "uniques": "uniques/accessories/belts" },
+            { "key": "charms", "name": { "cn": "护符", "tw": "護符", "us": "Charms" }, "uniques": "uniques/accessories/charms" },
+            { "key": "flasks", "name": { "cn": "药剂", "tw": "藥劑", "us": "Flasks" }, "uniques": "uniques/accessories/flasks" },
+            { "key": "jewels", "name": { "cn": "珠宝", "tw": "珠寶", "us": "Jewels" }, "uniques": "uniques/accessories/jewels" }
+          ]
+        },
+        {
+          "key": "one-hand",
+          "name": { "cn": "单手武器", "tw": "單手武器", "us": "One-Handed Weapons" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Weapons/OneHandWeapons/OneHandMaces/Basetypes/1HMace01.webp",
+          "children": [
+            { "key": "one-hand-maces", "name": { "cn": "单手锤", "tw": "單手錘", "us": "One Hand Maces" }, "uniques": "uniques/one-hand/one-hand-maces" },
+            { "key": "wands", "name": { "cn": "法杖", "tw": "法杖", "us": "Wands" }, "uniques": "uniques/one-hand/wands" },
+            { "key": "sceptres", "name": { "cn": "权杖", "tw": "權杖", "us": "Sceptres" }, "uniques": "uniques/one-hand/sceptres" },
+            { "key": "spears", "name": { "cn": "长锋", "tw": "戰矛", "us": "Spears" }, "uniques": "uniques/one-hand/spears" }
+          ]
+        },
+        {
+          "key": "two-hand",
+          "name": { "cn": "双手武器", "tw": "雙手武器", "us": "Two-Handed Weapons" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Weapons/TwoHandWeapons/Bows/Basetypes/Bow06.webp",
+          "children": [
+            { "key": "bows", "name": { "cn": "弓", "tw": "弓", "us": "Bows" }, "uniques": "uniques/two-hand/bows" },
+            { "key": "talismans", "name": { "cn": "魔符", "tw": "魔符", "us": "Talismans" }, "uniques": "uniques/two-hand/talismans" },
+            { "key": "crossbows", "name": { "cn": "十字弓", "tw": "十字弓", "us": "Crossbows" }, "uniques": "uniques/two-hand/crossbows" },
+            { "key": "two-hand-maces", "name": { "cn": "双手锤", "tw": "雙手錘", "us": "Two Hand Maces" }, "uniques": "uniques/two-hand/two-hand-maces" },
+            { "key": "quarterstaves", "name": { "cn": "细杖", "tw": "細杖", "us": "Quarterstaves" }, "uniques": "uniques/two-hand/quarterstaves" },
+            { "key": "staves", "name": { "cn": "长杖", "tw": "長杖", "us": "Staves" }, "uniques": "uniques/two-hand/staves" }
+          ]
+        },
+        {
+          "key": "off-hand",
+          "name": { "cn": "副手", "tw": "副手", "us": "Off Hand" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Offhand/Foci/Basetypes/Focus10.webp",
+          "children": [
+            { "key": "shields-str", "name": { "cn": "盾🔴", "tw": "盾🔴", "us": "Shields (STR)" }, "uniques": "uniques/off-hand/shields" },
+            { "key": "shields-str-dex", "name": { "cn": "盾🔴⚡", "tw": "盾🔴⚡", "us": "Shields (STR/DEX)" }, "uniques": "uniques/off-hand/shields" },
+            { "key": "shields-str-int", "name": { "cn": "盾🔴🔵", "tw": "盾🔴🔵", "us": "Shields (STR/INT)" }, "uniques": "uniques/off-hand/shields" },
+            { "key": "foci", "name": { "cn": "法器", "tw": "法器", "us": "Foci" }, "uniques": "uniques/off-hand/foci" },
+            { "key": "quivers", "name": { "cn": "箭袋", "tw": "箭袋", "us": "Quivers" }, "uniques": "uniques/off-hand/quivers" },
+            { "key": "bucklers", "name": { "cn": "轻盾", "tw": "輕盾", "us": "Bucklers" }, "uniques": "uniques/off-hand/bucklers" }
+          ]
+        },
+        {
+          "key": "helmets",
+          "name": { "cn": "头盔", "tw": "頭盔", "us": "Helmets" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Armours/Helmets/Basetypes/HelmetInt08.webp",
+          "children": [
+            { "key": "str", "name": { "cn": "头盔(力)", "tw": "頭盔(力)", "us": "Helmets (STR)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "dex", "name": { "cn": "头盔(敏)", "tw": "頭盔(敏)", "us": "Helmets (DEX)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "int", "name": { "cn": "头盔(智)", "tw": "頭盔(智)", "us": "Helmets (INT)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "str-dex", "name": { "cn": "头盔(力敏)", "tw": "頭盔(力敏)", "us": "Helmets (STR/DEX)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "str-int", "name": { "cn": "头盔(力智)", "tw": "頭盔(力智)", "us": "Helmets (STR/INT)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "dex-int", "name": { "cn": "头盔(敏智)", "tw": "頭盔(敏智)", "us": "Helmets (DEX/INT)" }, "uniques": "uniques/equipment/helmets" },
+            { "key": "str-dex-int", "name": { "cn": "头盔(力敏智)", "tw": "頭盔(力敏智)", "us": "Helmets (STR/DEX/INT)" }, "uniques": "uniques/equipment/helmets" }
+          ]
+        },
+        {
+          "key": "gloves",
+          "name": { "cn": "手套", "tw": "手套", "us": "Gloves" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Armours/Gloves/Basetypes/GlovesInt06.webp",
+          "children": [
+            { "key": "str", "name": { "cn": "手套(力)", "tw": "手套(力)", "us": "Gloves (STR)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "dex", "name": { "cn": "手套(敏)", "tw": "手套(敏)", "us": "Gloves (DEX)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "int", "name": { "cn": "手套(智)", "tw": "手套(智)", "us": "Gloves (INT)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "str-dex", "name": { "cn": "手套(力敏)", "tw": "手套(力敏)", "us": "Gloves (STR/DEX)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "str-int", "name": { "cn": "手套(力智)", "tw": "手套(力智)", "us": "Gloves (STR/INT)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "dex-int", "name": { "cn": "手套(敏智)", "tw": "手套(敏智)", "us": "Gloves (DEX/INT)" }, "uniques": "uniques/equipment/gloves" },
+            { "key": "str-dex-int", "name": { "cn": "手套(力敏智)", "tw": "手套(力敏智)", "us": "Gloves (STR/DEX/INT)" }, "uniques": "uniques/equipment/gloves" }
+          ]
+        },
+        {
+          "key": "body-armour",
+          "name": { "cn": "服装", "tw": "服裝", "us": "Body Armours" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Armours/BodyArmours/Basetypes/BodyInt03.webp",
+          "children": [
+            { "key": "str", "name": { "cn": "服装(力)", "tw": "服裝(力)", "us": "Body Armours (STR)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "dex", "name": { "cn": "服装(敏)", "tw": "服裝(敏)", "us": "Body Armours (DEX)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "int", "name": { "cn": "服装(智)", "tw": "服裝(智)", "us": "Body Armours (INT)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "str-dex", "name": { "cn": "服装(力敏)", "tw": "服裝(力敏)", "us": "Body Armours (STR/DEX)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "str-int", "name": { "cn": "服装(力智)", "tw": "服裝(力智)", "us": "Body Armours (STR/INT)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "dex-int", "name": { "cn": "服装(敏智)", "tw": "服裝(敏智)", "us": "Body Armours (DEX/INT)" }, "uniques": "uniques/equipment/body-armour" },
+            { "key": "str-dex-int", "name": { "cn": "服装(力敏智)", "tw": "服裝(力敏智)", "us": "Body Armours (STR/DEX/INT)" }, "uniques": "uniques/equipment/body-armour" }
+          ]
+        },
+        {
+          "key": "boots",
+          "name": { "cn": "鞋子", "tw": "鞋子", "us": "Boots" },
+          "icon": "https://cdn.poe2db.tw/image/Art/2DItems/Armours/Boots/Basetypes/BootsInt06.webp",
+          "children": [
+            { "key": "str", "name": { "cn": "鞋子(力)", "tw": "鞋子(力)", "us": "Boots (STR)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "dex", "name": { "cn": "鞋子(敏)", "tw": "鞋子(敏)", "us": "Boots (DEX)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "int", "name": { "cn": "鞋子(智)", "tw": "鞋子(智)", "us": "Boots (INT)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "str-dex", "name": { "cn": "鞋子(力敏)", "tw": "鞋子(力敏)", "us": "Boots (STR/DEX)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "str-int", "name": { "cn": "鞋子(力智)", "tw": "鞋子(力智)", "us": "Boots (STR/INT)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "dex-int", "name": { "cn": "鞋子(敏智)", "tw": "鞋子(敏智)", "us": "Boots (DEX/INT)" }, "uniques": "uniques/equipment/boots" },
+            { "key": "str-dex-int", "name": { "cn": "鞋子(力敏智)", "tw": "鞋子(力敏智)", "us": "Boots (STR/DEX/INT)" }, "uniques": "uniques/equipment/boots" }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "other",
+      "name": { "cn": "其他", "tw": "其他", "us": "Misc" },
+      "icon": "https://cdn.poe2db.tw/image/Art/2DArt/minimap/player/RareMonsterAlive.webp",
+      "children": [
+        { "key": "unavailable", "name": { "cn": "不存在", "tw": "不存在", "us": "Unavailable" } },
+        { "key": "quest-items", "name": { "cn": "任务物品", "tw": "任務物品", "us": "Quest Items" }, "own": true , "icon": "https://cdn.poe2db.tw/image/Art/2DItems/QuestItems/SkillBook.webp"}
+      ]
+    }
+  ]
+}

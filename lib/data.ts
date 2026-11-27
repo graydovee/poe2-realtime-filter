@@ -1,7 +1,6 @@
 import catalogData from "../data/item-catalog.json";
 import dropData from "../data/item-drop-metadata.json";
 import rulesData from "../data/default-rules.json";
-import mechanicsData from "../data/item-mechanics.json";
 import { deriveCatalogView, projectShareCatalog } from "./catalog-view";
 import type { FilterRule, ItemDefinition, Locale, MarketSnapshot, Strictness } from "./types";
 
@@ -34,26 +33,6 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   us: "English",
 };
 
-export const CATEGORY_LABELS: Record<string, Record<Locale, string>> = {
-  currency: { cn: "通货", tw: "通貨", us: "Currency" },
-  rune: { cn: "符文", tw: "符文", us: "Runes" },
-  "soul-core": { cn: "灵魂核心", tw: "靈魂核心", us: "Soul Cores" },
-  map: { cn: "地图", tw: "地圖", us: "Maps" },
-  unique: { cn: "暗金", tw: "暗金", us: "Uniques" },
-  base: { cn: "装备基底", tw: "裝備基底", us: "Bases" },
-  essence: { cn: "精华", tw: "精華", us: "Essences" },
-  fragment: { cn: "碎片", tw: "碎片", us: "Fragments" },
-  flask: { cn: "药剂", tw: "藥劑", us: "Flasks" },
-  gem: { cn: "宝石", tw: "寶石", us: "Gems" },
-};
-
-/** 通货与材料的分组词条与展示顺序，由 scripts/build-item-mechanics.mjs 生成（跟随 poe.ninja 标签页）。 */
-export const TAXONOMY = mechanicsData as {
-  order: string[];
-  groups: Record<string, Record<Locale, string>>;
-  items: Record<string, { mechanic: string; evidence: string }>;
-};
-
 const catalogView = deriveCatalogView(catalogData.items as ItemDefinition[], dropData);
 export const {
   itemCatalog: ITEM_CATALOG,
@@ -68,9 +47,22 @@ export const CLASS_MATCH_BY_ID = new Map(CLASS_MATCHES.map((match) => [match.ite
 /** 每件逐件物品属于哪条整类匹配，生成器用它判断后面的规则有没有被整类块覆盖。 */
 export const CLASS_OF_ITEM = new Map(CLASS_MATCHES.flatMap((match) => match.members.map((item) => [item.id, match] as const)));
 
-export const shareCatalog = () => projectShareCatalog(catalogData.shareGroups, catalogView, catalogData.shareTree);
+/** 物品目录的版本，写在分享码里。旧的分享地址无法继续沿用时加一。 */
+export const CATALOG_VERSION: number = catalogData.catalogVersion;
+export const shareCatalog = () => ({
+  ...projectShareCatalog(catalogData.shareGroups, catalogView, catalogData.shareTree),
+  version: CATALOG_VERSION,
+});
+/** 分享码槽位里记着、物品目录里已经没有的物品。读取方案时把它们去掉。 */
+export const RETIRED_ITEM_IDS: ReadonlySet<string> = new Set(
+  Object.values(catalogData.shareGroups)
+    .flatMap((group) => Object.keys(group.slots))
+    .filter((id) => !FILTER_ITEMS_BY_ID.has(id)),
+);
 
-const craftingItemIds = ITEM_CATALOG.filter((item) => item.categoryPath[0] === "crafting" && !item.matcher.class).map((item) => item.id);
+/** 价格档默认匹配的四个分类：通货、玩法、符文和精髓，也就是按件计价的通货和材料。 */
+const PRICED_ROOTS = new Set(["currency", "gameplay", "runes", "essences"]);
+const pricedItemIds = ITEM_CATALOG.filter((item) => PRICED_ROOTS.has(item.categoryPath[0]) && !item.matcher.class).map((item) => item.id);
 
 /** 四个价格档各自跟随的通货，按规则 ID 对应。 */
 export const DEFAULT_EFFECT_ITEMS = {
@@ -86,10 +78,10 @@ export function legacyEffectItemId(ruleId: string): string | undefined {
     : undefined;
 }
 
-/** 新方案的四个价格档，每档默认匹配整个「通货与材料」分类。 */
+/** 新方案的四个价格档，每档默认匹配通货、玩法、符文和精髓四个分类里的物品。 */
 export const DEFAULT_RULES: FilterRule[] = (rulesData as { rules: FilterRule[] }).rules.map((rule) => ({
   id: rule.id, name: rule.name, enabled: true, hidden: false, baselineEffectItemId: legacyEffectItemId(rule.id),
-  target: { ...rule.target, itemIds: [...craftingItemIds], itemEnabled: true },
+  target: { ...rule.target, itemIds: [...pricedItemIds], itemEnabled: true },
   effects: {},
 }));
 

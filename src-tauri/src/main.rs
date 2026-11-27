@@ -86,7 +86,7 @@ impl Desktop {
         }
         for (source, versions) in sources {
             // Check once per source, and release the network lock before editing the library.
-            let outcome = self.store.source_download(&source, &versions);
+            let outcome = self.store.source_download(&source, &versions, |_| {});
             if matches!(&outcome, Ok(filters) if filters.is_empty()) {
                 continue;
             }
@@ -234,7 +234,8 @@ impl Desktop {
     }
 }
 
-const ITEM_ICON_HOST: &str = "https://www.poe2wiki.net/images/";
+/// 物品图标只从这两个图床读取：PoE2 Wiki 的文件和 poe2db 的物品图片。
+const ITEM_ICON_HOSTS: [&str; 2] = ["https://www.poe2wiki.net/images/", "https://cdn.poe2db.tw/image/"];
 const ITEM_ICON_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 fn item_icon_mime(url: &str) -> &'static str {
@@ -259,7 +260,7 @@ fn item_icon_mime(url: &str) -> &'static str {
 #[tauri::command]
 async fn item_icon(app: tauri::AppHandle, url: String) -> Result<String> {
     on_worker(move || {
-        if !url.starts_with(ITEM_ICON_HOST)
+        if !ITEM_ICON_HOSTS.iter().any(|host| url.starts_with(host))
             || url.len() > 512
             || url.chars().any(char::is_control)
         {
@@ -492,6 +493,21 @@ async fn pick_base_filter(app: tauri::AppHandle) -> Result<Option<BaseFilter>> {
     .await
 }
 
+/// Sends a source download's progress to the interface as `base-download` events.
+fn download_reporter(
+    app: &tauri::AppHandle,
+    source: &str,
+) -> impl Fn(base_filter::DownloadProgress) + Send + Sync + 'static {
+    let app = app.clone();
+    let source = source.to_owned();
+    move |progress| {
+        let _ = app.emit(
+            "base-download",
+            json!({ "source": source, "progress": progress }),
+        );
+    }
+}
+
 #[tauri::command]
 async fn source_filters(
     app: tauri::AppHandle,
@@ -503,10 +519,18 @@ async fn source_filters(
         if cached_only {
             state.store.source_cache(&source)
         } else {
-            state.store.source_download(&source, &BTreeSet::new())
+            let report = download_reporter(&app, &source);
+            state
+                .store
+                .source_download(&source, &BTreeSet::new(), report)
         }
     })
     .await
+}
+
+#[tauri::command]
+fn base_download_cancel(state: State<'_, Desktop>) {
+    state.store.cancel_source_download();
 }
 
 #[tauri::command]
@@ -527,7 +551,10 @@ async fn scheme_download_base(app: tauri::AppHandle, id: String, source: String)
             .as_str()
             .filter(|_| scheme.profile["baseFilter"].is_null())
             .ok_or("方案无需下载基础过滤器")?;
-        let filters = state.store.source_download(&source, &BTreeSet::new())?;
+        let report = download_reporter(&app, &source);
+        let filters = state
+            .store
+            .source_download(&source, &BTreeSet::new(), report)?;
         let base = matching_download(&filters, hint, None)
             .ok_or_else(|| format!("下载列表中未找到唯一的同名过滤器「{hint}」"))?;
         let _guard = state.changes.lock().map_err(|error| error.to_string())?;
@@ -590,11 +617,18 @@ fn scheme_remove(state: State<'_, Desktop>, id: String, remove_file: bool) -> Re
 }
 
 #[tauri::command]
-async fn scheme_rename(app: tauri::AppHandle, id: String, name: String) -> Result<()> {
+async fn scheme_update_info(
+    app: tauri::AppHandle,
+    id: String,
+    name: String,
+    description: String,
+) -> Result<()> {
     on_worker(move || {
         let state = app.state::<Desktop>();
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
-        state.store.rename(&mut state.store.load()?, &id, &name)
+        state
+            .store
+            .set_info(&mut state.store.load()?, &id, &name, &description)
     })
     .await
 }
@@ -625,7 +659,7 @@ async fn inspect_share(app: tauri::AppHandle, code: String, server: Server) -> R
         let share = share_code::decode(&code)?.share;
         let target = share.profile.get("server").map(|value| serde_json::from_value::<Server>(value.clone()))
             .transpose().map_err(|_| "分享码的游戏服务器无效")?.unwrap_or(server);
-        Ok(json!({"server":target, "name":share.name, "league": share.profile["league"], "hasServer": share.profile.get("server").is_some(), "catalog":state.market(target).catalog(false)?}))
+        Ok(json!({"server":target, "name":share.name, "description":share.description, "league": share.profile["league"], "hasServer": share.profile.get("server").is_some(), "catalog":state.market(target).catalog(false)?}))
     }).await
 }
 
@@ -1163,6 +1197,7 @@ fn main() {
             scan_base_filters,
             pick_base_filter,
             source_filters,
+            base_download_cancel,
             base_download_offers,
             scheme_download_base,
             base_styles,
@@ -1170,7 +1205,7 @@ fn main() {
             scheme_save,
             scheme_copy,
             scheme_remove,
-            scheme_rename,
+            scheme_update_info,
             scheme_uninstall,
             scheme_share,
             inspect_share,

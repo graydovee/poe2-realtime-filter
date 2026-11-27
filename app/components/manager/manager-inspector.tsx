@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { local, SERVER_LABELS, type Library, type LocalScheme } from "../../../lib/desktop";
+import { formatMarketTimeFull } from "../../../lib/time";
 import type { GameServer } from "../../../lib/types";
 import { useAppStore } from "../../state/store";
 import type { DownloadOffer } from "../../state/types";
@@ -77,11 +78,13 @@ function SchemeDetail({ scheme, server, busy, offers }: {
   const issue = schemeIssue(scheme.status);
   const missingBase = missingBaseHint(scheme);
   const rules = scheme.profile.rules ?? [];
+  const marketTime = formatMarketTimeFull(scheme.installed?.marketCapturedAt);
   // 文件路径一律不显示：它们对判断方案状态没有帮助，还会把版面撑坏。
   const rows: Array<[string, string]> = [
     ["赛季", scheme.profile.league || "待选赛季"],
     ["基础过滤器", baseLabel(scheme.profile.baseFilter, scheme.profile.baseFilterHint)],
     ["规则", `${rules.length} 条 · 启用 ${rules.filter((rule) => rule.enabled).length} · 隐藏 ${rules.filter((rule) => rule.hidden).length}`],
+    ...(marketTime ? [["行情时间", marketTime] as [string, string]] : []),
   ];
 
   return (
@@ -90,6 +93,9 @@ function SchemeDetail({ scheme, server, busy, offers }: {
         <StatusDot tone={schemeTone(scheme)} className="mt-1.5" />
         <h3 className="min-w-0 text-base leading-snug font-semibold break-words text-ink">{scheme.name}</h3>
       </div>
+      {scheme.description && (
+        <p className="mt-2 pl-3.5 text-sm leading-relaxed text-ink-muted [overflow-wrap:anywhere]">{scheme.description}</p>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5 pl-3.5">
         <Badge>{SERVER_LABELS[server]}</Badge>
         <Badge tone={scheme.installed ? "sage" : "muted"}>{scheme.installed ? "已安装" : "未安装"}</Badge>
@@ -143,7 +149,7 @@ function SchemeDetail({ scheme, server, busy, offers }: {
           规则、基础过滤器和音效打成一个包，对方导入后可以直接编辑和安装。
         </p>
         <div className="grid grid-cols-2 gap-2">
-          <Tooltip label="只带规则。基础过滤器和音效需要对方自己已经有。">
+          <Tooltip label="带规则、方案设置、名称和描述。基础过滤器和音效需要对方自己已经有。">
             <Button className="w-full" disabled={busy} onClick={() => void shareScheme(scheme)}>
               <Share2 aria-hidden="true" />
               分享码
@@ -172,9 +178,9 @@ function SchemeDetail({ scheme, server, busy, offers }: {
             安装到游戏
           </Button>
         )}
-        <Button disabled={busy} onClick={() => openManagerDialog("rename", scheme)}>
+        <Button disabled={busy} onClick={() => openManagerDialog("nameDescription", scheme)}>
           <Pencil aria-hidden="true" />
-          重命名
+          名称和描述
         </Button>
         <Button disabled={busy} onClick={() => void copyScheme(scheme.id)}>
           <Copy aria-hidden="true" />

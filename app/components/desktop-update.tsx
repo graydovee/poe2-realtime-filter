@@ -6,6 +6,7 @@ import { Download, Loader2, RefreshCw } from "lucide-react";
 
 import { explain, isDesktop, local } from "../../lib/desktop";
 import { Button } from "./ui/button";
+import { ProgressBar } from "./ui/progress";
 import { toast } from "./ui/toast";
 import { Tooltip } from "./ui/tooltip";
 
@@ -97,12 +98,7 @@ export function DesktopUpdate() {
         </Button>
       )}
       {update.phase === "downloading" && (
-        <progress
-          aria-label="更新下载进度"
-          className="h-1 w-20 accent-gold"
-          value={total ? received : undefined}
-          max={total}
-        />
+        <ProgressBar label="更新下载进度" className="h-1 w-20" value={total ? (received / total) * 100 : undefined} />
       )}
       <Tooltip label={ready ? `新版本 ${update.version ?? ""} 已就绪` : working ? "正在更新…" : "检查更新"}>
         <Button

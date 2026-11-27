@@ -27,7 +27,6 @@ export type ManagerState = {
   directoryDraft: string | undefined;
   directoryError: string;
   intervalDraft: string | undefined;
-  renameValue: string;
   removeFile: boolean;
   /** 每次收到 `local-refresh` 递增，用来重新读取下载来源。 */
   refreshTick: number;
@@ -51,6 +50,8 @@ export type ManagerActions = {
   openManagerDialog: (kind: ManagerDialogKind, scheme: LocalScheme) => void;
   setManagerDialog: (dialog: ManagerDialog | null) => void;
   confirmManagerDialog: () => Promise<void>;
+  /** 保存方案的名称和描述，成功后刷新方案库并同步编辑器里的名称。失败时抛出错误信息。 */
+  updateSchemeInfo: (id: string, name: string, description: string) => Promise<void>;
   installScheme: (scheme: LocalScheme) => Promise<void>;
   copyScheme: (id: string) => Promise<void>;
   shareScheme: (scheme: LocalScheme) => Promise<void>;
@@ -159,7 +160,6 @@ export const createManagerSlice: StateCreator<AppState, [], [], ManagerSlice> = 
   directoryDraft: undefined,
   directoryError: "",
   intervalDraft: undefined,
-  renameValue: "",
   removeFile: false,
   refreshTick: 0,
   exportOpen: false,
@@ -229,22 +229,35 @@ export const createManagerSlice: StateCreator<AppState, [], [], ManagerSlice> = 
   setSelectedSchemeId: (selectedSchemeId) => set({ selectedSchemeId }),
 
   openManagerDialog: (kind, scheme) =>
-    set({ managerDialog: { kind, scheme }, managerError: "", renameValue: scheme.name, removeFile: false }),
+    set({ managerDialog: { kind, scheme }, managerError: "", removeFile: false }),
 
   setManagerDialog: (managerDialog) => set({ managerDialog }),
+
+  updateSchemeInfo: async (id, name, description) => {
+    set({ managerBusy: true, managerError: "" });
+    try {
+      await local("scheme_update_info", { id, name, description });
+    } catch (cause) {
+      await get().reloadLibrary();
+      set({ managerBusy: false });
+      throw new Error(explain(cause));
+    }
+    await get().reloadLibrary();
+    set({ managerBusy: false, managerDialog: null });
+    const saved = get().library?.schemes.find((scheme) => scheme.id === id);
+    if (saved && get().schemeId === id) set({ schemeName: saved.name, schemeDescription: saved.description });
+    toast.success("名称和描述已更新");
+  },
 
   confirmManagerDialog: async () => {
     const dialog = get().managerDialog;
     if (!dialog) return;
     const { kind, scheme } = dialog;
     await get().runManager(async () => {
-      if (kind === "rename") {
-        await local("scheme_rename", { id: scheme.id, name: get().renameValue });
-        toast.success("方案已重命名");
-      } else if (kind === "uninstall") {
+      if (kind === "uninstall") {
         await local("scheme_uninstall", { id: scheme.id });
         toast.success("过滤器已卸载，方案已保留");
-      } else {
+      } else if (kind === "remove") {
         const removeFile = get().removeFile;
         await local("scheme_remove", { id: scheme.id, removeFile });
         toast.success(scheme.installed && !removeFile ? "方案已删除，游戏过滤器已保留" : "方案已删除");

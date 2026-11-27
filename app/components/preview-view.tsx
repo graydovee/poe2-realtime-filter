@@ -199,7 +199,7 @@ export function PreviewView({ generated }: { generated: Generated }) {
                 rows={[
                   ["赛季", market.league],
                   ["市场来源", market.rates ? market.source : "暂无可用行情"],
-                  ["抓取时间", market.rates ? new Date(market.capturedAt).toLocaleString("zh-CN") : "尚未更新"],
+                  ["行情时间", market.rates ? new Date(market.capturedAt).toLocaleString("zh-CN") : "尚未更新"],
                   [
                     "汇率",
                     market.rates ? `1D = ${market.rates.divineToChaos}C / ${market.rates.divineToExalted}E` : "无有效汇率",

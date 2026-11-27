@@ -1,41 +1,52 @@
+import categoryTree from "../data/item-categories.json";
 import type { ItemDefinition } from "./types";
 
 type DropMetadata = {
-  items: Record<string, { icon?: string; dropLevel?: number | null }>;
+  items: Record<string, { icon?: string; dropLevel?: number | null; itemClass?: number }>;
   uniques: Record<string, Record<string, string | null>>;
   localizedUniqueNames: Record<string, { cn: string; tw: string }>;
   stackable: string[];
+  /** 装备基底会不会以普通、魔法或稀有掉落：客户端表里编号带 Unique 的基底只出传奇，记为 false。 */
+  dropEnabled: Record<string, boolean>;
 };
 
-const wikiImage = (path?: string | null) => path ? `https://www.poe2wiki.net/images/${path}` : undefined;
-const ONE_HAND_TYPES = new Set(["one-hand-maces", "wands", "sceptres", "spears"]);
+/** 图标记的是图片地址：PoE2 Wiki 的文件路径拼成该站的图片地址，其余是完整的地址。 */
+const iconUrl = (path?: string | null) => {
+  if (!path) return undefined;
+  return path.startsWith("https://") ? path : `https://www.poe2wiki.net/images/${path}`;
+};
 
-/** 装备在选择器里的分类：普通基底和传奇各一棵树，武器再按单手 / 双手分开。入参是目录里的装备路径（装备 › 类别 › 类型）。 */
-function equipmentPath(path: string[], group: "normal-bases" | "unique-equipment") {
-  const [, kind, type] = path;
-  const category = kind === "weapons" ? ONE_HAND_TYPES.has(type ?? "") ? "one-hand" : "two-hand" : kind;
-  return ["equipment", group, category, ...(type ? [type] : [])];
-}
+type Category = { key: string; uniques?: string; children?: Category[] };
+/** 客户端的物品类别编号里属于装备的这些类别：每一条记录都是一个装备基底，选择器把每件分成普通基底和传奇两种条目。 */
+export const EQUIPMENT_CLASSES = new Set<number>(categoryTree.itemClasses.equipment);
+/** 出传奇的叶子上，传奇所在的路径（分类树里叶子的 uniques）。 */
+const UNIQUE_PATHS = new Map<string, string[]>();
+const index = (nodes: Category[], prefix: string[]) => {
+  for (const node of nodes) {
+    const path = [...prefix, node.key];
+    if (node.uniques) UNIQUE_PATHS.set(path.join("/"), node.uniques.split("/"));
+    if (node.children) index(node.children, path);
+  }
+};
+index(categoryTree.roots as Category[], []);
 
-/** 装备的整类条目都放在装备树里（珠宝直接在装备下，其余在类型下），对应选择器里的普通基底 / 传奇两棵树。 */
-const isEquipmentType = (path: string[]) => path[0] === "equipment" && path.length >= 3;
-/** 装备之外的整类条目：在分类末尾的 class-selection 分组里，或者在分类自己名下（远征日志）。根分类下的标记不算。 */
-const classMatchPath = (path: string[]): string[] | undefined =>
-  path[path.length - 1] === "class-selection" ? (path.length >= 3 ? path.slice(0, -1) : undefined) : path;
-
-export type ClassMatch = { path: string[]; item: ItemDefinition; members: ItemDefinition[] };
+export type ClassMatch = { item: ItemDefinition; members: ItemDefinition[] };
 
 /**
- * 整类匹配登记表只登记与选择器分类相符的 Class 条件，没登记的不做整类匹配：
- * - Stackable Currency：它的范围比「通货与材料」小（符文、灵魂核心不属于这个类别）；
- * - 「其他」、通货与材料根分类下的几个标记，和那里的逐件物品不是一回事；
- * - Instance Local Items：不是任务物品，和 Quest Items 挤在同一个分类里；
- * - Augment：目录把它放在石板分类下，但它是符文、灵魂核心那一类（游戏在 2025 年 12 月把 Socketable
- *   改名成了 Augment，见 GGG 的过滤器更新公告；NeverSink 0.10.4 里 Class == "Augment" 搭配的也是符文
- *   和灵魂核心）。石板对应的是 Tablet，这里不登记，石板按逐件输出。
+ * 整类匹配登记表：整类条目按游戏里的类名登记它覆盖的客户端类别编号，成员是这些类别里的逐件物品。
+ * 规则把一个类别的成员全部选中时，生成器换成一条 Class 条件。没登记的不做整类匹配：
+ * - Stackable Currency、Map Fragments、Tablet、Augment 的范围和选择器里的分类对不上；
+ * - Fishing Rods、Instance Local Items 不是可选物品，Instance Local Items 还和 Quest Items 挤在同一个分类里。
  * 类别和物品的对应关系由 tests/class-matches.test.mjs 对照内置的 NeverSink 过滤器核对。
  */
-const UNREGISTERED_CLASSES = new Set(["Instance Local Items", "Augment"]);
+const CLASS_ITEMS: Record<string, number[]> = {
+  Charms: [33], "Life Flasks": [0], "Mana Flasks": [1], Omen: [108], Incubators: [76], "Pinnacle Keys": [109, 117], "Vault Keys": [90],
+  "Skill Gems": [18, 78], "Support Gems": [19],
+  Amulets: [4], Rings: [5], Belts: [21], Jewels: [42], Shields: [26], Foci: [81], Quivers: [20], Bucklers: [94],
+  Wands: [8], Sceptres: [32], Spears: [79], "One Hand Maces": [12], Bows: [13], Staves: [14], Crossbows: [80],
+  "Two Hand Maces": [17], Quarterstaves: [58], Talismans: [110], Gloves: [22], Boots: [23], "Body Armours": [24], Helmets: [25],
+  "Expedition Logbook": [74, 75], "Quest Items": [31], Waystones: [35],
+};
 
 // 选择器、过滤器生成、分享码和目录更新使用同一套派生逻辑。此模块会在 QuickJS 里执行，只用 ES2021 的库函数。
 export function deriveCatalogView(items: ItemDefinition[], metadata: DropMetadata) {
@@ -43,26 +54,30 @@ export function deriveCatalogView(items: ItemDefinition[], metadata: DropMetadat
   // 未切割宝石每个等级是一件独立物品，掉落数据和图标仍按不带等级后缀的基底名查。
   const itemCatalog = items.map((item) => {
     const metadataKey = item.name.replace(/ \(Level \d+\)$/, "");
+    const record = metadata.items[metadataKey];
     return {
       ...item,
       stackable: stackableNames.has(metadataKey),
-      dropLevel: metadata.items[metadataKey]?.dropLevel ?? undefined,
-      iconUrl: wikiImage(metadata.items[metadataKey]?.icon),
+      dropLevel: record?.dropLevel ?? undefined,
+      iconUrl: iconUrl(record?.icon),
+      itemClass: record?.itemClass,
     };
   });
 
-  const equipment = itemCatalog.filter((item) => item.categoryPath[0] === "equipment" && !item.ambiguous && item.matcher.baseType);
+  // 普通基底只给会以普通、魔法或稀有掉落的装备基底出；只出传奇的基底（例如符文之叉）只以传奇的身份出现。
+  const equipment = itemCatalog.filter((item) => EQUIPMENT_CLASSES.has(item.itemClass ?? -1) && !item.ambiguous && item.matcher.baseType);
   const equipmentIds = new Set(equipment.map((item) => item.id));
-  const baseVariants = equipment.map((item): ItemDefinition => ({
+  const baseVariants = equipment.filter((item) => metadata.dropEnabled[item.name] !== false).map((item): ItemDefinition => ({
     ...item,
     id: `base:${item.id}`,
     marketItemId: item.id,
-    categoryPath: equipmentPath(item.categoryPath, "normal-bases"),
     matcher: { ...item.matcher, nonUnique: true },
   }));
-  const uniqueVariants = equipment.flatMap((item): ItemDefinition[] => {
+  // 传奇条目每件出了传奇的基底一个，归到「传奇」下对应的叶子：装备、药瓶、咒符、石板和圣物都会出传奇。
+  const uniqueVariants = itemCatalog.flatMap((item): ItemDefinition[] => {
     const names = metadata.uniques[item.name];
-    if (!names || !item.matcher.baseType) return [];
+    const path = UNIQUE_PATHS.get(item.categoryPath.join("/"));
+    if (!names || !path || item.ambiguous || !item.matcher.baseType) return [];
     const variants = Object.keys(names).sort();
     const label = variants.join(" / ");
     return [{
@@ -74,43 +89,45 @@ export function deriveCatalogView(items: ItemDefinition[], metadata: DropMetadat
         tw: variants.map((name) => metadata.localizedUniqueNames[name]?.tw ?? name).join(" / "),
         us: label,
       },
+      baseLocaleNames: item.localeNames,
       searchNames: Object.values(item.localeNames),
       category: "unique",
-      categoryPath: equipmentPath(item.categoryPath, "unique-equipment"),
+      categoryPath: path,
       matcher: { ...item.matcher, rarity: "Unique" },
       priceable: false,
       dropLevel: undefined,
-      iconUrl: (variants.length === 1 ? wikiImage(names[variants[0]]) : undefined) ?? item.iconUrl,
+      iconUrl: (variants.length === 1 ? iconUrl(names[variants[0]]) : undefined) ?? item.iconUrl,
     }];
   });
+  const concreteItems = [...itemCatalog.filter((item) => !equipmentIds.has(item.id) && !item.matcher.class), ...baseVariants, ...uniqueVariants];
 
-  // 装备类型的整类条目按普通基底 / 传奇各派生一个带稀有度的变体。
-  const classEntries = itemCatalog.filter((item) => item.matcher.class);
-  const equipmentClassVariants = classEntries
-    .filter((item) => isEquipmentType(item.categoryPath))
-    // 去掉末尾的整类标记，剩下的就是目录里的装备路径；珠宝直接在装备下，没有类型段。
-    .map((item) => ({ item, path: item.categoryPath.slice(0, -1) }))
-    .flatMap(({ item, path }): ItemDefinition[] => [
-      { ...item, id: `base:${item.id}`, categoryPath: equipmentPath(path, "normal-bases"), matcher: { class: item.matcher.class, nonUnique: true }, ambiguous: false },
-      { ...item, id: `unique:${item.id}`, categoryPath: equipmentPath(path, "unique-equipment"), matcher: { class: item.matcher.class, rarity: "Unique" }, ambiguous: false },
-    ]);
+  // 登记过的整类条目：成员是它的类别里的逐件物品。装备的每个类型按普通基底、传奇各派生一个带稀有度的整类变体。
+  const inClasses = (ids: number[]) => (item: ItemDefinition) => item.itemClass !== undefined && ids.includes(item.itemClass);
+  const registered = itemCatalog.filter((item) => item.matcher.class && CLASS_ITEMS[item.matcher.class]);
+  const equipmentTypes = registered.filter((item) => CLASS_ITEMS[item.matcher.class!].every((id) => EQUIPMENT_CLASSES.has(id)));
+  const others = registered.filter((item) => !equipmentTypes.includes(item));
+  const typeVariants = equipmentTypes.map((item): [ItemDefinition, ItemDefinition] => [
+    { ...item, id: `base:${item.id}`, categoryPath: item.categoryPath.slice(0, -1), matcher: { class: item.matcher.class, nonUnique: true }, ambiguous: false },
+    { ...item, id: `unique:${item.id}`, categoryPath: item.categoryPath.slice(0, -1), matcher: { class: item.matcher.class, rarity: "Unique" }, ambiguous: false },
+  ]);
+  const equipmentClassVariants = typeVariants.flat();
+  const classMatches: ClassMatch[] = [
+    ...others.map((item) => ({ item, members: concreteItems.filter(inClasses(CLASS_ITEMS[item.matcher.class!])) })),
+    ...equipmentTypes.flatMap((item, index) => {
+      const members = concreteItems.filter(inClasses(CLASS_ITEMS[item.matcher.class!]));
+      const [base, unique] = typeVariants[index];
+      return [
+        { item: base, members: members.filter((member) => member.matcher.nonUnique) },
+        { item: unique, members: members.filter((member) => member.category === "unique") },
+      ];
+    }),
+  ];
 
   const filterItems = [...itemCatalog, ...baseVariants, ...uniqueVariants, ...equipmentClassVariants];
-  const concreteItems = [...itemCatalog.filter((item) => !equipmentIds.has(item.id) && !item.matcher.class), ...baseVariants, ...uniqueVariants];
-  const classMatches: ClassMatch[] = [
-    ...classEntries
-      .filter((item) => !isEquipmentType(item.categoryPath) && !UNREGISTERED_CLASSES.has(item.name))
-      .flatMap((item) => {
-        const path = classMatchPath(item.categoryPath);
-        return path ? [{ path, item }] : [];
-      }),
-    ...equipmentClassVariants.map((item) => ({ path: item.categoryPath, item })),
-  ].map((match) => ({ ...match, members: concreteItems.filter((item) => item.categoryPath.join("/") === match.path.join("/")) }));
-
-  // 没有逐件物品的分类（换界石、远征日志、任务物品）只能整类选择。选择器在有效路径下展示整类条目。
+  // 只能整类选择的分类（远征日志、任务物品）没有逐件物品，登记的整类条目就是选择器里的条目，放在它所代表的分类下。
   const classOnlyItems = classMatches
     .filter((match) => !match.members.length && !equipmentClassVariants.includes(match.item))
-    .map((match) => ({ ...match.item, categoryPath: match.path }));
+    .map((match) => ({ ...match.item, categoryPath: match.item.categoryPath.slice(0, -1) }));
 
   return { itemCatalog, filterItems, classMatches, classOnlyItems, pickerItems: [...concreteItems, ...classOnlyItems] };
 }
@@ -242,7 +259,7 @@ function indexShareTree(data: unknown, groups: Map<string, IndexedShareGroup>) {
     if (group !== null) groupPaths.set(group, ordinals);
     const entries = Object.entries(siblings);
     const children: ShareTree[] = Array(entries.length);
-    for (const [key, node] of entries) {
+    for (const [key, node] of Object.entries(siblings)) {
       const childPath = [...path, key];
       if (!key || !isRecord(node)) throw new Error(`分享码分类 ${pathKey(childPath)} 的记录无效`);
       const { ordinal } = node;
@@ -261,7 +278,7 @@ function indexShareTree(data: unknown, groups: Map<string, IndexedShareGroup>) {
   return { tree, groupPaths };
 }
 
-const ROOT_SHARE_ORDER = new Map(["endgame", "crafting", "gems", "supplies", "equipment", "other"].map((key, ordinal) => [key, ordinal]));
+const ROOT_SHARE_ORDER = new Map(["currency", "uniques", "gameplay", "endgame", "runes", "essences", "gems", "equipment", "other"].map((key, ordinal) => [key, ordinal]));
 const rootShareOrder = (key: string) => ROOT_SHARE_ORDER.get(key) ?? ROOT_SHARE_ORDER.size;
 
 /** 按选择器的分类树追加同级序号，分类移走或消失后仍保留原路径。 */
@@ -281,22 +298,25 @@ export function allocateShareTree(previous: ShareTreeData, previousGroups: Share
   return merge(previous, buildCatalogTree(view.pickerItems));
 }
 
-/** 导出用当前槽位和分类树。导入可访问已有路径和别名，退役槽位投影为 null。 */
+/**
+ * 导出用当前槽位和分类树。导入可访问已有路径和别名，退役槽位投影为 null。
+ * activeSlots 是地址表里仍然存在的物品的槽位：物品改类后，旧分享码里整选它原来的分类，展开的仍是原来那些物品。
+ */
 export function projectShareCatalog(groups: ShareGroups, view: ShareItems, ordinals: unknown): ShareCatalog {
   const indexed = indexShareGroups(groups);
   const { tree, groupPaths } = indexShareTree(ordinals, indexed);
-  const byId = [...indexed.values()];
   const paths = currentPaths(view);
   const current = currentAddresses(indexed, paths);
-  const activeSlots = byId.map((): number[] => []);
-  for (const [group, slot] of Object.values(current)) activeSlots[group].push(slot);
   return {
-    groups: byId.map(({ id, path, bySlot }) => ({
-      id,
-      slots: bySlot.map((itemId) => paths.has(itemId) ? itemId : null),
-      path: path === null ? null : groupPaths.get(id)!,
-      activeSlots: activeSlots[id].sort((a, b) => a - b),
-    })),
+    groups: [...indexed.values()].map(({ id, path, bySlot }) => {
+      const slots = bySlot.map((itemId) => paths.has(itemId) ? itemId : null);
+      return {
+        id,
+        slots,
+        path: path === null ? null : groupPaths.get(id)!,
+        activeSlots: slots.flatMap((itemId, slot) => itemId === null ? [] : [slot]),
+      };
+    }),
     current,
     tree,
   };

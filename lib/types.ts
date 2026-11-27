@@ -26,6 +26,8 @@ export type ItemMatcher = {
   nonUnique?: boolean;
   /** 未切割宝石在游戏里只有一个基底，等级靠 GemLevel 条件区分；每个等级是一件独立物品。 */
   gemLevel?: number;
+  /** 换界石的阶数：每个阶数是一件独立物品，写出 `Class == "Waystones"` 加 `WaystoneTier = N`。 */
+  waystoneTier?: number;
 };
 
 export type ItemDefinition = {
@@ -36,7 +38,6 @@ export type ItemDefinition = {
   categoryPath: string[];
   baseType?: string;
   marketKey: string;
-  source: "never-sink" | "game-data" | "fallback";
   known: boolean;
   priceable: boolean;
   ambiguous: boolean;
@@ -46,6 +47,10 @@ export type ItemDefinition = {
   iconUrl?: string;
   searchNames?: string[];
   marketItemId?: string;
+  /** 传奇条目上基底的三语名称。条目自己的名字是传奇的名字。 */
+  baseLocaleNames?: Record<Locale, string>;
+  /** 客户端表里的物品类别编号（BaseItemTypes 的 ItemClass）。整类匹配按它认出同一个类别的物品。 */
+  itemClass?: number;
 };
 
 export type MarketPrice = {

@@ -7,10 +7,12 @@ const INVALID_COMPRESSED_DATA: &str = "分享码压缩数据损坏";
 
 // Independent frame vectors with body b"123456789" (CRC32 0xcbf43926).
 // The compressed streams were produced with Node zlib.
-const RAW_VECTOR: &str = "POE2F2.BggCEAEYASY59MsxMjM0NTY3ODk";
-const PACKED_BROTLI_VECTOR: &str = "POE2F2.BggCEAEYAiY59MsLBIAxMjM0NTY3ODkD";
-const DEFLATE_VECTOR: &str = "POE2F2.BggCEAEYAyY59MszNDI2MTUzt7AEAA";
+const RAW_VECTOR: &str = "POE2F2.CAgCEAEYASABJjn0yzEyMzQ1Njc4OQ";
+const PACKED_BROTLI_VECTOR: &str = "POE2F2.CAgCEAEYAiABJjn0ywsEgDEyMzQ1Njc4OQM";
+const DEFLATE_VECTOR: &str = "POE2F2.CAgCEAEYAyABJjn0yzM0MjYxNTO3sAQA";
 const RAW_HEADER: &[u8] = &[0x08, 2, 0x10, 1, 0x18, 1];
+// The catalog version, written after the three required fields.
+const CATALOG_FIELD: &[u8] = &[0x20, 1];
 const VECTOR_BODY: &[u8] = b"123456789";
 const BODY_VERSION: BodyVersion = BodyVersion {
     format: 2,
@@ -20,24 +22,27 @@ const BODY_VERSION: BodyVersion = BodyVersion {
 fn plain() -> Share {
     Share {
         name: "打宝".into(),
-        profile: json!({"schemaVersion":2,"league":"Standard","rules":[],"skippedItemIds":["albino-rhoa-feather"]}),
+        description: String::new(),
+        profile: json!({"schemaVersion":2,"league":"Standard","rules":[],"skippedItemIds":["scroll-of-wisdom"]}),
     }
 }
 
 fn with_server() -> Share {
     Share {
         name: "打宝".into(),
+        description: String::new(),
         profile: json!({"schemaVersion":2,"league":"Standard","server":"tencent",
             "rules":[{"id":"default-exalted","name":"崇高石价格档","enabled":true,"hidden":false,
                 "followBaseline":true,"effects":{},"target":{"itemIds":["exalted-orb","chaos-orb"],
                 "range":{"max":{"amount":1,"currency":"chaos"},"min":{"amount":1,"currency":"exalted"}}}}],
-            "skippedItemIds":["albino-rhoa-feather"]}),
+            "skippedItemIds":["scroll-of-wisdom"]}),
     }
 }
 
 fn with_drop_conditions() -> Share {
     Share {
         name: "通货数量档".into(),
+        description: String::new(),
         profile: json!({"schemaVersion":3,"server":"international","league":"Standard",
             "rules":[{"effects":{"beam":"Blue Temp","font":{"fontSize":42,"textColor":"0 0 0 255"},
                 "icon":"1 Blue Circle","sound":{"id":9,"type":"builtin","volume":300}},
@@ -52,6 +57,7 @@ fn with_drop_conditions() -> Share {
 fn code_fixture() -> Share {
     Share {
         name: "Shared fixture, shared fixture, shared fixture".into(),
+        description: String::new(),
         profile: json!({"schemaVersion": 3, "server": "international", "league": "Standard",
             "originalLeague": "Original", "strictness": 2, "style": "default", "locale": "cn",
             "rules": [{"id":"local-test-id", "name":"Shared fixture, shared fixture, shared fixture",
@@ -60,7 +66,7 @@ fn code_fixture() -> Share {
                 "effects":{"beam":"Blue Temp","sound":{"type":"builtin","id":2,"volume":150}}},
                 {"id":"local-test-id-2","name":"Shared fixture, shared fixture, shared fixture","enabled":true,"hidden":false,
                  "target":{"itemIds":["exalted-orb"]},"baselineEffectItemId":"chaos-orb"}],
-            "skippedItemIds":["albino-rhoa-feather"]}),
+            "skippedItemIds":["scroll-of-wisdom"]}),
     }
 }
 
@@ -91,6 +97,7 @@ fn official_frame_wire_vectors() {
             BODY_VERSION,
             crc32fast::hash(VECTOR_BODY),
             candidate,
+            1,
         )
     };
     assert_eq!(encode(Encoder::Raw).unwrap(), RAW_VECTOR);
@@ -100,8 +107,8 @@ fn official_frame_wire_vectors() {
             .decode(code.split_once('.').unwrap().1)
             .unwrap();
         assert_eq!(
-            &wire[..11],
-            &[6, 8, 2, 16, 1, 24, tag, 0x26, 0x39, 0xf4, 0xcb]
+            &wire[..13],
+            &[8, 8, 2, 16, 1, 24, tag, 32, 1, 0x26, 0x39, 0xf4, 0xcb]
         );
         assert_eq!(
             packed_body(&code).unwrap(),
@@ -117,10 +124,10 @@ fn production_picks_shortest_complete_code() {
         let checksum = crc32fast::hash(body);
         let expected = ENCODERS
             .iter()
-            .map(|&candidate| frame::encode(body, BODY_VERSION, checksum, candidate).unwrap())
+            .map(|&candidate| frame::encode(body, BODY_VERSION, checksum, candidate, 1).unwrap())
             .min_by_key(String::len)
             .unwrap();
-        let code = encode_shortest(body, BODY_VERSION).unwrap();
+        let code = encode_shortest(body, BODY_VERSION, 1).unwrap();
         assert_eq!(code, expected);
         assert_eq!(packed_body(&code).unwrap(), (BODY_VERSION, body.to_vec()));
     }
@@ -149,7 +156,7 @@ fn packed_header_skips_unknown_optional_fields() {
     let headers = [
         // Unknown varint, length-delimited, fixed64 and fixed32 fields in any order.
         [
-            &[0x20, 0x05][..],
+            &[0x28, 0x05][..],
             RAW_HEADER,
             &[0x2a, 3, b'a', b'b', b'c'],
             &[0x31, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -205,6 +212,8 @@ fn packed_header_rejects_malformed_fields_and_lengths() {
         &[0x25, 0, 0, 0],                      // truncated fixed32
         &[0x18, 0x80],                         // truncated compression varint
         &[0x18, 0x80, 0x80, 0x80, 0x80, 0x10], // compression wider than u32
+        &[0x20, 0x00],                         // catalog version zero
+        &[0x20, 0x80, 0x80, 0x80, 0x80, 0x10], // catalog version wider than u32
         &[
             0x20, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02,
         ], // exceeds u64
@@ -248,7 +257,7 @@ fn packed_header_rejects_malformed_fields_and_lengths() {
 fn packed_header_rejects_unsupported_format_revision_or_compression() {
     for header in [
         [8, 3, 16, 1, 24, 1], // Unknown format.
-        [8, 2, 16, 2, 24, 1], // Unknown revision of the positional body.
+        [8, 2, 16, 3, 24, 1], // Unknown revision of the positional body.
         [8, 2, 16, 1, 24, 4], // Unknown compression.
     ] {
         // Unsupported values are rejected before CRC and before consulting the body.
@@ -267,20 +276,23 @@ fn packed_payload_checks_crc_and_exact_stream_end() {
         let wire = URL_SAFE_NO_PAD
             .decode(code.split_once('.').unwrap().1)
             .unwrap();
+        // The checksum follows the length byte and the header.
+        let checksum = 1 + wire[0] as usize;
         let mut changed_crc = wire.clone();
-        changed_crc[7] ^= 1;
+        changed_crc[checksum] ^= 1;
         assert_eq!(
             decode(&frame_code(&changed_crc)).unwrap_err(),
             "分享码校验失败"
         );
+        // A truncated checksum is reported before it is compared.
         assert_eq!(
-            decode(&frame_code(&wire[..10])).unwrap_err(),
+            decode(&frame_code(&wire[..checksum + 3])).unwrap_err(),
             "分享码压缩数据不完整"
         );
         for invalid in [
             wire[..wire.len() - 1].to_vec(),
             [&wire[..], &[0]].concat(),
-            [&wire[..], &wire[11..]].concat(),
+            [&wire[..], &wire[checksum + 4..]].concat(),
         ] {
             assert_eq!(
                 decode(&frame_code(&invalid)).unwrap_err(),
@@ -306,7 +318,7 @@ fn limits_encoded_and_inflated_bytes() {
     let maximum = &oversized[..MAX_JSON];
     for candidate in [Encoder::Raw, Encoder::brotli(4, 16), Encoder::Deflate(6)] {
         let frame =
-            |body| frame::encode(body, BODY_VERSION, crc32fast::hash(body), candidate).unwrap();
+            |body| frame::encode(body, BODY_VERSION, crc32fast::hash(body), candidate, 1).unwrap();
         assert_eq!(packed_body(&frame(maximum)).unwrap().1, maximum);
         assert_eq!(decode(&frame(&oversized)).unwrap_err(), INFLATED_TOO_LARGE);
     }
@@ -355,9 +367,9 @@ fn packed_body(code: &str) -> Result<(BodyVersion, Vec<u8>)> {
 }
 
 // Fixed vectors of complete share codes.
-const RAW_SHARE: &str = "POE2F2.BggCEAEYARN3c2gTBuaJk-WunQwCCFN0YW5kYXJkABCBAgQB";
-const BROTLI_SHARE: &str = "POE2F2.BggCEAEYAjjSmleCGwCYkVqsNbbGLDh3_78swUKOpGid0BSHtABxygF784CiIMfw89MZDh6yYEKTlVcbfZTvC553470fa5tuyg8xhkM0oDcZ4L5mJRgkRALVNOHjTHsshF8qfJv1UE5bNq0VgocVSmKbDBU";
-const DEFLATE_SHARE: &str = "POE2F2.BggCEAEYAzjSmleVzMsJhDAQANCZyQoJe9nDFpAC9tODDXjQBkYTNeCPUcGrVViWFQl2IHh8l7fjL61ZvLNlWKZZ_MeOlz5A6XTizrE4nUioQscNAVB1M0LQqBAVRMbEzext5tsBFG34vz2ZouZ-_PaSw2ulB75XeqKOTg";
+const RAW_SHARE: &str = "POE2F2.CAgCEAEYASABkPBTBBMG5omT5a6dDAIIU3RhbmRhcmQAFIYCCwEF";
+const BROTLI_SHARE: &str = "POE2F2.CAgCEAEYAiABFIqnc6IbAJyRWqw1tsYsuHl3X1sTXMhj0thAgaYYUgGik9OD8ueH8znHsHkUQ-AhCyZEWXm1ycd8XvC8G-_9WNt0U_2wYDekgHmnAPUtKxHQSIMbhuz5pT0WppeF77AeymnLprVC8iimG5jpAg";
+const DEFLATE_SHARE: &str = "POE2F2.CAgCEAEYAyABFIqnc5XMzQmDQBAG0Pl2WNjFqwVsAfnpIQ3kYBqYZDe6YDSMCqnAFlKWFQl2IHh8l7fgUjWiKYZ3_o2TplMYdr0Su2qULopGd9dc505aQ2TqgxHIgQEm6_2tnVJ4pM-X2PxxPTz5VyP9cO71SeVsCthy5gKwGw";
 
 #[test]
 fn full_share_vectors_keep_wire_and_decoded_profiles() {
@@ -372,7 +384,7 @@ fn full_share_vectors_keep_wire_and_decoded_profiles() {
     assert_eq!(decode(DEFLATE_SHARE).unwrap().share, expected);
     for (share, fixture) in [(&plain, RAW_SHARE), (&source, BROTLI_SHARE)] {
         let bytes = (positional::CODEC.pack)(share).unwrap();
-        assert_eq!(encode_shortest(&bytes, BODY_VERSION).unwrap(), fixture);
+        assert_eq!(encode_shortest(&bytes, BODY_VERSION, 1).unwrap(), fixture);
     }
 }
 
@@ -380,6 +392,85 @@ fn full_share_vectors_keep_wire_and_decoded_profiles() {
 fn export_layout_is_registered_for_import() {
     let code = encode(&plain()).unwrap();
     assert_eq!(decode(&code).unwrap().share, plain());
+}
+
+#[test]
+fn packed_header_carries_the_catalog_version() {
+    let read = |header: &[u8]| {
+        let code = raw_frame(header, VECTOR_BODY);
+        let wire = decode_base64(code.strip_prefix("POE2F2.").unwrap(), MAX_PAYLOAD)?;
+        frame::Frame::read(&wire).map(|frame| frame.catalog)
+    };
+    // Codes from before the field existed carry the first catalog.
+    assert_eq!(read(RAW_HEADER).unwrap(), None);
+    assert_eq!(read(&[CATALOG_FIELD, RAW_HEADER].concat()).unwrap(), Some(1));
+    // A repeated scalar keeps its last value. Another wire type is skipped.
+    assert_eq!(
+        read(&[&[0x20, 0x02][..], RAW_HEADER, CATALOG_FIELD].concat()).unwrap(),
+        Some(1)
+    );
+    assert_eq!(
+        read(&[RAW_HEADER, &[0x22, 0x01, 0x01][..]].concat()).unwrap(),
+        None
+    );
+
+    // The exported code carries the current catalog version.
+    let code = encode(&plain()).unwrap();
+    let wire = decode_base64(code.strip_prefix("POE2F2.").unwrap(), MAX_PAYLOAD).unwrap();
+    let frame = frame::Frame::read(&wire).unwrap();
+    assert_eq!(frame.catalog, Some(positional::catalog_version().unwrap()));
+    positional::check_catalog_version(frame.catalog).unwrap();
+
+    // A code from another catalog is rejected before its body is read.
+    let newer = [RAW_HEADER, &[0x20, 0x02][..]].concat();
+    assert_eq!(
+        decode(&raw_frame(&newer, VECTOR_BODY)).unwrap_err(),
+        "分享码来自第 2 版物品目录，当前客户端使用第 1 版，请升级客户端"
+    );
+}
+
+
+// Fixed vectors of complete revision 2 share codes.
+const DESCRIBED_RAW_SHARE: &str = "POE2F2.CAgCEAIYASAB8LY_mzgG5omT5a6dJOW8gOiNkuWIsOe7iOWxgO-8jOiHquWKqOi3n-maj-eJqeS7twwCCFN0YW5kYXJkABSGAgsBBQ";
+const DESCRIBED_BROTLI_SHARE: &str = "POE2F2.CAgCEAIYAiAB8LY_m-ADEDgG5omT5a6dJOW8gOiNkuWIsOe7iOWxgO-8jOiHquWKqOi3n-maj-eJqeS7twwCCFN0YW5kYXJkABSGAgsBBQM";
+const DESCRIBED_DEFLATE_SHARE: &str = "POE2F2.CAgCEAIYAyAB8LY_mwE_AMD_OAbmiZPlrp0k5byA6I2S5Yiw57uI5bGA77yM6Ieq5Yqo6Lef6ZqP54mp5Lu3DAIIU3RhbmRhcmQAFIYCCwEF";
+const DESCRIBED_FIXTURE_BROTLI_SHARE: &str = "POE2F2.CAgCEAIYAiABOjFxhYIhAI-RWqw1tsYRksxacPPuvrYmuJDHpLGBAg2MKkB0cnpQ_vxwjiPMMGwexVBUAIcctFBbKmeIoPiZr8Hzbrz3Y23TTZWRHyyYIwWUTgHq60oENNLghiGGh3ssTC8L32E9lNOWTWuF5FFMF2a6";
+
+fn described(share: &Share, description: &str) -> Share {
+    let mut share = share.clone();
+    share.description = description.into();
+    share
+}
+
+#[test]
+fn described_revision_vectors_keep_wire_and_decoded_shares() {
+    let plain = described(&plain(), "开荒到终局，自动跟随物价");
+    let source = described(
+        &code_fixture(),
+        "Shared fixture, shared fixture, shared fixture",
+    );
+    let mut expected = source.clone();
+    for rule in expected.profile["rules"].as_array_mut().unwrap() {
+        rule.as_object_mut().unwrap().remove("id");
+    }
+    assert_eq!(decode(DESCRIBED_RAW_SHARE).unwrap().share, plain);
+    assert_eq!(decode(DESCRIBED_BROTLI_SHARE).unwrap().share, plain);
+    assert_eq!(decode(DESCRIBED_DEFLATE_SHARE).unwrap().share, plain);
+    assert_eq!(
+        decode(DESCRIBED_FIXTURE_BROTLI_SHARE).unwrap().share,
+        expected
+    );
+    for (share, fixture) in [
+        (&plain, DESCRIBED_RAW_SHARE),
+        (&source, DESCRIBED_FIXTURE_BROTLI_SHARE),
+    ] {
+        let bytes = (positional::DESCRIBED_CODEC.pack)(share).unwrap();
+        assert_eq!(
+            encode_shortest(&bytes, EXPORT_BODY.version, 1).unwrap(),
+            fixture
+        );
+        assert_eq!(encode(share).unwrap(), fixture);
+    }
 }
 
 #[cfg(test)]
@@ -427,7 +518,13 @@ pub(crate) fn measure_compression_candidates(
         .iter()
         .map(|&(name, candidate)| {
             let start = std::time::Instant::now();
-            let code = frame::encode(&bytes, EXPORT_BODY.version, checksum, candidate)?;
+            let code = frame::encode(
+            &bytes,
+            EXPORT_BODY.version,
+            checksum,
+            candidate,
+            positional::catalog_version()?,
+        )?;
             Ok((name, code.len(), start.elapsed()))
         })
         .collect()

@@ -29,7 +29,8 @@ const activeAddresses = (projection, { group, children }) => [
   ...children.flatMap((child) => activeAddresses(projection, child)),
 ];
 const sortAddresses = (addresses) => addresses.sort(([a, x], [b, y]) => a - b || x - y);
-const selectedIds = (projection, node) => activeAddresses(projection, node).map((address) => resolve(projection, address)).sort();
+// 整选一个分类得到的物品：地址表里仍然存在的那些槽位，物品改类后它的旧地址仍算在原来的分类里。
+const selectedIds = (projection, node) => [...new Set(activeAddresses(projection, node).map((address) => resolve(projection, address)))].sort();
 
 test("桌面引擎的分享码目录与选择器及合法物品一致", async () => {
   const { outputFiles: [bundle] } = await build({
@@ -39,27 +40,27 @@ test("桌面引擎的分享码目录与选择器及合法物品一致", async ()
   const dispatch = runInNewContext(bundle.text + "\ndesktopEngine.dispatch");
   const projection = JSON.parse(dispatch("shareCatalog", "null"));
   assert.deepEqual(projection, data.shareCatalog());
-  assert.deepEqual(Object.keys(projection).sort(), ["current", "groups", "tree"]);
+  assert.deepEqual(Object.keys(projection).sort(), ["current", "groups", "tree", "version"]);
+  assert.equal(projection.version, catalog.catalogVersion);
   const picker = new Map(data.PICKER_ITEMS.map((item) => [item.id, item.categoryPath]));
   assert.deepEqual(Object.keys(projection.current).sort(), [...data.FILTER_ITEMS_BY_ID.keys()].sort());
-  const activeSlots = projection.groups.map(() => []);
   for (const [itemId, [groupId, slot]] of Object.entries(projection.current)) {
-    activeSlots[groupId].push(slot);
     assert.equal(resolve(projection, [groupId, slot]), itemId);
     assert.deepEqual(catalog.shareGroups[groupId].path, picker.get(itemId) ?? null, itemId);
   }
   for (const [id, group] of projection.groups.entries()) {
     assert.deepEqual(Object.keys(group).sort(), ["activeSlots", "id", "path", "slots"]);
     assert.equal(group.id, id);
-    assert.deepEqual(group.activeSlots, activeSlots[id].sort((a, b) => a - b));
+    // 有效的槽位是地址表里仍然存在的物品，不只是当前地址：改类物品的旧地址也留着，旧分享码整选它原来的分类时用得上。
+    assert.deepEqual(group.activeSlots, group.slots.flatMap((itemId, slot) => itemId === null ? [] : [slot]));
     const { path } = catalog.shareGroups[id];
     assert.deepEqual(group.path, path === null ? null : ordinalPath(catalog.shareTree, path));
     if (path !== null) assert.equal(shareNode(projection.tree, group.path).group, id);
   }
   const groupPath = (itemId) => catalog.shareGroups[projection.current[itemId][0]].path;
   assert.deepEqual(groupPath("class-quest-items"), ["other", "quest-items"]);
-  assert.deepEqual(groupPath("base:omen-crest-shield"), ["equipment", "normal-bases", "offhands", "shields"]);
-  assert.deepEqual(groupPath("unique:omen-crest-shield"), ["equipment", "unique-equipment", "offhands", "shields"]);
+  assert.deepEqual(groupPath("base:omen-crest-shield"), ["equipment", "off-hand", "shields-str-int"]);
+  assert.deepEqual(groupPath("unique:omen-crest-shield"), ["uniques", "off-hand", "shields"]);
   assert.equal(groupPath("omen-crest-shield"), null);
   assert.equal(groupPath("base:class-shields"), null);
   // 固定几处已分配地址，目录后续更新继续保留这些号码。
@@ -67,30 +68,36 @@ test("桌面引擎的分享码目录与选择器及合法物品一致", async ()
   assert.equal(catalog.shareGroups[22].slots["class-waystones"], 0);
   assert.equal(catalog.shareGroups[80].slots["omen-crest-shield"], 421);
 
-  const rootKeys = ["endgame", "crafting", "gems", "supplies", "equipment", "other"];
-  assert.deepEqual(rootKeys.map((key) => catalog.shareTree[key].ordinal), [0, 1, 2, 3, 4, 5]);
+  // 原有的六个顶层分类保留各自的序号，分类重排后新加的五个接在后面。
+  const rootKeys = ["endgame", "crafting", "gems", "supplies", "equipment", "other", "currency", "uniques", "gameplay", "runes", "essences"];
+  assert.deepEqual(rootKeys.map((key) => catalog.shareTree[key].ordinal), rootKeys.map((_, index) => index));
   const nodes = [buildCatalogTree(data.PICKER_ITEMS)];
   for (const node of nodes) {
     const path = ordinalPath(catalog.shareTree, node.path);
     const projected = shareNode(projection.tree, path);
     assert.deepEqual(Object.keys(projected).sort(), ["children", "group"]);
     assert.equal(projected.group, node.items.length ? projection.current[node.items[0].id][0] : null, node.path.join("/"));
-    const expected = sortAddresses(catalogItems(node).map(({ id }) => projection.current[id]));
-    assert.deepEqual(sortAddresses(activeAddresses(projection, projected)), expected, node.path.join("/"));
+    // 分类里每件物品的当前地址都在这个节点的整选范围内。
+    const current = catalogItems(node).map(({ id }) => projection.current[id]);
+    for (const address of current) assert.ok(activeAddresses(projection, projected).some(([group, slot]) => group === address[0] && slot === address[1]), node.path.join("/") + " " + resolve(projection, address));
+    for (const [group, slot] of activeAddresses(projection, projected)) assert.ok(resolve(projection, [group, slot]), node.path.join("/") + " 的整选范围里有已退役的槽位");
     nodes.push(...node.children);
   }
 });
 
-test("实际通货规则和分类组合恰好覆盖完整的可见物品组", () => {
+test("默认价格档的物品正好是通货、玩法、符文、精髓四个分类整选的结果", () => {
   const projection = data.shareCatalog();
   const nodeAt = (path) => shareNode(projection.tree, ordinalPath(catalog.shareTree, path));
+  const pricedRoots = [["currency"], ["gameplay"], ["runes"], ["essences"]];
   for (const rule of data.DEFAULT_RULES) {
-    assert.deepEqual(selectedIds(projection, nodeAt(["crafting"])), [...rule.target.itemIds].sort(), rule.id);
+    // 整类条目（远征日志）在选择器里，但它没有行情，不在价格档的物品范围里。
+    const selected = [...new Set(pricedRoots.flatMap((path) => selectedIds(projection, nodeAt(path))))].filter((id) => !data.FILTER_ITEMS_BY_ID.get(id).matcher.class);
+    assert.deepEqual([...selected].sort(), [...rule.target.itemIds].sort(), rule.id);
   }
-  const paths = [["crafting", "socketables"], ["equipment", "normal-bases", "one-hand"]];
+  // 分类重排后，新分类的分组号接在原有的分组之后。
+  const paths = [["runes"], ["equipment", "one-hand"]];
   const addresses = sortAddresses(paths.flatMap((path) => activeAddresses(projection, nodeAt(path))));
-  const ids = [...new Set(addresses.map(([id]) => id))];
-  assert.deepEqual(ids, [8, 9, 10, 35, 36, 37, 38]);
+  assert.ok(addresses.every(([group]) => group >= 84), "新分类的分组号接在原有分组之后");
   const expected = data.PICKER_ITEMS.filter(({ categoryPath }) => paths.some((path) =>
     path.every((key, index) => key === categoryPath[index])));
   assert.deepEqual(addresses.map((address) => resolve(projection, address)).sort(), expected.map(({ id }) => id).sort());
@@ -108,7 +115,8 @@ test("调整目录、选择器和数据记录的顺序不会改变组号、槽�
   const reorderedTree = reverseTree(catalog.shareTree);
   assert.deepEqual(allocateShareGroups(reordered, view), catalog.shareGroups);
   assert.deepEqual(allocateShareTree(reorderedTree, reordered, view), catalog.shareTree);
-  assert.deepEqual(projectShareCatalog(reordered, view, reorderedTree), data.shareCatalog());
+  const { version, ...projection } = data.shareCatalog();
+  assert.deepEqual(projectShareCatalog(reordered, view, reorderedTree), projection);
 });
 
 test("组号、组内槽位和同级序号跨过 127 后仍只追加", () => {
@@ -159,23 +167,24 @@ function catalogFixture(t) {
   };
 }
 
-test("玩法与掉落数据更新时追加新路径，保留已有别名和退役槽位", (t) => {
+test("分类和掉落数据更新时追加新路径，保留已有别名和退役槽位", (t) => {
   const { workspace, catalogFile, writeFixture } = catalogFixture(t);
-  const mechanics = readJson(path.join(root, "data/item-mechanics.json"));
-  mechanics.items["Divine Orb"].mechanic = "omens";
   const changedMetadata = structuredClone(metadata);
   delete changedMetadata.uniques["Omen Crest Shield"];
   changedMetadata.uniques["Avian Targe"] = { "Catalog Test Unique": null };
   const newKey = "aaa-test-waystones";
-  const items = catalog.items.map((item) => item.id === "class-waystones"
-    ? { ...item, categoryPath: ["endgame", newKey, "class-selection"] } : item);
+  // 神圣石换了一个分类；1 阶换界石所在的分类改了名。
+  const movedPath = ["currency", "tiered"];
+  const items = catalog.items.map((item) => item.id === "waystone-tier-1"
+    ? { ...item, categoryPath: ["endgame", newKey] }
+    : item.id === "divine-orb" ? { ...item, categoryPath: movedPath } : item);
   writeFixture("item-catalog.json", { ...catalog, items });
-  writeFixture("item-mechanics.json", mechanics);
   writeFixture("item-drop-metadata.json", changedMetadata);
 
   const addedId = "unique:avian-targe";
-  assert.throws(() => projectShareCatalog(catalog.shareGroups, deriveCatalogView(catalog.items, changedMetadata), catalog.shareTree), new RegExp(addedId));
-  const updater = path.join(root, "scripts/apply-catalog-mechanics.mjs");
+  assert.throws(() => projectShareCatalog(catalog.shareGroups, deriveCatalogView(items, changedMetadata), catalog.shareTree), /缺少当前分享码槽位/);
+  assert.ok(!deriveCatalogView(items, changedMetadata).pickerItems.some((item) => item.id === "unique:omen-crest-shield"));
+  const updater = path.join(root, "scripts/sync-share-addresses.mjs");
   execFileSync(process.execPath, [updater], { cwd: workspace });
   const updated = readJson(catalogFile);
   const updatedView = deriveCatalogView(updated.items, changedMetadata);
@@ -186,24 +195,28 @@ test("玩法与掉落数据更新时追加新路径，保留已有别名和退�
   assert.deepEqual(updated.shareTree.endgame.children, {
     ...oldSiblings, [newKey]: { ordinal: Object.keys(oldSiblings).length, children: {} },
   });
-  const oldWaystones = previous.current["class-waystones"];
-  const newWaystones = next.current["class-waystones"];
+  const oldWaystones = previous.current["waystone-tier-1"];
+  const newWaystones = next.current["waystone-tier-1"];
   assert.deepEqual(next.groups[newWaystones[0]].path, [0, Object.keys(oldSiblings).length]);
   assert.equal(shareNode(next.tree, previous.groups[oldWaystones[0]].path).group, oldWaystones[0]);
-  assert.deepEqual(next.groups[oldWaystones[0]].activeSlots, []);
-  assert.equal(resolve(next, oldWaystones), "class-waystones");
+  // 旧分类的整选范围里仍有 1 阶换界石的旧地址：旧分享码整选「换界石」时展开的还是它。
+  assert.ok(next.groups[oldWaystones[0]].activeSlots.includes(oldWaystones[1]));
+  assert.equal(resolve(next, oldWaystones), "waystone-tier-1");
 
   const movedId = "divine-orb";
   const retiredId = "unique:omen-crest-shield";
   const movedFrom = previous.current[movedId];
   const movedTo = next.current[movedId];
   assert.notEqual(movedFrom[0], movedTo[0]);
-  assert.deepEqual(updated.shareGroups[movedTo[0]].path, ["crafting", "omens"]);
+  assert.deepEqual(updated.shareGroups[movedTo[0]].path, movedPath);
   assert.equal(movedTo[1], previous.groups[movedTo[0]].slots.length);
   assert.equal(resolve(next, movedFrom), movedId);
   assert.equal(resolve(next, movedTo), movedId);
-  assert.ok(!next.groups[movedFrom[0]].activeSlots.includes(movedFrom[1]));
+  // 改类的物品在两个分类的整选范围里都有：新分类用新地址，旧分类留着旧地址。
+  assert.ok(next.groups[movedFrom[0]].activeSlots.includes(movedFrom[1]));
   assert.ok(next.groups[movedTo[0]].activeSlots.includes(movedTo[1]));
+  assert.ok(selectedIds(next, shareNode(next.tree, next.groups[movedFrom[0]].path)).includes(movedId));
+  assert.ok(selectedIds(next, shareNode(next.tree, next.groups[movedTo[0]].path)).includes(movedId));
 
   const [retiredGroup, retiredSlot] = previous.current[retiredId];
   assert.equal(updated.shareGroups[retiredGroup].slots[retiredId], retiredSlot);
@@ -216,18 +229,21 @@ test("玩法与掉落数据更新时追加新路径，保留已有别名和退�
   assert.equal(resolve(next, next.current[addedId]), addedId);
 
   const updatedBytes = readFileSync(catalogFile, "utf8");
-  execFileSync(process.execPath, [updater, "--share-only"], { cwd: workspace });
+  execFileSync(process.execPath, [updater], { cwd: workspace });
   assert.equal(readFileSync(catalogFile, "utf8"), updatedBytes);
 
   const retiredView = deriveCatalogView(updated.items.filter(({ id }) => id !== movedId), changedMetadata);
   const retired = projectShareCatalog(updated.shareGroups, retiredView, updated.shareTree);
   assert.equal(resolve(retired, movedFrom), null);
   assert.equal(resolve(retired, movedTo), null);
+  assert.ok(!retired.groups[movedFrom[0]].activeSlots.includes(movedFrom[1]));
+  assert.ok(!retired.groups[movedTo[0]].activeSlots.includes(movedTo[1]));
 });
 
 test("客户端分类写入器也追加路径序号并保留原路径", (t) => {
   const { workspace, catalogFile, writeFixture } = catalogFixture(t);
-  const items = [catalog.items.find(({ id }) => id === "divine-orb")];
+  // 目录里神圣石的分类是旧的，客户端表说它在「通货」下：写入器按客户端表改过去，旧路径留在分享码的分类树里。
+  const items = [{ ...catalog.items.find(({ id }) => id === "divine-orb"), categoryPath: ["currency", "tiered"] }];
   const view = deriveCatalogView(items, metadata);
   const shareGroups = allocateShareGroups({}, view);
   const shareTree = allocateShareTree({}, {}, view);
@@ -236,14 +252,15 @@ test("客户端分类写入器也追加路径序号并保留原路径", (t) => {
   const clientRoot = path.join(workspace, "client");
   const localeDir = path.join(clientRoot, "us");
   mkdirSync(localeDir, { recursive: true });
-  writeFileSync(path.join(localeDir, "BaseItemTypes.jsonl"), JSON.stringify({ Name: "Divine Orb", ItemClass: 31 }) + "\n");
-  execFileSync(process.execPath, [path.join(root, "scripts/build-catalog-groups.mjs"), clientRoot, "--skip-mechanics"], { cwd: workspace });
+  writeFileSync(path.join(localeDir, "BaseItemTypes.jsonl"), JSON.stringify({ Name: "Divine Orb", ItemClass: 30, Tags: [], Id: "Metadata/Items/Currency/CurrencyModValues", DropLevel: 35 }) + "\n");
+  execFileSync(process.execPath, [path.join(root, "scripts/build-catalog-groups.mjs"), clientRoot], { cwd: workspace, stdio: "pipe" });
   const updated = readJson(catalogFile);
+  assert.deepEqual(updated.items[0].categoryPath, ["currency", "currency"]);
   const next = projectShareCatalog(updated.shareGroups, deriveCatalogView(updated.items, metadata), updated.shareTree);
-  assert.deepEqual(updated.shareTree.crafting, shareTree.crafting);
-  assert.deepEqual(next.groups.map(({ path }) => path), [[0, 0], [1, 0]]);
+  assert.deepEqual(updated.shareTree.currency.children.tiered, shareTree.currency.children.tiered);
+  assert.deepEqual(next.groups.map(({ path }) => path), [[0, 0], [0, 1]]);
   assert.deepEqual(next.current["divine-orb"], [1, 0]);
-  assert.deepEqual(next.groups[0].activeSlots, []);
+  assert.deepEqual(next.groups[0].activeSlots, [0]);
   assert.equal(resolve(next, [0, 0]), "divine-orb");
 });
 
@@ -286,7 +303,8 @@ test("父类和子类按当前槽位全选，移动与退役保留已有路径",
   const next = projectShareCatalog(changedGroups, changed, changedTree);
   assert.deepEqual(changedTree, tree);
   assert.deepEqual(next.tree, before.tree);
-  assert.deepEqual(next.groups[directGroup].activeSlots, [0, 2]);
+  // 改类的物品在原来的分类里仍然有效（旧分享码整选用得到），退役的从整选范围里去掉。
+  assert.deepEqual(next.groups[directGroup].activeSlots, [0, 1, 2]);
   assert.deepEqual(selectedIds(next, shareNode(next.tree, branchPath)), ["a-direct", "child-item", "moved", "z-direct"]);
   assert.notDeepEqual(next.current.moved, before.current.moved);
   assert.equal(resolve(next, before.current.moved), "moved");
@@ -299,7 +317,8 @@ test("父类和子类按当前槽位全选，移动与退役保留已有路径",
   const restored = projectShareCatalog(restoredGroups, initialView, restoredTree);
   assert.deepEqual(restoredTree, tree);
   assert.deepEqual(restored.current, before.current);
-  assert.deepEqual(restored.groups.map(({ activeSlots }) => activeSlots), before.groups.map(({ activeSlots }) => activeSlots));
+  // 改类的物品回来以后当前地址和原来一样；它待过的那个分类里还留着它的旧地址。
+  for (const [index, group] of before.groups.entries()) assert.ok(group.activeSlots.every((slot) => restored.groups[index].activeSlots.includes(slot)));
   assert.equal(resolve(restored, next.current.moved), "moved");
   assert.equal(resolve(restored, [retiredGroup, retiredSlot]), "retired");
 });

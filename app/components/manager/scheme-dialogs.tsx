@@ -11,15 +11,16 @@ import { Input, Textarea } from "../ui/input";
 import { Select } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { toast } from "../ui/toast";
+import { SchemeInfoDialog } from "./scheme-info-dialog";
 
-/** 方案库用到的全部对话框：重命名、卸载、删除、导入分享码、导入确认、手动复制分享码。 */
+/** 方案库用到的全部对话框：名称和描述、卸载、删除、导入分享码、导入确认、手动复制分享码。 */
 export function SchemeDialogs() {
   const library = useAppStore((state) => state.library);
   const busy = useAppStore((state) => state.managerBusy);
   const error = useAppStore((state) => state.managerError);
   const dialog = useAppStore((state) => state.managerDialog);
   const setDialog = useAppStore((state) => state.setManagerDialog);
-  const renameValue = useAppStore((state) => state.renameValue);
+  const updateSchemeInfo = useAppStore((state) => state.updateSchemeInfo);
   const removeFile = useAppStore((state) => state.removeFile);
   const importOpen = useAppStore((state) => state.importOpen);
   const shareCode = useAppStore((state) => state.shareCode);
@@ -48,42 +49,18 @@ export function SchemeDialogs() {
 
   return (
     <>
-      <ConfirmDialog
-        open={dialog?.kind === "rename"}
+      <SchemeInfoDialog
+        open={dialog?.kind === "nameDescription"}
         onOpenChange={(open) => {
           if (!open) closeDialog();
         }}
-        busy={busy}
-        title="重命名方案"
-        size="sm"
-        footer={
-          <>
-            <Button disabled={busy} onClick={closeDialog}>
-              取消
-            </Button>
-            <Button variant="primary" type="submit" form="scheme-rename" disabled={busy || !renameValue.trim()}>
-              {busy ? "保存中…" : "保存名称"}
-            </Button>
-          </>
-        }
-      >
-        <form
-          id="scheme-rename"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (renameValue.trim() && !busy) void confirm();
-          }}
-        >
-          <Field label="方案名称">
-            <Input required maxLength={80} value={renameValue} disabled={busy} onChange={(event) => patch({ renameValue: event.target.value })} />
-          </Field>
-          {error && (
-            <p role="alert" className="mt-2 text-sm text-ember">
-              {error}
-            </p>
-          )}
-        </form>
-      </ConfirmDialog>
+        title="名称和描述"
+        description="方案名同时是游戏里的过滤器文件名。"
+        initialName={scheme?.name ?? ""}
+        initialDescription={scheme?.description ?? ""}
+        submitLabel="保存"
+        onSubmit={(name, description) => (scheme ? updateSchemeInfo(scheme.id, name, description) : Promise.resolve())}
+      />
 
       <ConfirmDialog
         open={dialog?.kind === "uninstall"}
@@ -220,6 +197,9 @@ export function SchemeDialogs() {
           />
         ) : (
           <p className="text-sm text-ink-muted">{importTarget?.league ? `赛季：${importTarget.league}` : "待选赛季"}</p>
+        )}
+        {importTarget?.description && (
+          <p className="text-sm leading-relaxed text-ink-muted [overflow-wrap:anywhere]">{importTarget.description}</p>
         )}
         {error && (
           <p role="alert" className="text-sm text-ember">

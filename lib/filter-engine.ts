@@ -52,6 +52,8 @@ export function matcherLines(item: ItemDefinition, withRarity = true): string[] 
   if (item.matcher.baseType) lines.push("\tBaseType == " + quote(item.matcher.baseType));
   // 未切割宝石每个等级共用一个基底，靠 GemLevel 区分。
   if (item.matcher.gemLevel !== undefined) lines.push("\tGemLevel = " + item.matcher.gemLevel);
+  // 换界石每个阶数是一件独立物品，靠 WaystoneTier 区分。
+  if (item.matcher.waystoneTier !== undefined) lines.push("\tClass == \"Waystones\"", "\tWaystoneTier = " + item.matcher.waystoneTier);
   if (withRarity && item.matcher.rarity) lines.push("\tRarity " + item.matcher.rarity);
   if (withRarity && item.matcher.nonUnique) lines.push("\tRarity < Unique");
   return lines;
@@ -111,6 +113,8 @@ function covers(earlier: Candidate, current: Candidate): boolean {
   const inner = current.item.matcher;
   if (outer.baseType && outer.baseType !== inner.baseType) return false;
   if (outer.gemLevel !== inner.gemLevel) return false;
+  // 整类条目不限阶数，盖得住它那一类里的每一阶换界石；选定一阶的块只盖得住同一阶。
+  if (outer.waystoneTier !== undefined && outer.waystoneTier !== inner.waystoneTier) return false;
   // 逐件物品自己不带 Class 条件，它属于哪个类别记在登记表里。
   const outerClass = outer.class ?? CLASS_OF_ITEM.get(earlier.item.id)?.item.matcher.class;
   const innerClass = inner.class ?? CLASS_OF_ITEM.get(current.item.id)?.item.matcher.class;
@@ -124,9 +128,21 @@ function covers(earlier: Candidate, current: Candidate): boolean {
   });
 }
 
+/** 一件物品属于哪个游戏类别：整类条目自己带着 Class 条件，其余的记在登记表里。 */
+const classOf = (item: ItemDefinition) => item.matcher.class ?? CLASS_OF_ITEM.get(item.id)?.item.matcher.class;
+/** 不带基底、也不带稀有度的条目：整类条目和换界石各阶。 */
+const unbased = (item: ItemDefinition) => !item.matcher.baseType && !item.matcher.nonUnique && !item.matcher.rarity;
+
 function overlapsSkipped(item: ItemDefinition, skipped: ItemDefinition[]): boolean {
   return skipped.some((other) => {
     if (other.id === item.id) return true;
+    // 这类条目按类别比：整类条目和它那一类里的物品是同一批，跳过了一个，另一个也不再生成规则。
+    if (unbased(other) && unbased(item)) {
+      const otherClass = classOf(other);
+      if (otherClass && otherClass === classOf(item)) return other.matcher.waystoneTier === undefined || item.matcher.waystoneTier === undefined
+        || other.matcher.waystoneTier === item.matcher.waystoneTier;
+      return false;
+    }
     if (!other.matcher.baseType || other.matcher.baseType !== item.matcher.baseType) return false;
     if (other.matcher.gemLevel !== item.matcher.gemLevel) return false;
     if (item.matcher.class && other.matcher.class && item.matcher.class !== other.matcher.class) return false;

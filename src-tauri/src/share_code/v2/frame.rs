@@ -13,11 +13,14 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 const FORMAT: u64 = 1;
 const REVISION: u64 = 2;
 const COMPRESSION: u64 = 3;
+const CATALOG: u64 = 4;
 const VARINT: u64 = 0;
 const MAX_FIELD_NUMBER: u64 = (1 << 29) - 1;
 
 pub(super) struct Frame<'a> {
     pub(super) version: BodyVersion,
+    /// Version of the item catalog the code was written against. Absent means the first one.
+    pub(super) catalog: Option<u32>,
     compression: u32,
     payload: &'a [u8],
 }
@@ -31,9 +34,10 @@ impl<'a> Frame<'a> {
         let (head, payload) = bytes
             .split_at_checked(length as usize)
             .ok_or(INVALID_HEADER)?;
-        let (version, compression) = read_header(head).ok_or(INVALID_HEADER)?;
+        let (version, catalog, compression) = read_header(head).ok_or(INVALID_HEADER)?;
         Ok(Self {
             version,
+            catalog,
             compression,
             payload,
         })
@@ -50,8 +54,9 @@ pub(super) fn encode(
     version: BodyVersion,
     checksum: u32,
     encoder: Encoder,
+    catalog: u32,
 ) -> Result<String> {
-    let header = write_header(version, encoder.algorithm());
+    let header = write_header(version, encoder.algorithm(), catalog);
     let mut frame = Vec::with_capacity(header.len() + 16);
     put_varint(&mut frame, header.len() as u64);
     frame.extend_from_slice(&header);
@@ -63,12 +68,13 @@ pub(super) fn encode(
     Ok(format!("{PREFIX}.{}", URL_SAFE_NO_PAD.encode(frame)))
 }
 
-fn write_header(version: BodyVersion, algorithm: Algorithm) -> Vec<u8> {
+fn write_header(version: BodyVersion, algorithm: Algorithm, catalog: u32) -> Vec<u8> {
     let mut out = Vec::new();
     for (number, value) in [
         (FORMAT, version.format),
         (REVISION, version.revision),
         (COMPRESSION, algorithm as u32),
+        (CATALOG, catalog),
     ] {
         put_varint(&mut out, number << 3 | VARINT);
         put_varint(&mut out, u64::from(value));
@@ -76,9 +82,11 @@ fn write_header(version: BodyVersion, algorithm: Algorithm) -> Vec<u8> {
     out
 }
 
-/// A repeated scalar keeps its last value. Every known field must have a nonzero value.
-fn read_header(mut bytes: &[u8]) -> Option<(BodyVersion, u32)> {
+/// A repeated scalar keeps its last value. The first three fields must be present and nonzero.
+/// The catalog version is optional, but nonzero when present.
+fn read_header(mut bytes: &[u8]) -> Option<(BodyVersion, Option<u32>, u32)> {
     let (mut format, mut revision, mut compression) = (0, 0, 0);
+    let mut catalog = None;
     while !bytes.is_empty() {
         let key = varint(&mut bytes)?;
         let number = key >> 3;
@@ -90,6 +98,14 @@ fn read_header(mut bytes: &[u8]) -> Option<(BodyVersion, u32)> {
             (FORMAT, VARINT) => &mut format,
             (REVISION, VARINT) => &mut revision,
             (COMPRESSION, VARINT) => &mut compression,
+            (CATALOG, VARINT) => {
+                let version = u32::try_from(varint(&mut bytes)?).ok()?;
+                if version == 0 {
+                    return None;
+                }
+                catalog = Some(version);
+                continue;
+            }
             _ => {
                 skip(&mut bytes, wire)?;
                 continue;
@@ -100,7 +116,7 @@ fn read_header(mut bytes: &[u8]) -> Option<(BodyVersion, u32)> {
     if format == 0 || revision == 0 || compression == 0 {
         return None;
     }
-    Some((BodyVersion { format, revision }, compression))
+    Some((BodyVersion { format, revision }, catalog, compression))
 }
 
 /// Skip unknown fields of the supported proto3 wire types.

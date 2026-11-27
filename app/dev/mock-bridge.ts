@@ -7,6 +7,7 @@ import { inspectBaseFilter } from "../../lib/baseline-effects";
 import type { Library } from "../../lib/desktop";
 import { DEFAULT_RULES } from "../../lib/data";
 import { generateFilter } from "../../lib/filter-engine";
+import { DOWNLOAD_CANCELLED, reportDownloadProgress } from "../state/downloads";
 import type {
   BaseFilter,
   Currency,
@@ -162,7 +163,11 @@ const CUSTOM_RULES: FilterRule[] = [
     name: "高价值地图与远征日志",
     enabled: true,
     hidden: false,
-    target: { itemIds: ["class-waystones", "class-expedition-logbook"], itemEnabled: true, priceEnabled: false },
+    target: {
+      itemIds: ["waystone-tier-16", "waystone-tier-15", "waystone-tier-14", "waystone-tier-13", "waystone-tier-12", "waystone-tier-11", "class-expedition-logbook"],
+      itemEnabled: true,
+      priceEnabled: false,
+    },
     effects: {
       beam: "Blue",
       icon: "1 Blue Circle",
@@ -204,14 +209,20 @@ let library: Library = {
     {
       id: "scheme-1",
       name: "崇高石开荒",
+      description: "开荒期用，崇高石以上保留光柱，其余交给基础过滤器。",
       profile: profile("Runes of Aldur", BASE),
       autoRefresh: true,
-      installed: { name: "崇高石开荒.filter", directory: "C:\\Users\\grayd\\Documents\\My Games\\Path of Exile 2" },
+      installed: {
+        name: "崇高石开荒.filter",
+        directory: "C:\\Users\\grayd\\Documents\\My Games\\Path of Exile 2",
+        marketCapturedAt: "2026-11-26T08:40:00.000Z",
+      },
       status: "过滤器已写入游戏目录",
     },
     {
       id: "scheme-2",
       name: "终局刷图 · 半严格",
+      description: "终局刷图：只留高价值掉落，低阶通货全部隐藏。",
       profile: profile("Runes of Aldur", BASES[1], { strictness: 4 }),
       autoRefresh: false,
       installed: null,
@@ -220,6 +231,7 @@ let library: Library = {
     {
       id: "scheme-3",
       name: "朋友的分享方案",
+      description: "",
       profile: profile("Standard", undefined, { baseFilterHint: "NeverSink's filter 2 - 3-STRICT" }),
       autoRefresh: false,
       installed: null,
@@ -228,15 +240,17 @@ let library: Library = {
     {
       id: "scheme-4",
       name: "方案一",
+      description: "",
       profile: profile("Forbidden Rites", LOCAL_BASE, { rules: clone(DEFAULT_RULES) }),
       autoRefresh: false,
       installed: null,
       status: "",
     },
     {
-      // 名字达到 80 字上限，用来检查再长的文字也不会把列表撑坏。
+      // 名称达到 80 字上限、描述也很长，用来检查再长的文字也不会把列表撑坏。
       id: "scheme-5",
       name: "名字特别长的方案".repeat(10),
+      description: "这是一段很长的描述，用来检查卡片在窄窗口里不会被撑坏：超出宽度的部分应当截断并以省略号结尾，完整的内容在方案详情里能看到。".repeat(2),
       profile: profile("Forbidden Rites", BASE, { rules: clone(DEFAULT_RULES) }),
       autoRefresh: false,
       installed: null,
@@ -245,7 +259,14 @@ let library: Library = {
   ],
 };
 
+/** 描述和后端一样存成一行。 */
+const oneLine = (text: unknown) => String(text).trim().split(/\s+/).join(" ");
+
 let nextId = 6;
+/** 最近一次解析的分享码里的描述，导入时带给新方案。 */
+let sharedDescription = "";
+/** 演示里的下载是否被取消。 */
+let downloadStopped = false;
 
 const schemeById = (id: unknown) => library.schemes.find((entry) => entry.id === id);
 
@@ -304,7 +325,7 @@ const handlers: Record<string, Handler> = {
     return { ...generateFilter(profile, baseline, snapshot), market: snapshot };
   },
   scheme_save: ({ edit }) => {
-    const value = edit as { id: string | null; name: string; profile: FilterProfile; baseFilterChanged?: boolean };
+    const value = edit as { id: string | null; name: string; description: string; profile: FilterProfile; baseFilterChanged?: boolean };
     const existing = value.id ? schemeById(value.id) : undefined;
     const draft = clone(value.profile);
     if (existing) {
@@ -312,12 +333,12 @@ const handlers: Record<string, Handler> = {
         draft.baseFilter = existing.profile.baseFilter;
         draft.baseFilterHint = existing.profile.baseFilterHint;
       }
-      existing.name = value.name;
+      existing.description = oneLine(value.description);
       existing.profile = draft;
       return existing.id;
     }
     const id = `scheme-${nextId++}`;
-    library.schemes.push({ id, name: value.name, profile: draft, autoRefresh: false, installed: null, status: "" });
+    library.schemes.push({ id, name: value.name, description: oneLine(value.description), profile: draft, autoRefresh: false, installed: null, status: "" });
     return id;
   },
   scheme_copy: ({ id }) => {
@@ -326,9 +347,16 @@ const handlers: Record<string, Handler> = {
       library.schemes.push({ ...clone(scheme), id: `scheme-${nextId++}`, name: `${scheme.name} 副本`, installed: null });
     }
   },
-  scheme_rename: ({ id, name }) => {
+  scheme_update_info: ({ id, name, description }) => {
     const scheme = schemeById(id);
-    if (scheme) scheme.name = String(name);
+    if (!scheme) throw new Error("方案不存在");
+    const next = String(name).trim();
+    if (library.schemes.some((entry) => entry !== scheme && entry.name.toLowerCase() === next.toLowerCase())) {
+      throw new Error("已有同名方案，请选择其他名称");
+    }
+    scheme.name = next;
+    if (scheme.installed) scheme.installed.name = `${next}.filter`;
+    scheme.description = oneLine(description);
   },
   scheme_remove: ({ id }) => void (library.schemes = library.schemes.filter((entry) => entry.id !== id)),
   scheme_uninstall: ({ id }) => {
@@ -341,7 +369,7 @@ const handlers: Record<string, Handler> = {
   scheme_install: ({ id }) => {
     const scheme = schemeById(id);
     if (scheme) {
-      scheme.installed = { name: `${scheme.name}.filter`, directory: library.filterDirectory };
+      scheme.installed = { name: `${scheme.name}.filter`, directory: library.filterDirectory, marketCapturedAt: new Date().toISOString() };
       scheme.status = "过滤器已写入游戏目录";
     }
   },
@@ -360,17 +388,23 @@ const handlers: Record<string, Handler> = {
     }
   },
   base_download_offers: () => ({ "NeverSink's filter 2 - 3-STRICT": [{ source: "neversink", label: "NeverSink" }] }),
-  inspect_share: ({ code }) => ({
-    server: "international",
-    name: `分享方案 ${String(code).slice(-4)}`,
-    league: "Standard",
-    hasServer: true,
-    catalog: LEAGUE,
-  }),
+  inspect_share: ({ code }) => {
+    sharedDescription = "分享者写的说明：开荒到中期都适用，崇高石以上高亮。";
+    return {
+      // 分享码里带 tencent 的当作腾讯服的方案，用来演示跨服务器的确认框。
+      server: /tencent/i.test(String(code)) ? "tencent" : "international",
+      name: `分享方案 ${String(code).slice(-4)}`,
+      description: sharedDescription,
+      league: "Standard",
+      hasServer: true,
+      catalog: LEAGUE,
+    };
+  },
   scheme_import: ({ name }) => {
     library.schemes.push({
       id: `scheme-${nextId++}`,
       name: String(name || "导入的方案"),
+      description: sharedDescription,
       profile: profile("Standard", BASE),
       autoRefresh: false,
       installed: null,
@@ -409,10 +443,28 @@ const handlers: Record<string, Handler> = {
       ],
     },
   }),
-  source_filters: async ({ cachedOnly }) => {
-    await delay(cachedOnly ? 200 : 900);
-    return clone(BASES.slice(0, 2));
+  source_filters: async ({ source, cachedOnly }) => {
+    const cached = clone(BASES.slice(0, 2));
+    if (cachedOnly) {
+      await delay(200);
+      return cached;
+    }
+    // 分阶段推送进度，让对话框里的进度显示和取消可以演示。
+    downloadStopped = false;
+    reportDownloadProgress(String(source), { state: "checking" });
+    await delay(900);
+    const total = 4_700_000;
+    for (let step = 1; step <= 5 && !downloadStopped; step += 1) {
+      await delay(450);
+      reportDownloadProgress(String(source), { state: "downloading", received: (total * step) / 5, total });
+    }
+    if (downloadStopped) throw new Error(DOWNLOAD_CANCELLED);
+    reportDownloadProgress(String(source), { state: "extracting" });
+    await delay(900);
+    if (downloadStopped) throw new Error(DOWNLOAD_CANCELLED);
+    return cached;
   },
+  base_download_cancel: () => void (downloadStopped = true),
   pick_base_filter: () => null,
   pick_filter_directory: () => "D:\\PoE2\\Filters",
   save_filter_directory: ({ directory }) => {

@@ -30,6 +30,9 @@ pub struct Installed {
     pub directory: PathBuf,
     name: String,
     sha256: String,
+    /// Capture time of the market snapshot the installed filter was generated with.
+    #[serde(default)]
+    pub market_captured_at: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -37,6 +40,8 @@ pub struct Installed {
 pub struct Scheme {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub description: String,
     pub profile: Value,
     pub auto_refresh: bool,
     pub installed: Option<Installed>,
@@ -152,6 +157,8 @@ impl Default for Library {
 pub struct Edit {
     pub id: Option<String>,
     pub name: String,
+    #[serde(default)]
+    pub description: String,
     pub profile: Value,
     pub sounds: BTreeMap<String, String>,
     pub base_filter_changed: Option<bool>,
@@ -284,6 +291,15 @@ pub(crate) fn scheme_name(name: &str) -> Result<String> {
         return Err("方案名需要 1–80 个字符，且能用作 Windows 文件名".into());
     }
     Ok(name.to_owned())
+}
+
+/// One line of free text: runs of whitespace, including line breaks, become single spaces.
+pub(crate) fn scheme_description(raw: &str) -> Result<String> {
+    let description = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if description.chars().count() > 200 || description.chars().any(char::is_control) {
+        return Err("描述最多 200 个字符，且不含控制字符".into());
+    }
+    Ok(description)
 }
 
 pub(crate) fn valid_audio(name: &str) -> bool {
@@ -468,6 +484,7 @@ impl Store {
         &self,
         library: &mut Library,
         raw_name: &str,
+        raw_description: &str,
         profile: Value,
         sounds: BTreeMap<String, String>,
     ) -> Result<String> {
@@ -476,6 +493,7 @@ impl Store {
             library,
             Uuid::new_v4().to_string(),
             raw_name,
+            raw_description,
             profile,
             sounds,
         )?;
@@ -492,14 +510,17 @@ impl Store {
         library: &Library,
         id: String,
         raw_name: &str,
+        raw_description: &str,
         profile: Value,
         sounds: BTreeMap<String, Vec<u8>>,
     ) -> Result<Scheme> {
         let name = scheme_name(raw_name)?;
+        let description = scheme_description(raw_description)?;
         let profile: Value = engine::call("validate", profile)?;
         let mut scheme = Scheme {
             id,
             name,
+            description,
             profile,
             auto_refresh: true,
             installed: None,
@@ -578,8 +599,15 @@ impl Store {
 
     pub fn save(&self, library: &mut Library, edit: Edit) -> Result<String> {
         let Some(id) = edit.id else {
-            return self.add(library, &edit.name, edit.profile, edit.sounds);
+            return self.add(
+                library,
+                &edit.name,
+                &edit.description,
+                edit.profile,
+                edit.sounds,
+            );
         };
+        let description = scheme_description(&edit.description)?;
         let scheme = Self::get_mut(library, &id)?;
         let mut profile = edit.profile;
         if let Some(fields) = profile.as_object_mut() {
@@ -606,41 +634,53 @@ impl Store {
             scheme.status.clear();
         }
         scheme.profile = profile;
+        scheme.description = description;
         self.store_sounds(scheme, edit.sounds)?;
         self.persist(library)?;
         Ok(id)
     }
 
-    pub fn rename(&self, library: &mut Library, id: &str, raw_name: &str) -> Result<()> {
+    /// Sets the name and the description. A changed name moves the installed filter too.
+    pub fn set_info(
+        &self,
+        library: &mut Library,
+        id: &str,
+        raw_name: &str,
+        raw_description: &str,
+    ) -> Result<()> {
         let name = scheme_name(raw_name)?;
+        let description = scheme_description(raw_description)?;
         let scheme = Self::get(library, id)?;
         self.check_unique(library, scheme.server(), &name, Some(id))?;
         if scheme.installed.is_some() {
             self.check_install_target(library, scheme, &name)?;
         }
         let scheme = Self::get_mut(library, id)?;
-        if name == scheme.name {
+        if name == scheme.name && description == scheme.description {
             return Ok(());
         }
         let old = scheme.clone();
         let mut renamed = None;
-        if let Some(installed) = &mut scheme.installed {
-            if Self::read_owned(installed)?.is_some() {
-                let next = format!("{name}.filter");
-                let from = Self::filter_path(&installed.directory, &installed.name)?;
-                let to = Self::filter_path(&installed.directory, &next)?;
-                if !paths_same(&installed.name, &next) && to.exists() {
-                    return Err("游戏目录已有同名过滤器，请改用其他方案名".into());
+        if name != scheme.name {
+            if let Some(installed) = &mut scheme.installed {
+                if Self::read_owned(installed)?.is_some() {
+                    let next = format!("{name}.filter");
+                    let from = Self::filter_path(&installed.directory, &installed.name)?;
+                    let to = Self::filter_path(&installed.directory, &next)?;
+                    if !paths_same(&installed.name, &next) && to.exists() {
+                        return Err("游戏目录已有同名过滤器，请改用其他方案名".into());
+                    }
+                    move_file(&from, &to)?;
+                    renamed = Some((from, to));
+                    installed.name = next;
+                } else {
+                    scheme.installed = None;
+                    scheme.status = "原过滤器已不存在，请重新安装".into();
                 }
-                move_file(&from, &to)?;
-                renamed = Some((from, to));
-                installed.name = next;
-            } else {
-                scheme.installed = None;
-                scheme.status = "原过滤器已不存在，请重新安装".into();
             }
         }
         scheme.name = name;
+        scheme.description = description;
         if let Err(error) = self.persist(library) {
             *Self::get_mut(library, id)? = old;
             if let Some((from, to)) = renamed {
@@ -716,6 +756,7 @@ impl Store {
         let profile: Value = engine::call("validate", profile)?;
         Ok(Share {
             name: scheme.name.clone(),
+            description: scheme.description.clone(),
             profile,
         })
     }
@@ -750,6 +791,7 @@ impl Store {
         self.add(
             library,
             name_override.as_deref().unwrap_or(&share.name),
+            &share.description,
             share.profile,
             BTreeMap::new(),
         )
@@ -863,12 +905,20 @@ impl Store {
         registry.save(&self.root)
     }
 
+    /// Downloads a source's latest release, reporting its progress. A download reports
+    /// `DOWNLOAD_CANCELLED` when it was stopped.
     pub fn source_download(
         &self,
         source: &str,
         versions: &BTreeSet<String>,
+        report: impl Fn(base_filter::DownloadProgress) + Send + Sync + 'static,
     ) -> Result<Vec<BaseFilter>> {
-        self.downloads.download(&self.root, source, versions)
+        self.downloads
+            .download(&self.root, source, versions, report)
+    }
+
+    pub fn cancel_source_download(&self) {
+        self.downloads.cancel_download();
     }
 
     pub fn download_offers(
@@ -1330,6 +1380,10 @@ impl Store {
         market: Option<Value>,
         custom_directory: Option<&Path>,
     ) -> Result<()> {
+        let captured_at = market
+            .as_ref()
+            .and_then(|market| market["capturedAt"].as_str())
+            .map(str::to_owned);
         let (filter, assets) = self.prepare_filter(scheme, market)?;
         let directory = if let Some(installed) = &scheme.installed {
             installed.directory.clone()
@@ -1365,10 +1419,19 @@ impl Store {
         if !unchanged {
             write_file(&output, filter.as_bytes(), previous.is_some())?;
         }
+        // A refresh that could not fetch prices reinstalls without a snapshot; the filter then
+        // still carries the prices of the previous generation.
+        let market_captured_at = captured_at.or_else(|| {
+            scheme
+                .installed
+                .as_ref()
+                .and_then(|installed| installed.market_captured_at.clone())
+        });
         scheme.installed = Some(Installed {
             directory,
             name,
             sha256: digest(filter.as_bytes()),
+            market_captured_at,
         });
         scheme.status.clear();
         Ok(())
@@ -1442,6 +1505,7 @@ mod tests {
             .add(
                 &mut library,
                 "Shared",
+                "",
                 static_profile.clone(),
                 BTreeMap::new(),
             )
@@ -1450,10 +1514,10 @@ mod tests {
         tencent["server"] = json!("tencent");
         tencent["league"] = json!("0.5.5");
         let same_name = store
-            .add(&mut library, "Shared", tencent.clone(), BTreeMap::new())
+            .add(&mut library, "Shared", "", tencent.clone(), BTreeMap::new())
             .unwrap();
         assert!(store
-            .add(&mut library, "Shared", tencent, BTreeMap::new())
+            .add(&mut library, "Shared", "", tencent, BTreeMap::new())
             .is_err());
         assert_eq!(
             Store::get(&library, &international).unwrap().server(),
@@ -1484,7 +1548,9 @@ mod tests {
             )
             .is_err());
         assert_eq!(fs::read(&path).unwrap(), bytes);
-        store.rename(&mut library, &same_name, "Tencent").unwrap();
+        store
+            .set_info(&mut library, &same_name, "Tencent", "")
+            .unwrap();
         store
             .install(
                 Store::get_mut(&mut library, &same_name).unwrap(),
@@ -1492,7 +1558,9 @@ mod tests {
                 None,
             )
             .unwrap();
-        assert!(store.rename(&mut library, &same_name, "Shared").is_err());
+        assert!(store
+            .set_info(&mut library, &same_name, "Shared", "")
+            .is_err());
         store.uninstall(&mut library, &same_name).unwrap();
         assert_eq!(fs::read(&path).unwrap(), bytes);
         assert!(Store::get(&library, &international)
@@ -1507,7 +1575,13 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "终极打宝", profile(&store), BTreeMap::new())
+            .add(
+                &mut library,
+                "终极打宝",
+                "自动更新物价",
+                profile(&store),
+                BTreeMap::new(),
+            )
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -1519,6 +1593,24 @@ mod tests {
             fs::metadata(&installed).unwrap().modified().unwrap(),
             modified
         );
+        // Each generation records the capture time of the prices it used.
+        let captured = |scheme: &Scheme| {
+            scheme
+                .installed
+                .as_ref()
+                .and_then(|installed| installed.market_captured_at.clone())
+        };
+        assert_eq!(captured(scheme), None);
+        let market = json!({
+            "server": "international", "league": "Standard", "source": "fixture",
+            "capturedAt": "2026-03-01T00:00:00Z", "expiresAt": "2099-01-01T00:00:00Z",
+            "rates": {"divineToExalted": 100, "divineToChaos": 10}, "prices": {}
+        });
+        store.install(scheme, Some(market), None).unwrap();
+        assert_eq!(captured(scheme).as_deref(), Some("2026-03-01T00:00:00Z"));
+        // A refresh that could not fetch prices keeps the time of the filter it left in place.
+        store.install(scheme, None, None).unwrap();
+        assert_eq!(captured(scheme).as_deref(), Some("2026-03-01T00:00:00Z"));
         let code = Store::share(scheme).unwrap();
         store.persist(&library).unwrap();
         let mut library = fixture(temp.path()).load().unwrap();
@@ -1527,6 +1619,10 @@ mod tests {
             .import(&mut library, &code, Some("离线副本".into()))
             .unwrap();
         assert_ne!(id, copy);
+        assert_eq!(
+            Store::get(&library, &copy).unwrap().description,
+            "自动更新物价"
+        );
         let mut expected = Store::get(&library, &id).unwrap().profile.clone();
         expected.as_object_mut().unwrap().remove("baseFilter");
         expected["baseFilterHint"] = json!("fixture.filter");
@@ -1551,11 +1647,11 @@ mod tests {
         assert!(store.import(&mut library, "POE2F1.$$$", None).is_err());
         let renamed = store.default_game.join("新名字.filter");
         fs::write(&renamed, "User filter").unwrap();
-        assert!(store.rename(&mut library, &id, "新名字").is_err());
+        assert!(store.set_info(&mut library, &id, "新名字", "").is_err());
         assert!(installed.is_file());
         assert_eq!(fs::read_to_string(&renamed).unwrap(), "User filter");
         fs::remove_file(&renamed).unwrap();
-        store.rename(&mut library, &id, "新名字").unwrap();
+        store.set_info(&mut library, &id, "新名字", "").unwrap();
         assert!(!installed.exists());
         assert!(renamed.exists());
         store.remove(&mut library, &id, false).unwrap();
@@ -1622,7 +1718,7 @@ mod tests {
             "target": {"itemIds": ["chaos-orb"]}, "effects": {}
         }]);
         let id = store
-            .add(&mut library, "方案", draft, BTreeMap::new())
+            .add(&mut library, "方案", "", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let mut expected = scheme.profile.clone();
@@ -1763,6 +1859,7 @@ mod tests {
             }
             let bytes = serde_json::to_vec(&Share {
                 name: name.into(),
+                description: String::new(),
                 profile,
             }).unwrap();
             // A code may carry a local path. Import must ignore it.
@@ -1851,7 +1948,7 @@ mod tests {
         let mut initial = profile(&store);
         initial["baseFilter"] = json!(base("0.1.0"));
         let id = store
-            .add(&mut library, "下载版", initial.clone(), BTreeMap::new())
+            .add(&mut library, "下载版", "", initial.clone(), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -1878,6 +1975,7 @@ mod tests {
                 Edit {
                     id: Some(id.clone()),
                     name: "下载版".into(),
+                    description: String::new(),
                     profile: initial,
                     sounds: BTreeMap::new(),
                     base_filter_changed: Some(false),
@@ -1923,7 +2021,7 @@ mod tests {
         });
         let preview = store.preview(draft.clone(), Some(market.clone())).unwrap();
         let id = store
-            .add(&mut library, "堆叠方案", draft, BTreeMap::new())
+            .add(&mut library, "堆叠方案", "", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         assert_eq!(scheme.profile["schemaVersion"], 3);
@@ -1953,6 +2051,13 @@ mod tests {
         let installed = store.default_game.join("堆叠方案.filter");
         assert_eq!(fs::read_to_string(&installed).unwrap(), text);
         let written = fs::metadata(&installed).unwrap().modified().unwrap();
+        let captured = |scheme: &Scheme| {
+            scheme
+                .installed
+                .as_ref()
+                .and_then(|installed| installed.market_captured_at.clone())
+        };
+        assert_eq!(captured(scheme).as_deref(), Some("2026-03-01T00:00:00Z"));
         market["capturedAt"] = json!("2026-03-01T02:00:00Z");
         store.install(scheme, Some(market.clone()), None).unwrap();
         assert_eq!(fs::read_to_string(&installed).unwrap(), text);
@@ -1960,6 +2065,8 @@ mod tests {
             fs::metadata(&installed).unwrap().modified().unwrap(),
             written
         );
+        // A generation that leaves the file unchanged still records its prices.
+        assert_eq!(captured(scheme).as_deref(), Some("2026-03-01T02:00:00Z"));
         assert!(store.install(scheme, None, None).is_err());
         assert_eq!(fs::read_to_string(&installed).unwrap(), text);
         scheme.profile["rules"][0]["target"]["itemIds"] = json!(["base:omen-crest-shield"]);
@@ -2004,7 +2111,9 @@ mod tests {
             "ping.ogg".into(),
             base64::engine::general_purpose::STANDARD.encode(b"fixture audio"),
         )]);
-        let id = store.add(&mut library, "独立方案", draft, sounds).unwrap();
+        let id = store
+            .add(&mut library, "独立方案", "", draft, sounds)
+            .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let (text, assets) = store.prepare_filter(scheme, None).unwrap();
         assert!(text.contains("SetFontSize 38"));
@@ -2045,16 +2154,34 @@ mod tests {
         draft.as_object_mut().unwrap().remove("baseFilter");
         let catalog: Value =
             serde_json::from_str(include_str!("../../data/item-catalog.json")).unwrap();
+        // 预兆分在四个玩法的叶子下，加上「其他 › 不存在」里的腐化预兆，合起来正好是 Omen 这一个类别。
+        let omens = [
+            json!(["gameplay", "ritual", "equipment-omens"]),
+            json!(["gameplay", "ritual", "map-omens"]),
+            json!(["gameplay", "abyss", "omens"]),
+            json!(["gameplay", "expedition", "omens"]),
+        ];
         let mut items: Vec<Value> = catalog["items"]
             .as_array()
             .unwrap()
             .iter()
-            .filter(|item| item["categoryPath"] == json!(["crafting", "omens"]))
+            .filter(|item| {
+                omens.contains(&item["categoryPath"])
+                    || item["id"] == json!("omen-of-corruption")
+            })
             .map(|item| item["id"].clone())
             .collect();
-        assert_eq!(items.len(), 37);
-        // 换界石没有逐件物品，直接选中整类条目。
-        items.push(json!("class-waystones"));
+        assert_eq!(items.len(), 42);
+        // 换界石 16 阶全选，和预兆一样合并成一条整类块。
+        let tiers: Vec<Value> = catalog["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|item| item["matcher"]["waystoneTier"].is_u64())
+            .map(|item| item["id"].clone())
+            .collect();
+        assert_eq!(tiers.len(), 16);
+        items.extend(tiers);
         draft["rules"] = json!([{
             "id": "whole", "name": "整类", "enabled": true, "hidden": false,
             "target": {"itemIds": items},
@@ -2069,12 +2196,36 @@ mod tests {
         );
         assert!(!filter.contains("BaseType == \"Omen of"), "{filter}");
         let id = store
-            .add(&mut library, "整类方案", draft, BTreeMap::new())
+            .add(&mut library, "整类方案", "", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let (text, _) = store.prepare_filter(scheme, None).unwrap();
         assert!(text.contains("Class == \"Omen\""));
         assert!(text.contains("Class == \"Waystones\""));
+    }
+
+    #[test]
+    fn waystone_tiers_generate_tier_conditions_in_the_desktop_engine() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut draft = profile(&store);
+        draft.as_object_mut().unwrap().remove("baseFilter");
+        draft["rules"] = json!([{
+            "id": "tier", "name": "高阶换界石", "enabled": true, "hidden": false,
+            "target": {"itemIds": ["waystone-tier-16", "waystone-tier-15"]},
+            "effects": {"beam": "Blue"}
+        }]);
+        let preview = store.preview(draft, None).unwrap();
+        let filter = preview["filterFile"].as_str().unwrap();
+        assert!(
+            filter.contains("Class == \"Waystones\"\n\tWaystoneTier = 16\n\tPlayEffect Blue"),
+            "{filter}"
+        );
+        assert!(
+            filter.contains("Class == \"Waystones\"\n\tWaystoneTier = 15\n\tPlayEffect Blue"),
+            "{filter}"
+        );
+        assert!(!filter.contains("WaystoneTier = 14"), "{filter}");
     }
 
     #[test]
@@ -2122,7 +2273,7 @@ mod tests {
             "{issue}"
         );
         let id = store
-            .add(&mut library, "过期基础过滤器", draft, BTreeMap::new())
+            .add(&mut library, "过期基础过滤器", "", draft, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let error = store.prepare_filter(scheme, None).unwrap_err();
@@ -2135,7 +2286,7 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "原目录", profile(&store), BTreeMap::new())
+            .add(&mut library, "原目录", "", profile(&store), BTreeMap::new())
             .unwrap();
         let original = store.default_game.join("原目录.filter");
         store
@@ -2161,20 +2312,24 @@ mod tests {
         assert!(!new_directory.join("原目录.filter").exists());
 
         // Editing even a stale draft that supplies a different name never changes a game file.
+        // The description is stored as one line.
         let edit = Edit {
             base_filter_changed: None,
             id: Some(id.clone()),
             name: "草稿原名称".into(),
+            description: "  开荒期的\n方案  ".into(),
             profile: profile(&store),
             sounds: BTreeMap::new(),
         };
         store.save(&mut library, edit).unwrap();
-        assert_eq!(Store::get(&library, &id).unwrap().name, "原目录");
+        let saved = Store::get(&library, &id).unwrap();
+        assert_eq!(saved.name, "原目录");
+        assert_eq!(saved.description, "开荒期的 方案");
         assert_eq!(fs::read(&original).unwrap(), installed_bytes);
 
         fs::write(&original, b"edited outside the app").unwrap();
         assert!(store
-            .rename(&mut library, &id, "不能改名")
+            .set_info(&mut library, &id, "不能改名", "")
             .unwrap_err()
             .contains("外部修改"));
         assert!(store
@@ -2184,7 +2339,7 @@ mod tests {
         assert_eq!(fs::read(&original).unwrap(), b"edited outside the app");
         assert!(Store::get(&library, &id).unwrap().installed.is_some());
         fs::write(&original, installed_bytes).unwrap();
-        store.rename(&mut library, &id, "新名称").unwrap();
+        store.set_info(&mut library, &id, "新名称", "").unwrap();
         let renamed = store.default_game.join("新名称.filter");
         assert!(renamed.is_file());
         assert!(!original.exists());
@@ -2203,6 +2358,159 @@ mod tests {
     }
 
     #[test]
+    fn scheme_info_sets_the_name_and_the_description_together() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let id = store
+            .add(
+                &mut library,
+                "原名",
+                "  原描述 ",
+                profile(&store),
+                BTreeMap::new(),
+            )
+            .unwrap();
+        assert_eq!(Store::get(&library, &id).unwrap().description, "原描述");
+        store
+            .install(Store::get_mut(&mut library, &id).unwrap(), None, None)
+            .unwrap();
+        let installed = store.default_game.join("原名.filter");
+        let modified = fs::metadata(&installed).unwrap().modified().unwrap();
+        let info = |library: &Library| {
+            let scheme = Store::get(library, &id).unwrap();
+            (scheme.name.clone(), scheme.description.clone())
+        };
+
+        // A new description alone leaves the game directory alone.
+        store
+            .set_info(&mut library, &id, "原名", "新描述\n第二行")
+            .unwrap();
+        assert_eq!(info(&library), ("原名".into(), "新描述 第二行".into()));
+        assert_eq!(
+            fs::metadata(&installed).unwrap().modified().unwrap(),
+            modified
+        );
+
+        // Unchanged values write nothing.
+        let before = fs::read(store.root.join("library.json")).unwrap();
+        store
+            .set_info(&mut library, &id, " 原名 ", " 新描述 第二行 ")
+            .unwrap();
+        assert_eq!(fs::read(store.root.join("library.json")).unwrap(), before);
+
+        // A new name moves the installed filter, and the description follows.
+        store
+            .set_info(&mut library, &id, "新名", "更新的描述")
+            .unwrap();
+        assert_eq!(info(&library), ("新名".into(), "更新的描述".into()));
+        assert!(!installed.exists());
+        assert!(store.default_game.join("新名.filter").is_file());
+
+        // An invalid name or description changes nothing.
+        let long = "长".repeat(201);
+        let before = fs::read(store.root.join("library.json")).unwrap();
+        for (name, description) in [
+            ("bad/name", "描述"),
+            ("新名", long.as_str()),
+            ("新名", "a\u{0}b"),
+        ] {
+            assert!(store
+                .set_info(&mut library, &id, name, description)
+                .is_err());
+        }
+        assert_eq!(info(&library), ("新名".into(), "更新的描述".into()));
+        assert_eq!(fs::read(store.root.join("library.json")).unwrap(), before);
+        assert!(store.default_game.join("新名.filter").is_file());
+    }
+
+    #[test]
+    fn libraries_written_before_descriptions_and_market_times_load() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let id = store
+            .add(
+                &mut library,
+                "已有方案",
+                "",
+                profile(&store),
+                BTreeMap::new(),
+            )
+            .unwrap();
+        store
+            .install(Store::get_mut(&mut library, &id).unwrap(), None, None)
+            .unwrap();
+        store.persist(&library).unwrap();
+        let path = store.root.join("library.json");
+        let mut value: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let record = &mut value["schemes"][0];
+        record.as_object_mut().unwrap().remove("description");
+        record["installed"]
+            .as_object_mut()
+            .unwrap()
+            .remove("marketCapturedAt");
+        fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+
+        let library = store.load().unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        assert_eq!(scheme.description, "");
+        assert!(scheme
+            .installed
+            .as_ref()
+            .unwrap()
+            .market_captured_at
+            .is_none());
+    }
+
+    #[test]
+    fn a_share_code_carries_the_description_and_import_validates_it() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let long = "长".repeat(201);
+        assert!(store
+            .add(
+                &mut library,
+                "过长",
+                &long,
+                profile(&store),
+                BTreeMap::new()
+            )
+            .is_err());
+
+        let id = store
+            .add(
+                &mut library,
+                "分享",
+                "  开荒到终局，\n自动跟随物价  ",
+                profile(&store),
+                BTreeMap::new(),
+            )
+            .unwrap();
+        let scheme = Store::get(&library, &id).unwrap();
+        let code = Store::share(scheme).unwrap();
+        assert_eq!(
+            share_code::decode(&code).unwrap().share.description,
+            "开荒到终局， 自动跟随物价"
+        );
+        let copy = store
+            .import(&mut library, &code, Some("副本".into()))
+            .unwrap();
+        let imported = Store::get(&library, &copy).unwrap();
+        assert_eq!(imported.name, "副本");
+        assert_eq!(imported.description, "开荒到终局， 自动跟随物价");
+
+        let mut share = share_code::decode(&code).unwrap().share;
+        share.description = long;
+        let count = library.schemes.len();
+        assert!(store
+            .import(&mut library, &share_code::encode(&share).unwrap(), None)
+            .is_err());
+        assert_eq!(library.schemes.len(), count);
+    }
+
+    #[test]
     fn downloadable_zip_contains_the_filter_and_its_custom_audio() {
         use std::io::Read;
 
@@ -2216,7 +2524,9 @@ mod tests {
             "trade.ogg".into(),
             base64::engine::general_purpose::STANDARD.encode(contents),
         )]);
-        let id = store.add(&mut library, "安装包", input, uploaded).unwrap();
+        let id = store
+            .add(&mut library, "安装包", "", input, uploaded)
+            .unwrap();
         let scheme = Store::get(&library, &id).unwrap();
         let (text, sounds) = store.prepare_filter(scheme, None).unwrap();
         let asset_name = format!("poe2rf-{}.ogg", digest(contents));
@@ -2246,7 +2556,7 @@ mod tests {
         let store = fixture(temp.path());
         let mut library = store.load().unwrap();
         let id = store
-            .add(&mut library, "基本", profile(&store), BTreeMap::new())
+            .add(&mut library, "基本", "", profile(&store), BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -2294,7 +2604,7 @@ mod tests {
         fs::write(&source, rule).unwrap();
         fs::write(&music, b"filter sound").unwrap();
         let id = store
-            .add(&mut library, "本地依赖测试", input, BTreeMap::new())
+            .add(&mut library, "本地依赖测试", "", input, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, None, None).unwrap();
@@ -2361,7 +2671,7 @@ mod tests {
         }
         let mut market = json!({"league":"Standard", "capturedAt":"2026-01-01T00:00:00Z", "expiresAt":"2099-01-01T00:00:00Z", "rates":{"divineToExalted":1000,"divineToChaos":100}, "prices":prices});
         let id = store
-            .add(&mut library, "Price tier QA", input, BTreeMap::new())
+            .add(&mut library, "Price tier QA", "", input, BTreeMap::new())
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         store.install(scheme, Some(market.clone()), None).unwrap();
@@ -2411,7 +2721,9 @@ mod tests {
             "id":"arbitrary-rule", "name":"Borrow Exalted style", "enabled":true, "hidden":false,
             "baselineEffectItemId":"exalted-orb", "effects":{}, "target":{"itemIds":["chaos-orb"]}
         }]);
-        let original = store.add(&mut library, "Effect source", draft, BTreeMap::new()).unwrap();
+        let original = store
+            .add(&mut library, "Effect source", "", draft, BTreeMap::new())
+            .unwrap();
         let code = Store::share(Store::get(&library, &original).unwrap()).unwrap();
         let wire = share_code::decode(&code).unwrap().share;
         let rule = &wire.profile["rules"][0];
@@ -2473,7 +2785,13 @@ mod tests {
             "target": {"itemIds":["exalted-orb"]}
         }]);
         let id = store
-            .add(&mut library, "Preset QA", input.clone(), BTreeMap::new())
+            .add(
+                &mut library,
+                "Preset QA",
+                "",
+                input.clone(),
+                BTreeMap::new(),
+            )
             .unwrap();
         let scheme = Store::get_mut(&mut library, &id).unwrap();
         let share = share_code::decode(&Store::share(scheme).unwrap()).unwrap().share;

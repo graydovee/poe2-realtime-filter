@@ -39,6 +39,8 @@ const EXPORT_CODEC: &dyn ShareEncoder = &v2::Codec;
 #[serde(deny_unknown_fields)]
 pub struct Share {
     pub name: String,
+    #[serde(default)]
+    pub description: String,
     pub profile: Value,
 }
 

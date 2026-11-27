@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "node --test tests/*.test.mjs",
     "validate:data": "node scripts/validate-data.mjs",
+    "catalog:update": "node scripts/update-item-catalog.mjs",
     "tauri": "tauri",
     "build:engine": "node scripts/build-desktop-engine.mjs",
     "build:desktop-web": "npm run build:engine && npm run build"
