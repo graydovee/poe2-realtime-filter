@@ -3,7 +3,7 @@ import { toast } from "sonner";
 
 import type { BaseInspection } from "../../lib/baseline-effects";
 import { blockKey, type BaseRules } from "../../lib/base-overlays";
-import { explain, fileToBase64, local, readSound, type LocalScheme } from "../../lib/desktop";
+import { explain, fileToBase64, local, readSound, type LocalScheme, type SavedScheme } from "../../lib/desktop";
 import { DEFAULT_PROFILE } from "../../lib/default-profile";
 import { FALLBACK_SNAPSHOT, legacyEffectItemId } from "../../lib/data";
 import { normalizeProfile } from "../../lib/profile";
@@ -687,6 +687,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
   saveScheme: async (name, description) => {
     const { profile, customSounds, schemeId } = get();
     set({ schemeBusy: true, saveError: "" });
+    let saved: SavedScheme;
     try {
       const uploads: Record<string, string> = {};
       let bytes = 0;
@@ -700,7 +701,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
         if (bytes > 32 * 1024 * 1024) throw new Error("音效合计最多 32 MB");
         uploads[sound.fileName] = await fileToBase64(file);
       }
-      await local<string>("scheme_save", {
+      saved = await local<SavedScheme>("scheme_save", {
         edit: { id: schemeId, name, description, profile, sounds: uploads, baseFilterChanged: counters.baseFilterChanged },
       });
     } catch (cause) {
@@ -708,8 +709,10 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
     } finally {
       set({ schemeBusy: false });
     }
-    toast.success(`「${name}」已保存`);
     get().leaveEditor();
+    // 已安装的方案保存后马上重新生成。没能重新生成时，原因显示在方案库顶部，和方案卡片上的一样。
+    if (saved.error) set({ managerError: `「${name}」${saved.error}` });
+    else toast.success(saved.regenerated ? `「${name}」已保存，游戏里的过滤器已更新` : `「${name}」已保存`);
   },
 
   requestSave: () => {

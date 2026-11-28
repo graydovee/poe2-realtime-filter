@@ -21,7 +21,7 @@ use std::{
 };
 use store::{
     display_directory, digest, writable_directory, write_file, Edit, PackageDecisions,
-    RefreshSettings, Server, Store,
+    RefreshSettings, Saved, Server, Store,
 };
 use tauri::{tray::TrayIconBuilder, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
@@ -602,11 +602,16 @@ async fn preview(app: tauri::AppHandle, profile: Value) -> Result<Value> {
 }
 
 #[tauri::command]
-async fn scheme_save(app: tauri::AppHandle, edit: Edit) -> Result<String> {
+async fn scheme_save(app: tauri::AppHandle, edit: Edit) -> Result<Saved> {
     on_worker(move || {
         let state = app.state::<Desktop>();
         let _guard = state.changes.lock().map_err(|e| e.to_string())?;
-        state.store.save(&mut state.store.load()?, edit)
+        let mut library = state.store.load()?;
+        // 已安装的方案保存后马上重新生成，用的是和「重新生成」相同的行情快照。
+        let market = Store::get(&library, edit.id.as_deref().unwrap_or_default())
+            .ok()
+            .and_then(|scheme| state.market(scheme.server()).snapshot(scheme.league()));
+        state.store.save(&mut library, edit, market)
     })
     .await
 }

@@ -456,11 +456,13 @@ const handlers: Record<string, Handler> = {
       }
       existing.description = oneLine(value.description);
       existing.profile = draft;
-      return existing.id;
+      // 已安装的方案保存后马上重新生成，行情时间跟着更新。
+      if (existing.installed) existing.installed.marketCapturedAt = new Date().toISOString();
+      return { id: existing.id, regenerated: Boolean(existing.installed), error: null };
     }
     const id = `scheme-${nextId++}`;
     library.schemes.push({ id, name: value.name, description: oneLine(value.description), profile: draft, autoRefresh: false, installed: null, status: "" });
-    return id;
+    return { id, regenerated: false, error: null };
   },
   scheme_copy: ({ id }) => {
     const scheme = schemeById(id);

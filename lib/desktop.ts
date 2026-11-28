@@ -18,6 +18,8 @@ export type LocalScheme = {
 };
 
 export type Settings = { intervalMinutes: number; paused: boolean };
+/** 保存方案的结果。已安装的方案保存后马上重新生成；没能重新生成时 `error` 是写进方案状态的说明。 */
+export type SavedScheme = { id: string; regenerated: boolean; error: string | null };
 export type Library = {
   server: GameServer;
   settings: Settings;

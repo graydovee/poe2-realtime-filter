@@ -164,6 +164,16 @@ pub struct Edit {
     pub base_filter_changed: Option<bool>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Saved {
+    pub id: String,
+    /// 方案已安装，游戏里的过滤器已按保存的内容重新生成。
+    pub regenerated: bool,
+    /// 方案已安装但没能重新生成时的说明，同时写进方案的状态。
+    pub error: Option<String>,
+}
+
 pub struct Store {
     root: PathBuf,
     downloads: base_filter::SourceDownloads,
@@ -598,15 +608,23 @@ impl Store {
         Ok(())
     }
 
-    pub fn save(&self, library: &mut Library, edit: Edit) -> Result<String> {
+    /// 保存方案。已安装的方案接着按保存的内容重新生成，游戏里的过滤器同步更新；
+    /// 没能重新生成时方案照样保存，原因写进状态，游戏继续用上一次的过滤器。
+    pub fn save(&self, library: &mut Library, edit: Edit, market: Option<Value>) -> Result<Saved> {
         let Some(id) = edit.id else {
-            return self.add(
-                library,
-                &edit.name,
-                &edit.description,
-                edit.profile,
-                edit.sounds,
-            );
+            return self
+                .add(
+                    library,
+                    &edit.name,
+                    &edit.description,
+                    edit.profile,
+                    edit.sounds,
+                )
+                .map(|id| Saved {
+                    id,
+                    regenerated: false,
+                    error: None,
+                });
         };
         let description = scheme_description(&edit.description)?;
         let scheme = Self::get_mut(library, &id)?;
@@ -638,7 +656,28 @@ impl Store {
         scheme.description = description;
         self.store_sounds(scheme, edit.sounds)?;
         self.persist(library)?;
-        Ok(id)
+        let scheme = Self::get_mut(library, &id)?;
+        if scheme.installed.is_none() {
+            return Ok(Saved {
+                id,
+                regenerated: false,
+                error: None,
+            });
+        }
+        let (regenerated, error) = match self.install(&mut *scheme, market, None) {
+            Ok(()) => (true, None),
+            Err(reason) => {
+                scheme.status =
+                    format!("已保存，重新生成失败，游戏继续使用上一次的过滤器 · {reason}");
+                (false, Some(scheme.status.clone()))
+            }
+        };
+        self.persist(library)?;
+        Ok(Saved {
+            id,
+            regenerated,
+            error,
+        })
     }
 
     /// Sets the name and the description. A changed name moves the installed filter too.
@@ -1983,7 +2022,8 @@ mod tests {
         let text = fs::read_to_string(&installed).unwrap();
         assert!(text.contains("SetFontSize 42"));
         assert!(text.contains("CustomAlertSound \"poe2rf-"));
-        store
+        // A stale draft keeps the library's base and regenerates with it.
+        let saved = store
             .save(
                 &mut library,
                 Edit {
@@ -1994,12 +2034,15 @@ mod tests {
                     sounds: BTreeMap::new(),
                     base_filter_changed: Some(false),
                 },
+                None,
             )
             .unwrap();
+        assert!(saved.regenerated);
         assert_eq!(
             Store::get(&library, &id).unwrap().profile["baseFilter"]["version"],
             "0.2.0"
         );
+        assert_eq!(fs::read_to_string(&installed).unwrap(), text);
     }
 
     #[test]
@@ -2325,8 +2368,8 @@ mod tests {
         assert!(original.is_file());
         assert!(!new_directory.join("原目录.filter").exists());
 
-        // Editing even a stale draft that supplies a different name never changes a game file.
-        // The description is stored as one line.
+        // A stale draft never renames the game file. Its content is the installed one,
+        // so regenerating leaves the file as it is. The description is stored as one line.
         let edit = Edit {
             base_filter_changed: None,
             id: Some(id.clone()),
@@ -2335,10 +2378,11 @@ mod tests {
             profile: profile(&store),
             sounds: BTreeMap::new(),
         };
-        store.save(&mut library, edit).unwrap();
-        let saved = Store::get(&library, &id).unwrap();
-        assert_eq!(saved.name, "原目录");
-        assert_eq!(saved.description, "开荒期的 方案");
+        let saved = store.save(&mut library, edit, None).unwrap();
+        assert!(saved.regenerated);
+        let saved_scheme = Store::get(&library, &id).unwrap();
+        assert_eq!(saved_scheme.name, "原目录");
+        assert_eq!(saved_scheme.description, "开荒期的 方案");
         assert_eq!(fs::read(&original).unwrap(), installed_bytes);
 
         fs::write(&original, b"edited outside the app").unwrap();
@@ -2436,6 +2480,134 @@ mod tests {
         assert_eq!(info(&library), ("新名".into(), "更新的描述".into()));
         assert_eq!(fs::read(store.root.join("library.json")).unwrap(), before);
         assert!(store.default_game.join("新名.filter").is_file());
+    }
+
+    #[test]
+    fn saving_an_installed_scheme_regenerates_the_game_filter() {
+        let temp = tempfile::tempdir().unwrap();
+        let store = fixture(temp.path());
+        let mut library = store.load().unwrap();
+        let show = |size: u8| {
+            json!({
+                "id": "divine", "name": "崇高石", "enabled": true, "hidden": false,
+                "target": {"itemIds": ["divine-orb"]},
+                "effects": {"font": {"fontSize": size}}
+            })
+        };
+        let price = json!({
+            "id": "price", "name": "价格", "enabled": true, "hidden": false,
+            "target": {"itemIds": [], "range": {"min": {"amount": 1, "currency": "exalted"}}},
+            "effects": {}
+        });
+        let draft = |rules: Value| {
+            let mut profile = profile(&store);
+            profile["rules"] = rules;
+            profile
+        };
+        let id = store
+            .add(
+                &mut library,
+                "打宝",
+                "",
+                draft(json!([show(30)])),
+                BTreeMap::new(),
+            )
+            .unwrap();
+        let edit = |profile: Value| Edit {
+            base_filter_changed: None,
+            id: Some(id.clone()),
+            name: "打宝".into(),
+            description: String::new(),
+            profile,
+            sounds: BTreeMap::new(),
+        };
+        let captured_at = |library: &Library| {
+            Store::get(library, &id)
+                .unwrap()
+                .installed
+                .as_ref()
+                .and_then(|installed| installed.market_captured_at.clone())
+        };
+        store
+            .install(Store::get_mut(&mut library, &id).unwrap(), None, None)
+            .unwrap();
+        let installed = store.default_game.join("打宝.filter");
+        assert!(fs::read_to_string(&installed)
+            .unwrap()
+            .contains("SetFontSize 30"));
+        let market = json!({
+            "server": "international", "league": "Standard", "source": "fixture",
+            "capturedAt": "2026-03-01T00:00:00Z", "expiresAt": "2099-01-01T00:00:00Z",
+            "rates": {"divineToExalted": 100, "divineToChaos": 10}, "prices": {}
+        });
+
+        // New effects go straight into the game directory, with the time of the prices used.
+        let saved = store
+            .save(&mut library, edit(draft(json!([show(40)]))), Some(market))
+            .unwrap();
+        assert_eq!(saved.id, id);
+        assert!(saved.regenerated);
+        assert!(saved.error.is_none());
+        let text = fs::read_to_string(&installed).unwrap();
+        assert!(text.contains("SetFontSize 40") && !text.contains("SetFontSize 30"));
+        assert!(Store::get(&library, &id).unwrap().status.is_empty());
+        assert_eq!(
+            captured_at(&library).as_deref(),
+            Some("2026-03-01T00:00:00Z")
+        );
+
+        // Rules the game directory cannot take are saved all the same: the filter stays
+        // and the reason is on record, in memory and on disk.
+        let saved = store
+            .save(&mut library, edit(draft(json!([price]))), None)
+            .unwrap();
+        assert!(!saved.regenerated);
+        let reason = saved.error.unwrap();
+        assert!(reason.contains("等待"), "{reason}");
+        let scheme = Store::get(&library, &id).unwrap();
+        assert_eq!(scheme.status, reason);
+        assert_eq!(scheme.profile["rules"][0]["id"], "price");
+        assert_eq!(fs::read(&installed).unwrap(), text.as_bytes());
+        assert_eq!(
+            captured_at(&library).as_deref(),
+            Some("2026-03-01T00:00:00Z")
+        );
+        let reloaded = fixture(temp.path()).load().unwrap();
+        let scheme = Store::get(&reloaded, &id).unwrap();
+        assert_eq!(scheme.status, reason);
+        assert_eq!(scheme.profile["rules"][0]["id"], "price");
+
+        // The next rules that generate clear the record.
+        let saved = store
+            .save(&mut library, edit(draft(json!([show(45)]))), None)
+            .unwrap();
+        assert!(saved.regenerated);
+        assert!(Store::get(&library, &id).unwrap().status.is_empty());
+        assert!(fs::read_to_string(&installed)
+            .unwrap()
+            .contains("SetFontSize 45"));
+
+        // An uninstalled scheme and a new one only save.
+        store.uninstall(&mut library, &id).unwrap();
+        let saved = store
+            .save(&mut library, edit(draft(json!([show(42)]))), None)
+            .unwrap();
+        assert!(!saved.regenerated);
+        assert!(saved.error.is_none());
+        assert!(!installed.exists());
+        let fresh = Edit {
+            base_filter_changed: None,
+            id: None,
+            name: "新方案".into(),
+            description: String::new(),
+            profile: draft(json!([show(42)])),
+            sounds: BTreeMap::new(),
+        };
+        let saved = store.save(&mut library, fresh, None).unwrap();
+        assert_ne!(saved.id, id);
+        assert!(!saved.regenerated);
+        assert!(saved.error.is_none());
+        assert!(Store::get(&library, &saved.id).unwrap().installed.is_none());
     }
 
     #[test]
