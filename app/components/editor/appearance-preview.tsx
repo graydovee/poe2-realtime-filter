@@ -1,5 +1,7 @@
 "use client";
 
+import { EyeOff } from "lucide-react";
+
 import { itemLabel } from "../../../lib/catalog";
 import { FILTER_ITEMS_BY_ID } from "../../../lib/data";
 import {
@@ -15,6 +17,7 @@ import type { BaseFilter, RuleEffects } from "../../../lib/types";
 import { cn } from "../../../lib/cn";
 import { mapIconPath } from "../../../lib/map-icon";
 import { SoundPreviewButton } from "../sound-preview";
+import { Badge } from "../ui/badge";
 
 export function effectSourceLabel(itemId: string) {
   const item = FILTER_ITEMS_BY_ID.get(itemId);
@@ -35,15 +38,21 @@ export function MapIconGlyph({ shape, color, className }: { shape: string; color
   );
 }
 
-/** 模拟游戏里的掉落效果：光柱、物品标签和地图图标。 */
+/**
+ * 模拟游戏里的掉落效果：光柱、物品标签和地图图标。
+ * 隐藏规则的效果在游戏里按住 Alt 才显示，场景角上标着这一点。
+ */
 export function LootScene({
   effects,
   label,
+  hidden,
   compact,
   className,
 }: {
   effects: RuleEffects;
   label: string;
+  /** 隐藏规则：命中的物品按住 Alt 才显示。 */
+  hidden?: boolean;
   compact?: boolean;
   className?: string;
 }) {
@@ -82,6 +91,12 @@ export function LootScene({
         </span>
       </div>
       {shape && <MapIconGlyph shape={shape} color={beamColorValues[iconColor ?? ""] ?? "#9a9a9a"} className="loot-icon" />}
+      {hidden && (
+        <Badge tone="muted" className="absolute top-2 left-2 z-10">
+          <EyeOff aria-hidden="true" className="size-3.5 text-ember" />
+          按住 Alt 显示
+        </Badge>
+      )}
     </div>
   );
 }

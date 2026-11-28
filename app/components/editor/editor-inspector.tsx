@@ -129,14 +129,10 @@ export function EditorInspector() {
             activeBase?.kind === "edit" ? (
               <p className="text-sm text-ink-muted">选中的是一处失效的修改，它不生效。</p>
             ) : baseView ? (
-              baseView.hidden ? (
-                <p className="text-sm text-ink-muted">这条规则隐藏命中的物品，没有光柱和地图图标。</p>
-              ) : (
-                <>
-                  <LootScene effects={baseView.effects} label={baseRule?.label ?? ""} />
-                  <EffectSummary effects={baseView.effects} base={editsOn && edit ? base : undefined} />
-                </>
-              )
+              <>
+                <LootScene effects={baseView.effects} label={baseRule?.label ?? ""} hidden={baseView.hidden} />
+                <EffectSummary effects={baseView.effects} base={editsOn && edit ? base : undefined} />
+              </>
             ) : (
               <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器的规则…</p>
             )
@@ -147,7 +143,7 @@ export function EditorInspector() {
                 <p role="status" className="text-sm text-ink-muted">正在读取基础过滤器特效…</p>
               ) : active ? (
                 <>
-                  <LootScene effects={shownEffects} label={active.name || "示例物品"} />
+                  <LootScene effects={shownEffects} label={active.name || "示例物品"} hidden={active.hidden} />
                   <EffectSummary effects={shownEffects} base={previewBase} />
                 </>
               ) : (
