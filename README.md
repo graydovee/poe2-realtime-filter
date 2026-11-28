@@ -64,4 +64,4 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-wind
 npm run tauri -- build --ci --no-sign --target x86_64-pc-windows-msvc -- --locked
 ```
 
-安装包生成在 `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。正式发布由 `vX.Y.Z` 标签触发，GitHub Actions 构建带更新签名的安装包，并生成指向同一个安装包的 `latest.json`。发布说明出自提交信息：标题和摘要取打标签的那个提交，它的标题写成「发布 vX.Y.Z 摘要」，正文写这个版本的要点，改动清单是自上一个版本标签以来每个提交的标题。参见 [Windows 发布工作流](.github/workflows/release.yml)。
+安装包生成在 `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。正式发布由 `vX.Y.Z` 标签触发，GitHub Actions 构建带更新签名的安装包，并生成指向同一个安装包的 `latest.json`。GitHub Release 的标题固定是「PoE2 Realtime Filter vX.Y.Z」，说明是自上一个版本标签以来每个提交的标题，发布提交不算。参见 [Windows 发布工作流](.github/workflows/release.yml)。
